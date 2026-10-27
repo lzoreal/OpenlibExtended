@@ -258,6 +258,8 @@
   "mirrorCatalogueUnreachable": "Impossible de joindre open-slum.org – aucune liste de miroirs disponible",
   "mirrorFooterNote": "Les adresses des miroirs et leur état proviennent d’open-slum.org et sont actualisés automatiquement. Un miroir signalé DOWN n’est jamais contacté. La latence locale est mesurée par cet appareil lorsque vous touchez le bouton de vitesse.",
   "mirrorLatencyTestTooltip": "Tester la latence locale",
+  "mirrorLatencyHint": "Les miroirs locaux n’ont pas encore été testés ; la recherche peut être plus lente. Le test les trie selon votre propre latence.",
+  "mirrorLatencyGoTest": "Tester",
   "mirrorLatencyNotTested": "Latence locale non testée",
   "mirrorLatencyTesting": "Test de la latence locale…",
   "mirrorLatencyTimeout": "Délai local dépassé",

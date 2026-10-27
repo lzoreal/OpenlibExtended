@@ -12,6 +12,7 @@ import 'package:openlib/state/state.dart'
 import 'package:openlib/ui/components/book_card_widget.dart'
     show getFileType, getLanguage;
 import 'package:openlib/ui/components/language_names.dart';
+import 'package:openlib/ui/components/visible_builder.dart';
 import 'package:openlib/ui/swiss_grid.dart';
 
 /// Parses the size token out of the provider's comma-separated info line.
@@ -65,9 +66,6 @@ class SearchResultCard extends ConsumerWidget {
         : const AsyncValue<bool>.data(false);
 
     final hasThumbnail = thumbnail != null && thumbnail!.isNotEmpty;
-    final lazyCover =
-        hasThumbnail ? null : ref.watch(resultCoverProvider(link)).valueOrNull;
-    final coverUrl = hasThumbnail ? thumbnail : lazyCover;
 
     return InkWell(
       onTap: onClick,
@@ -81,42 +79,49 @@ class SearchResultCard extends ConsumerWidget {
               height: 80,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(SwissRadius.sm),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: coverUrl ?? '',
-                      fit: BoxFit.cover,
-                      httpHeaders: _coverHeaders(coverUrl),
-                      placeholder: (context, url) => _CoverFallback(
-                        scheme: scheme,
-                        title: title,
-                      ),
-                      errorWidget: (context, url, error) => _CoverFallback(
-                        scheme: scheme,
-                        title: title,
-                      ),
-                    ),
-                    if (isDownloaded.valueOrNull == true)
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: scheme.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: scheme.surface, width: 1),
+                child: VisibilityBuilder(
+                  builder: (context, visible) {
+                    if (!visible) {
+                      return _CoverFallback(scheme: scheme, title: title);
+                    }
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (hasThumbnail)
+                          _CoverImage(
+                            url: thumbnail!,
+                            title: title,
+                            scheme: scheme,
+                          )
+                        else
+                          _LazyResultCover(
+                            link: link,
+                            title: title,
+                            scheme: scheme,
                           ),
-                          child: Icon(
-                            Icons.check_rounded,
-                            size: 9,
-                            color: scheme.onPrimary,
+                        if (isDownloaded.valueOrNull == true)
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: scheme.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: scheme.surface, width: 1),
+                              ),
+                              child: Icon(
+                                Icons.check_rounded,
+                                size: 9,
+                                color: scheme.onPrimary,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -238,6 +243,56 @@ class _Dot extends StatelessWidget {
         shape: BoxShape.circle,
       ),
     );
+  }
+}
+
+class _CoverImage extends StatelessWidget {
+  const _CoverImage({
+    required this.url,
+    required this.title,
+    required this.scheme,
+  });
+
+  final String url;
+  final String title;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      httpHeaders: _coverHeaders(url),
+      placeholder: (context, url) => _CoverFallback(
+        scheme: scheme,
+        title: title,
+      ),
+      errorWidget: (context, url, error) => _CoverFallback(
+        scheme: scheme,
+        title: title,
+      ),
+    );
+  }
+}
+
+class _LazyResultCover extends ConsumerWidget {
+  const _LazyResultCover({
+    required this.link,
+    required this.title,
+    required this.scheme,
+  });
+
+  final String link;
+  final String title;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final url = ref.watch(resultCoverProvider(link)).valueOrNull;
+    if (url == null || url.isEmpty) {
+      return _CoverFallback(scheme: scheme, title: title);
+    }
+    return _CoverImage(url: url, title: title, scheme: scheme);
   }
 }
 

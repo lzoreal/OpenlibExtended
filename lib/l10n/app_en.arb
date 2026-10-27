@@ -1130,6 +1130,14 @@
   "@mirrorLatencyTestTooltip": {
     "description": "Mirrors settings page: AppBar button that measures this device's latency to enabled mirrors."
   },
+  "mirrorLatencyHint": "Local mirrors have not been tested; search may be slower. Testing sorts them by your own latency.",
+  "@mirrorLatencyHint": {
+    "description": "Search page hint shown when local mirror latency readings are missing or older than 24 hours"
+  },
+  "mirrorLatencyGoTest": "Test",
+  "@mirrorLatencyGoTest": {
+    "description": "Search page hint action that opens the mirrors page to run a local latency test"
+  },
   "mirrorLatencyNotTested": "Local latency not tested",
   "@mirrorLatencyNotTested": {
     "description": "Mirrors settings page: this device has no reading for the mirror yet."

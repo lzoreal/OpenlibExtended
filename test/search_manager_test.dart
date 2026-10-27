@@ -762,6 +762,41 @@ void main() {
           reason: 'result count must be logged');
     }, timeout: const Timeout(Duration(seconds: 30)));
 
+    test('hedges the first two mirrors so a slow mirror does not gate results',
+        () async {
+      final slow = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      slow.listen((request) async {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        request.response.headers.contentType = ContentType.html;
+        request.response.write(libgenHtml);
+        await request.response.close();
+      });
+      final fast = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      fast.listen((request) async {
+        request.response.headers.contentType = ContentType.html;
+        request.response.write(libgenHtml);
+        await request.response.close();
+      });
+
+      try {
+        final stopwatch = Stopwatch()..start();
+        final provider = LibgenProvider(mirrors: [
+          'http://127.0.0.1:${slow.port}',
+          'http://127.0.0.1:${fast.port}',
+        ]);
+
+        final books = await provider.search(const SearchQuery(text: 'flutter'));
+        stopwatch.stop();
+
+        expect(books, isNotEmpty);
+        expect(stopwatch.elapsed, lessThan(const Duration(milliseconds: 1500)),
+            reason: 'the fast mirror must win without waiting for the slow one');
+      } finally {
+        await slow.close(force: true);
+        await fast.close(force: true);
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
     test('a dead libgen mirror logs the failure before moving on', () async {
       // Port with nothing listening: connection refused, not a timeout.
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

@@ -829,6 +829,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mirrorLatencyTestTooltip => '测试本机延迟';
 
   @override
+  String get mirrorLatencyHint => '本机镜像未测速，搜索可能变慢。测速后会按本机延迟自动排序。';
+
+  @override
+  String get mirrorLatencyGoTest => '测速';
+
+  @override
   String get mirrorLatencyNotTested => '本机未测速';
 
   @override

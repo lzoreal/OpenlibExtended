@@ -1652,6 +1652,18 @@ abstract class AppLocalizations {
   /// **'Test local latency'**
   String get mirrorLatencyTestTooltip;
 
+  /// Search page hint shown when local mirror latency readings are missing or older than 24 hours
+  ///
+  /// In en, this message translates to:
+  /// **'Local mirrors have not been tested; search may be slower. Testing sorts them by your own latency.'**
+  String get mirrorLatencyHint;
+
+  /// Search page hint action that opens the mirrors page to run a local latency test
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get mirrorLatencyGoTest;
+
   /// Mirrors settings page: this device has no reading for the mirror yet.
   ///
   /// In en, this message translates to:

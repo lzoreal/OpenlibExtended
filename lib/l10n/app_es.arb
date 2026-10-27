@@ -258,6 +258,8 @@
   "mirrorCatalogueUnreachable": "No se pudo conectar con open-slum.org: no hay lista de espejos disponible",
   "mirrorFooterNote": "Las direcciones de los espejos y su estado provienen de open-slum.org y se actualizan automáticamente. Nunca se contacta con un espejo marcado como DOWN. La latencia local la mide este dispositivo al pulsar el botón de velocidad.",
   "mirrorLatencyTestTooltip": "Probar latencia local",
+  "mirrorLatencyHint": "Los espejos locales aún no se han probado; la búsqueda puede ser más lenta. La prueba los ordena según tu latencia.",
+  "mirrorLatencyGoTest": "Probar",
   "mirrorLatencyNotTested": "Latencia local sin probar",
   "mirrorLatencyTesting": "Probando latencia local…",
   "mirrorLatencyTimeout": "Tiempo de espera local agotado",

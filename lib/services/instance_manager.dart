@@ -84,6 +84,7 @@ class InstanceManager {
   static const String _orderKey = 'instance_manual_order';
   static const String _disabledKey = 'instance_disabled_hosts';
   static const String _localLatencyKey = 'instance_local_latency';
+  static const String _lastGoodMirrorKey = 'instance_last_good_mirror';
 
   /// Auto mode is the default: the user asked for the app to pick the
   /// easiest mirror itself and only reorder by hand if they opt in.
@@ -221,6 +222,28 @@ class InstanceManager {
         for (final entry in readings.entries) entry.key: entry.value.toJson(),
       }),
     );
+  }
+
+  /// The mirror URL that last answered a provider request successfully.
+  /// Providers try it first so a dead mirror at the top of the SLUM order
+  /// does not cost a full timeout on every search.
+  Future<String?> lastGoodMirror(MirrorService service) async {
+    final map = await _readHostMap(_lastGoodMirrorKey);
+    final list = map[service.name];
+    return (list == null || list.isEmpty) ? null : list.first;
+  }
+
+  Future<void> setLastGoodMirror(MirrorService service, String url) async {
+    final map = await _readHostMap(_lastGoodMirrorKey);
+    map[service.name] = [url];
+    await _writeHostMap(_lastGoodMirrorKey, map);
+  }
+
+  Future<void> clearLastGoodMirror(MirrorService service) async {
+    final map = await _readHostMap(_lastGoodMirrorKey);
+    if (map.remove(service.name) != null) {
+      await _writeHostMap(_lastGoodMirrorKey, map);
+    }
   }
 
   /// Every mirror of [service] in display order, including down and

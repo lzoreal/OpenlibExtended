@@ -258,6 +258,8 @@
   "mirrorCatalogueUnreachable": "open-slum.org nicht erreichbar – keine Spiegelliste verfügbar",
   "mirrorFooterNote": "Spiegeladressen und ihr Status stammen von open-slum.org und werden automatisch aktualisiert. Ein als DOWN gemeldeter Spiegel wird nie kontaktiert. Die lokale Latenz misst dieses Gerät, wenn du auf die Geschwindigkeitstaste tippst.",
   "mirrorLatencyTestTooltip": "Lokale Latenz testen",
+  "mirrorLatencyHint": "Lokale Spiegel wurden noch nicht getestet; die Suche kann langsamer sein. Nach dem Test werden sie nach deiner eigenen Latenz sortiert.",
+  "mirrorLatencyGoTest": "Testen",
   "mirrorLatencyNotTested": "Lokale Latenz nicht getestet",
   "mirrorLatencyTesting": "Lokale Latenz wird getestet…",
   "mirrorLatencyTimeout": "Lokale Zeitüberschreitung",

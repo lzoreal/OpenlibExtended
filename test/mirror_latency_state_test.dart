@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/services/instance_manager.dart';
+import 'package:openlib/services/mirror_latency.dart';
 import 'package:openlib/services/preference_store.dart';
 import 'package:openlib/services/slum_catalogue.dart';
 import 'package:openlib/state/state.dart';
@@ -52,6 +53,48 @@ void main() {
     await notifier.load();
 
     expect(notifier.state.readings['a.com']?.milliseconds, 85);
+    expect(notifier.state.loaded, isTrue);
+  });
+
+  test('hint shows only after loading and without fresh readings', () async {
+    final now = DateTime(2026, 10, 28, 12);
+    final fresh = MirrorLatencyReading(
+        milliseconds: 85, testedAt: now.subtract(const Duration(hours: 1)));
+    final expired = MirrorLatencyReading(
+        milliseconds: 85, testedAt: now.subtract(const Duration(hours: 25)));
+
+    expect(
+      shouldShowMirrorLatencyHint(const MirrorLatencyState(), now),
+      isFalse,
+      reason: 'the notifier has not loaded yet',
+    );
+    expect(
+      shouldShowMirrorLatencyHint(
+          const MirrorLatencyState(loaded: true), now),
+      isTrue,
+    );
+    expect(
+      shouldShowMirrorLatencyHint(
+        MirrorLatencyState(loaded: true, readings: {'a.com': fresh}),
+        now,
+      ),
+      isFalse,
+    );
+    expect(
+      shouldShowMirrorLatencyHint(
+        MirrorLatencyState(loaded: true, readings: {'a.com': expired}),
+        now,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldShowMirrorLatencyHint(
+        const MirrorLatencyState(loaded: true, testing: true),
+        now,
+      ),
+      isTrue,
+      reason: 'the hint stays in place to show test progress',
+    );
   });
 
   test('measures only enabled, non-down hosts', () async {
@@ -74,6 +117,7 @@ void main() {
     expect(result.reachable, 1);
     expect(result.fastestMs, 85);
     expect(notifier.state.testing, isFalse);
+    expect(notifier.state.loaded, isTrue);
     expect((await manager.localLatencies())['a.com']?.milliseconds, 85);
   });
 

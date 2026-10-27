@@ -318,23 +318,43 @@ class MirrorLatencyState {
     this.testing = false,
     this.testingHosts = const <String>{},
     this.readings = const <String, MirrorLatencyReading>{},
+    this.loaded = false,
   });
 
   final bool testing;
   final Set<String> testingHosts;
   final Map<String, MirrorLatencyReading> readings;
 
+  /// Whether persisted readings have been read at least once, so an empty
+  /// [readings] map means "never tested" rather than "still loading".
+  final bool loaded;
+
   MirrorLatencyState copyWith({
     bool? testing,
     Set<String>? testingHosts,
     Map<String, MirrorLatencyReading>? readings,
+    bool? loaded,
   }) {
     return MirrorLatencyState(
       testing: testing ?? this.testing,
       testingHosts: testingHosts ?? this.testingHosts,
       readings: readings ?? this.readings,
+      loaded: loaded ?? this.loaded,
     );
   }
+}
+
+/// True when no local latency reading is fresh enough to affect ordering.
+bool hasFreshMirrorLatency(
+    Map<String, MirrorLatencyReading> readings, DateTime now) {
+  return readings.values.any((reading) => reading.isFreshAt(now));
+}
+
+/// The search page nudges the user after readings have loaded and every
+/// stored reading is missing or older than 24 hours. It stays visible while
+/// a test runs so the hint can show progress in place.
+bool shouldShowMirrorLatencyHint(MirrorLatencyState state, DateTime now) {
+  return state.loaded && !hasFreshMirrorLatency(state.readings, now);
 }
 
 @immutable
@@ -370,7 +390,7 @@ class MirrorLatencyNotifier extends StateNotifier<MirrorLatencyState> {
 
   Future<void> load() async {
     final readings = await _manager.localLatencies();
-    if (mounted) state = state.copyWith(readings: readings);
+    if (mounted) state = state.copyWith(readings: readings, loaded: true);
   }
 
   Future<MirrorLatencyResult> test(Iterable<InstanceView> views) async {
@@ -394,7 +414,9 @@ class MirrorLatencyNotifier extends StateNotifier<MirrorLatencyState> {
       final results = await _measure(targets.map((site) => site.url));
       await _manager.saveLocalLatencies(results, testedAt: _clock());
       final readings = await _manager.localLatencies();
-      if (mounted) state = MirrorLatencyState(readings: readings);
+      if (mounted) {
+        state = MirrorLatencyState(readings: readings, loaded: true);
+      }
 
       var reachable = 0;
       int? fastest;

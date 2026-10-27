@@ -889,6 +889,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get mirrorLatencyTestTooltip => 'Tester la latence locale';
 
   @override
+  String get mirrorLatencyHint =>
+      'Les miroirs locaux n’ont pas encore été testés ; la recherche peut être plus lente. Le test les trie selon votre propre latence.';
+
+  @override
+  String get mirrorLatencyGoTest => 'Tester';
+
+  @override
   String get mirrorLatencyNotTested => 'Latence locale non testée';
 
   @override

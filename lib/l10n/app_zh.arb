@@ -258,6 +258,8 @@
   "mirrorCatalogueUnreachable": "无法访问 open-slum.org，暂无镜像列表",
   "mirrorFooterNote": "镜像地址与状态来自 open-slum.org 并自动刷新。标记为 DOWN 的镜像永远不会被访问。点右上角测速按钮可测本机到已启用节点的延迟。",
   "mirrorLatencyTestTooltip": "测试本机延迟",
+  "mirrorLatencyHint": "本机镜像未测速，搜索可能变慢。测速后会按本机延迟自动排序。",
+  "mirrorLatencyGoTest": "测速",
   "mirrorLatencyNotTested": "本机未测速",
   "mirrorLatencyTesting": "本机测速中…",
   "mirrorLatencyTimeout": "本机超时",

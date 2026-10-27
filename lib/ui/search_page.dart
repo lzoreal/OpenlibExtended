@@ -11,13 +11,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Project imports:
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/google_suggest_api.dart';
+import 'package:openlib/services/instance_manager.dart';
+import 'package:openlib/services/mirror_latency.dart';
 import 'package:openlib/services/recent_searches.dart';
 import 'package:openlib/state/state.dart'
     show
         enableFiltersState,
         fileType,
         getTrendingBooks,
+        instanceManagerProvider,
         languageValues,
+        mirrorLatencyProvider,
         searchAuthorProvider,
         searchProviderToggles,
         searchSourceOrderProvider,
@@ -30,6 +34,7 @@ import 'package:openlib/state/state.dart'
         selectedSourceState,
         selectedTypeState,
         selectedYearState,
+        shouldShowMirrorLatencyHint,
         sortValues,
         typeValues,
         yearValues;
@@ -37,6 +42,7 @@ import 'package:openlib/ui/components/active_downloads_widget.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/edge_fade.dart';
 import 'package:openlib/ui/components/inline_hint.dart';
+import 'package:openlib/ui/components/mirror_latency_hint.dart';
 import 'package:openlib/ui/components/page_header.dart';
 import 'package:openlib/ui/components/pill_tabs.dart';
 import 'package:openlib/ui/components/search_source_meta.dart';
@@ -67,6 +73,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
   late final TabController _modeController;
   int _suggestionRequest = 0;
   _SearchMode _mode = _SearchMode.suggestions;
+  bool _mirrorTestStarting = false;
 
   @override
   void initState() {
@@ -80,6 +87,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
     _searchController =
         TextEditingController(text: ref.read(searchQueryProvider));
     _searchFocusNode = FocusNode();
+    unawaited(ref.read(mirrorLatencyProvider.notifier).load());
     ref.listenManual(searchQueryProvider, (previous, next) {
       if (_searchController.text != next) {
         _searchController.text = next;
@@ -87,6 +95,43 @@ class _SearchPageState extends ConsumerState<SearchPage>
             TextSelection.fromPosition(TextPosition(offset: next.length));
       }
     });
+  }
+
+  Future<void> _runMirrorLatencyTest() async {
+    if (_mirrorTestStarting || ref.read(mirrorLatencyProvider).testing) {
+      return;
+    }
+    _mirrorTestStarting = true;
+
+    final l10n = AppLocalizations.of(context);
+    try {
+      final manager = ref.read(instanceManagerProvider);
+      final views = <InstanceView>[];
+      for (final service in MirrorService.values) {
+        views.addAll(await manager.instances(service));
+      }
+
+      final result = await ref.read(mirrorLatencyProvider.notifier).test(views);
+      if (!mounted) return;
+      final message = result.total == 0
+          ? l10n.mirrorLatencyNoTargets
+          : result.reachable == 0
+              ? l10n.mirrorLatencyAllTimedOut
+              : l10n.mirrorLatencyDone(
+                  result.reachable,
+                  result.total,
+                  formatMirrorLatency(result.fastestMs!),
+                );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.mirrorLatencyFailed('$e'))),
+      );
+    } finally {
+      _mirrorTestStarting = false;
+    }
   }
 
   void _syncMode() {
@@ -379,6 +424,8 @@ class _SearchPageState extends ConsumerState<SearchPage>
                     _SuggestionsTab(
                       query: query,
                       onSearch: (value) => _submit(value),
+                      onTestMirrors: () =>
+                          unawaited(_runMirrorLatencyTest()),
                     ),
                   ],
                 ),
@@ -983,20 +1030,37 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
 }
 
 class _SuggestionsTab extends ConsumerWidget {
-  const _SuggestionsTab({required this.query, required this.onSearch});
+  const _SuggestionsTab({
+    required this.query,
+    required this.onSearch,
+    required this.onTestMirrors,
+  });
 
   final String query;
   final ValueChanged<String> onSearch;
+  final VoidCallback onTestMirrors;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
+      final showLatencyHint = shouldShowMirrorLatencyHint(
+        ref.watch(mirrorLatencyProvider),
+        DateTime.now(),
+      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _SearchSourceSelector(),
+          if (showLatencyHint) ...[
+            const SizedBox(height: 12),
+            MirrorLatencyHint(
+              show: true,
+              testing: ref.watch(mirrorLatencyProvider).testing,
+              onTest: onTestMirrors,
+            ),
+          ],
           _RecentSearchesSection(onSearch: onSearch),
           _TryTheseSection(onSearch: onSearch),
           const SizedBox(height: 16),

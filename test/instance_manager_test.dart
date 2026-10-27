@@ -290,4 +290,25 @@ void main() {
       expect(readings[moved]?.isFreshAt(DateTime.now()), isFalse);
     });
   });
+
+  group('last good mirror', () {
+    test('persists per service and can be cleared', () async {
+      expect(await manager.lastGoodMirror(MirrorService.zlibrary), isNull);
+
+      await manager.setLastGoodMirror(
+          MirrorService.zlibrary, 'https://z-lib.gd');
+      expect(await manager.lastGoodMirror(MirrorService.zlibrary),
+          'https://z-lib.gd');
+      expect(await manager.lastGoodMirror(MirrorService.libgen), isNull,
+          reason: 'services keep separate memories');
+
+      final second = InstanceManager.forTest(store: store);
+      expect(await second.lastGoodMirror(MirrorService.zlibrary),
+          'https://z-lib.gd',
+          reason: 'the memory survives a new InstanceManager');
+
+      await manager.clearLastGoodMirror(MirrorService.zlibrary);
+      expect(await manager.lastGoodMirror(MirrorService.zlibrary), isNull);
+    });
+  });
 }

@@ -15,6 +15,8 @@ import 'package:dio/dio.dart';
 
 // Project imports:
 import 'package:openlib/services/diamwall_solver.dart';
+import 'package:openlib/services/instance_manager.dart';
+import 'package:openlib/services/preference_store.dart';
 import 'package:openlib/services/search_manager.dart';
 
 void main() {
@@ -420,6 +422,52 @@ void main() {
     });
   });
 
+  group('last good mirror', () {
+    test('tries the remembered mirror first and keeps the winner', () async {
+      var firstHits = 0;
+      var secondHits = 0;
+
+      Future<HttpServer> start(void Function() hit) async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        server.listen((request) async {
+          hit();
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.html
+            ..write(results);
+          await request.response.close();
+        });
+        return server;
+      }
+
+      final first = await start(() => firstHits++);
+      final second = await start(() => secondHits++);
+      final store = MemoryPreferenceStore();
+      final manager = InstanceManager.forTest(store: store);
+      final firstUrl = 'http://127.0.0.1:${first.port}';
+      final secondUrl = 'http://127.0.0.1:${second.port}';
+      await manager.setLastGoodMirror(MirrorService.zlibrary, secondUrl);
+
+      try {
+        final provider = ZlibraryProvider(
+          mirrors: [firstUrl, secondUrl],
+          instanceManager: manager,
+        );
+
+        final books =
+            await provider.search(const SearchQuery(text: 'docker'));
+
+        expect(books, isNotEmpty);
+        expect(secondHits, greaterThan(0));
+        expect(firstHits, 0,
+            reason: 'the remembered mirror must be tried first');
+        expect(await manager.lastGoodMirror(MirrorService.zlibrary), secondUrl);
+      } finally {
+        await first.close(force: true);
+        await second.close(force: true);
+      }
+    });
+  });
 }
 
 /// SHA1 digest bytes for the PoW verification test.

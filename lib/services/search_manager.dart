@@ -332,25 +332,46 @@ class LibgenProvider implements SearchProvider {
     });
 
     Object? lastError;
-    for (final mirror in mirrors) {
+
+    Future<List<BookData>?> searchMirror(String mirror) async {
       try {
         final response = await _dio.get('$mirror/index.php?$params&res=100');
         if (response.statusCode != 200) {
           _logger.warning('Libgen mirror answered with a non-200',
               tag: 'LibgenProvider',
               metadata: {'mirror': mirror, 'status': response.statusCode});
-          continue;
+          return null;
         }
-        final books = parseResults(response.data.toString(), mirror);
-        _logger.info('Libgen search returned ${books.length} books',
-            tag: 'LibgenProvider', metadata: {'mirror': mirror});
-        return books;
+        return parseResults(response.data.toString(), mirror);
       } catch (e) {
         lastError = e;
         _logger.warning('Libgen mirror failed, trying next',
             tag: 'LibgenProvider', error: e, metadata: {'mirror': mirror});
+        return null;
       }
     }
+
+    // A slow first mirror must not gate the first results: start the second
+    // shortly after and keep whichever answers first.
+    final winner = await hedgeFirst<List<BookData>>(
+      [for (final mirror in mirrors) () => searchMirror(mirror)],
+    );
+    if (winner != null) {
+      _logger.info('Libgen search returned ${winner.length} books',
+          tag: 'LibgenProvider');
+      return winner;
+    }
+
+    // The hedged pair failed; give the rest one quiet try each.
+    for (final mirror in mirrors.skip(2)) {
+      final books = await searchMirror(mirror);
+      if (books != null) {
+        _logger.info('Libgen search returned ${books.length} books',
+            tag: 'LibgenProvider', metadata: {'mirror': mirror});
+        return books;
+      }
+    }
+
     _logger.error('All libgen mirrors failed',
         tag: 'LibgenProvider', error: lastError);
     throw Exception('Library Genesis unreachable: $lastError');
@@ -379,8 +400,11 @@ class ZlibraryDownload {
 /// parsing results. It still yields an empty result when every mirror
 /// fails instead of failing the whole search.
 class ZlibraryProvider implements SearchProvider {
-  ZlibraryProvider({Dio? dio, List<String>? mirrors})
-      : _dio = dio ??
+  ZlibraryProvider({
+    Dio? dio,
+    List<String>? mirrors,
+    InstanceManager? instanceManager,
+  })  : _dio = dio ??
             createDioWithLogging(
                 options: BaseOptions(
               connectTimeout: const Duration(seconds: 6),
@@ -388,6 +412,7 @@ class ZlibraryProvider implements SearchProvider {
               headers: _browserHeaders,
             )),
         _mirrors = mirrors,
+        _instanceManager = instanceManager,
         _solver = DiamWallSolver();
 
   final AppLogger _logger = AppLogger();
@@ -401,14 +426,35 @@ class ZlibraryProvider implements SearchProvider {
   /// browser-only gates are filtered out entirely, because a 503 from
   /// them can never be passed headlessly.
   Future<List<String>> _resolveMirrors() async {
-    return InstanceManager().enabledUrls(
+    return (_instanceManager ?? InstanceManager()).enabledUrls(
       MirrorService.zlibrary,
       headlessOnly: !WebviewChallengeSolver.isSupported,
     );
   }
 
+  /// Tests that inject a fixed mirror list must not touch the app database,
+  /// while production (no injected mirrors) always has a memory store.
+  InstanceManager? get _mirrorMemory =>
+      _instanceManager ?? (_mirrors == null ? InstanceManager() : null);
+
+  Future<List<String>> _orderedMirrors() async {
+    final mirrors = [...(_mirrors ?? await _resolveMirrors())];
+    final memory = _mirrorMemory;
+    if (memory == null || mirrors.length < 2) return mirrors;
+    if (!await memory.isAutoMode()) return mirrors;
+
+    final lastGood = await memory.lastGoodMirror(MirrorService.zlibrary);
+    final index = lastGood == null ? -1 : mirrors.indexOf(lastGood);
+    if (index <= 0) return mirrors;
+
+    final remembered = mirrors.removeAt(index);
+    mirrors.insert(0, remembered);
+    return mirrors;
+  }
+
   final Dio _dio;
   final List<String>? _mirrors;
+  final InstanceManager? _instanceManager;
   final DiamWallSolver _solver;
 
   @override
@@ -419,7 +465,7 @@ class ZlibraryProvider implements SearchProvider {
 
   @override
   Future<List<BookData>> search(SearchQuery query) async {
-    final mirrors = _mirrors ?? await _resolveMirrors();
+    final mirrors = await _orderedMirrors();
 
     _logger.info('Searching Z-Library', tag: 'ZlibraryProvider', metadata: {
       'query': query.text,
@@ -480,6 +526,10 @@ class ZlibraryProvider implements SearchProvider {
         if (books.isNotEmpty) {
           _logger.info('Z-Library search returned ${books.length} books',
               tag: 'ZlibraryProvider', metadata: {'mirror': mirror});
+          final memory = _mirrorMemory;
+          if (memory != null) {
+            await memory.setLastGoodMirror(MirrorService.zlibrary, mirror);
+          }
           return books;
         }
       } catch (e) {
@@ -543,7 +593,7 @@ class ZlibraryProvider implements SearchProvider {
   /// link serves the file directly, exactly like libgen's get.php.
   /// Null when every mirror fails or the page cannot be parsed.
   Future<BookInfoData?> bookInfo(String url) async {
-    final mirrors = _mirrors ?? await _resolveMirrors();
+    final mirrors = await _orderedMirrors();
     final path = Uri.parse(url).path;
 
     final winner = await hedgeFirst<BookInfoData>(
@@ -676,7 +726,7 @@ class ZlibraryProvider implements SearchProvider {
   /// visible (actions section) ones first. Empty when the page cannot
   /// be fetched or parsed on any mirror.
   Future<List<String>> _allDownloadLinks(String bookPageUrl) async {
-    final mirrors = _mirrors ?? await _resolveMirrors();
+    final mirrors = await _orderedMirrors();
     final path = Uri.parse(bookPageUrl).path;
     final acceptAnyStatus = Options(validateStatus: (_) => true);
 
