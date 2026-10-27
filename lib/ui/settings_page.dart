@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/files.dart';
 import 'package:openlib/services/platform_utils.dart';
@@ -25,23 +26,30 @@ import 'package:openlib/services/database.dart';
 import 'package:openlib/services/logger.dart';
 import 'package:openlib/services/search_manager.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/components/page_header.dart';
+import 'package:openlib/ui/components/pill_tabs.dart';
+import 'package:openlib/ui/components/settings_row.dart';
+import 'package:openlib/ui/swiss_grid.dart';
+import 'package:openlib/ui/components/search_source_meta.dart';
 import 'package:openlib/ui/components/snack_bar_widget.dart';
 import 'package:openlib/ui/about_page.dart';
 import 'package:openlib/ui/instances_page.dart';
 import 'package:openlib/ui/onboarding/onboarding_page.dart';
+import 'package:openlib/ui/themes.dart' show openlibColorScheme;
 
 import 'package:openlib/state/state.dart'
     show
         themeModeProvider,
         fontSizeScaleProvider,
-        openPdfWithExternalAppProvider,
-        openEpubWithExternalAppProvider,
         showManualDownloadButtonProvider,
         backgroundVerificationProvider,
         donationKeyProvider,
         myLibraryProvider,
         searchProviderToggles,
-        localeOverrideProvider;
+        searchSourceOrderProvider,
+        localeOverrideProvider,
+        downloadManagerProvider;
 
 // Scans a directory for book files (epub, pdf) and imports them to the library database
 Future<void> scanAndImportBooks(
@@ -141,42 +149,38 @@ class _SettingsSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10, left: 4, top: 4),
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+        style: SwissText.micro.copyWith(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.66,
         ),
       ),
     );
   }
 }
 
-/// Card wrapping an embedded control (dropdown, slider) with a bold label.
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.title, required this.child});
+/// Groups rows into one tonal card with inset dividers.
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
 
-  final String title;
-  final Widget child;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          child,
+          for (var index = 0; index < children.length; index++) ...[
+            if (index > 0) const Divider(height: 1, indent: 56, endIndent: 16),
+            children[index],
+          ],
         ],
       ),
     );
@@ -191,6 +195,7 @@ class _SettingsTile extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.busy = false,
+    this.showChevron = true,
     this.onTap,
   });
 
@@ -198,36 +203,27 @@ class _SettingsTile extends StatelessWidget {
   final String? subtitle;
   final IconData? icon;
   final bool busy;
+  final bool showChevron;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final Widget resolvedTrailing = busy
+    final Widget? resolvedTrailing = busy
         ? const SizedBox(
-            width: 22,
-            height: 22,
+            width: 20,
+            height: 20,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
-        : const Icon(Icons.chevron_right);
+        : showChevron
+            ? const Icon(Icons.chevron_right, size: 20)
+            : null;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: scheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          onTap: onTap,
-          leading: icon != null ? Icon(icon, color: scheme.secondary) : null,
-          title:
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: subtitle != null
-              ? Text(subtitle!, style: const TextStyle(fontSize: 12))
-              : null,
-          trailing: resolvedTrailing,
-        ),
-      ),
+    return SettingsRow(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      trailing: resolvedTrailing,
+      onTap: onTap,
     );
   }
 }
@@ -237,66 +233,105 @@ class _SettingsSwitchTile extends StatelessWidget {
   const _SettingsSwitchTile({
     required this.title,
     this.subtitle,
+    this.icon,
     required this.value,
     required this.onChanged,
   });
 
   final String title;
   final String? subtitle;
+  final IconData? icon;
   final bool value;
   final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Theme.of(context).colorScheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: SwitchListTile(
-          value: value,
-          onChanged: onChanged,
-          activeThumbColor: Theme.of(context).colorScheme.secondary,
-          title:
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: subtitle != null
-              ? Text(subtitle!, style: const TextStyle(fontSize: 12))
-              : null,
-        ),
+    return SettingsRow(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
       ),
+      onTap: onChanged == null ? null : () => onChanged!(!value),
     );
   }
 }
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch useful providers
-    final themeMode = ref.watch(themeModeProvider);
-    final openPdfExternal = ref.watch(openPdfWithExternalAppProvider);
-    final openEpubExternal = ref.watch(openEpubWithExternalAppProvider);
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController =
+      TabController(length: 4, vsync: this);
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final showManualDownload = ref.watch(showManualDownloadButtonProvider);
     final backgroundVerification = ref.watch(backgroundVerificationProvider);
-    final fontSizeScale = ref.watch(fontSizeScaleProvider);
     final l10n = AppLocalizations.of(context);
+    final dataBase = MyLibraryDb.instance;
 
-    MyLibraryDb dataBase = MyLibraryDb.instance;
+    return ContentWidth(
+      maxWidth: 900,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: PageHeader(
+              eyebrow: l10n.settingsEyebrow,
+              title: l10n.settingsTitle,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            ),
+          ),
+          PillTabs(
+            controller: _tabController,
+            tabs: [
+              Tab(text: l10n.searchProvidersSection),
+              Tab(text: l10n.appearanceSection),
+              Tab(text: l10n.advancedSection),
+              Tab(text: l10n.aboutSection),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _sourcesTab(context, ref, dataBase, l10n),
+                _appearanceTab(context, ref, dataBase, l10n),
+                _advancedTab(context, ref, dataBase, l10n, showManualDownload,
+                    backgroundVerification),
+                _aboutTab(context, ref, dataBase, l10n),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _sourcesTab(BuildContext context, WidgetRef ref, MyLibraryDb dataBase,
+      AppLocalizations l10n) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        const _SearchProvidersWidget(),
+        _SettingsSectionHeader(l10n.sourceBehaviorSection),
+        _SettingsGroup(
           children: [
-            Text(l10n.settingsTitle,
-                style: Theme.of(context).textTheme.displayLarge),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.searchProvidersSection),
-            const _SearchProvidersWidget(),
-            _SettingsSectionHeader(l10n.libraryInstancesSection),
             _SettingsTile(
               title: l10n.mirrorsAndProviders,
               icon: Icons.dns,
@@ -307,70 +342,66 @@ class SettingsPage extends ConsumerWidget {
                         builder: (context) => const InstancesPage()));
               },
             ),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.appearanceSection),
-            _SettingsCard(
-              title: l10n.languageSetting,
-              child: _LanguageSelectorWidget(),
+            _SettingsTile(
+              title: l10n.donationKeyTitle,
+              subtitle: l10n.enterKeyForFasterDownloads,
+              icon: Icons.key,
+              onTap: () => _showDonationKeyDialog(context, ref, dataBase),
             ),
-            _SettingsCard(
-              title: l10n.themeTitle,
-              child: DropdownButtonFormField<ThemeMode>(
-                initialValue: themeMode,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                items: [
-                  DropdownMenuItem(
-                      value: ThemeMode.system,
-                      child: Text(l10n.followSystem)),
-                  DropdownMenuItem(
-                      value: ThemeMode.light, child: Text(l10n.lightTheme)),
-                  DropdownMenuItem(
-                      value: ThemeMode.dark, child: Text(l10n.darkTheme)),
-                ],
-                onChanged: (ThemeMode? val) {
-                  if (val != null) {
-                    ref.read(themeModeProvider.notifier).setTheme(val);
-                  }
-                },
-              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _appearanceTab(BuildContext context, WidgetRef ref,
+      MyLibraryDb dataBase, AppLocalizations l10n) {
+    return ListView(
+      key: const ValueKey('appearance-list'),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        _SettingsGroup(
+          children: const [_LanguageSelectorWidget()],
+        ),
+        _SettingsSectionHeader(l10n.themeTitle),
+        _SettingsGroup(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: _ThemeSelectorWidget(),
             ),
-            _SettingsCard(
-              title: l10n.fontSizeTitle,
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(l10n.scaleValue(fontSizeScale.toStringAsFixed(1))),
-                      Text(l10n.preview,
-                          textScaler: TextScaler.linear(fontSizeScale)),
-                    ],
-                  ),
-                  Slider(
-                    value: fontSizeScale,
-                    min: 0.8,
-                    max: 2.0,
-                    divisions: 12,
-                    label: fontSizeScale.toStringAsFixed(1),
-                    onChanged: (val) {
-                      ref.read(fontSizeScaleProvider.notifier).state = val;
-                    },
-                    onChangeEnd: (val) {
-                      dataBase.savePreference('fontSizeScale', val.toString());
-                    },
-                  ),
-                ],
-              ),
+          ],
+        ),
+        _SettingsSectionHeader(l10n.displaySection),
+        _SettingsGroup(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: _FontSizeSelector(dataBase: dataBase),
             ),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.generalSection),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _advancedTab(
+      BuildContext context,
+      WidgetRef ref,
+      MyLibraryDb dataBase,
+      AppLocalizations l10n,
+      bool showManualDownload,
+      bool backgroundVerification) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        _SettingsSectionHeader(l10n.generalSection),
+        _SettingsGroup(
+          children: [
             FutureBuilder<dynamic>(
               future: dataBase.getPreference('bookStorageDirectory'),
               builder: (context, snapshot) {
-                String subtitle = "Change where books are saved";
+                String subtitle = l10n.changeStorageHint;
                 if (snapshot.hasData && snapshot.data is String) {
                   subtitle = snapshot.data as String;
                 }
@@ -385,11 +416,6 @@ class SettingsPage extends ConsumerWidget {
                     if (pickedDirectory == null) return;
                     await requestStoragePermission();
 
-                    // Move the books from wherever they live now - the
-                    // old code only moved them when leaving the internal
-                    // default, so switching between two custom folders
-                    // left every file behind and the library showed
-                    // "File not found" on the next open.
                     if (currentDirectory != pickedDirectory) {
                       await moveLibraryFiles(currentDirectory, pickedDirectory);
                     }
@@ -399,38 +425,20 @@ class SettingsPage extends ConsumerWidget {
                     await scanAndImportBooks(pickedDirectory, dataBase, ref);
                     // ignore: unused_result
                     ref.refresh(myLibraryProvider);
-                    // The FutureBuilder reads the db future directly, so
-                    // rebuild manually to show the new path immediately.
                     (context as Element).markNeedsBuild();
                   },
                 );
               },
             ),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.readerSection),
-            _SettingsSwitchTile(
-              title: l10n.openPdfExternally,
-              subtitle: l10n.useDefaultPdfViewer,
-              value: openPdfExternal,
-              onChanged: (val) {
-                ref.read(openPdfWithExternalAppProvider.notifier).state = val;
-                dataBase.savePreference('openPdfwithExternalApp', val);
-              },
-            ),
-            _SettingsSwitchTile(
-              title: l10n.openEpubExternally,
-              subtitle: l10n.useDefaultEpubReader,
-              value: openEpubExternal,
-              onChanged: (val) {
-                ref.read(openEpubWithExternalAppProvider.notifier).state = val;
-                dataBase.savePreference('openEpubwithExternalApp', val);
-              },
-            ),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.advancedSection),
+          ],
+        ),
+        _SettingsSectionHeader(l10n.behaviorSection),
+        _SettingsGroup(
+          children: [
             _SettingsSwitchTile(
               title: l10n.manualDownloadButton,
               subtitle: l10n.showManualDownloadHint,
+              icon: Icons.download_outlined,
               value: showManualDownload,
               onChanged: (val) {
                 ref.read(showManualDownloadButtonProvider.notifier).state = val;
@@ -440,28 +448,163 @@ class SettingsPage extends ConsumerWidget {
             _SettingsSwitchTile(
               title: l10n.backgroundVerification,
               subtitle: l10n.backgroundVerificationHint,
+              icon: Icons.verified_user_outlined,
               value: backgroundVerification,
               onChanged: (val) {
                 ref.read(backgroundVerificationProvider.notifier).state = val;
                 WebviewChallengeSolver.headlessEnabled = val;
-                dataBase.savePreference(
-                    'backgroundVerification', val ? 1 : 0);
+                dataBase.savePreference('backgroundVerification', val ? 1 : 0);
               },
             ),
+          ],
+        ),
+        const _UpdateSettingsWidget(),
+        _SettingsSectionHeader(l10n.backupSection),
+        _BackupSettingsWidget(database: dataBase),
+        _SettingsSectionHeader(l10n.maintenanceSection),
+        _SettingsGroup(
+          children: [
             _SettingsTile(
-              title: l10n.donationKeyTitle,
-              subtitle: l10n.enterKeyForFasterDownloads,
-              icon: Icons.key,
-              onTap: () => _showDonationKeyDialog(context, ref, dataBase),
+              title: l10n.exportLogs,
+              subtitle: l10n.shareDiagnosticLogs,
+              icon: Icons.bug_report,
+              onTap: () => _exportLogs(context),
             ),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.backupSection),
-            _BackupSettingsWidget(database: dataBase),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.updatesSection),
-            const _UpdateSettingsWidget(),
-            const SizedBox(height: 20),
-            _SettingsSectionHeader(l10n.aboutSection),
+            _SettingsTile(
+              title: l10n.redoOnboarding,
+              subtitle: l10n.resetAppSetup,
+              icon: Icons.restart_alt,
+              onTap: () => _redoOnboarding(context, dataBase),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _aboutTab(BuildContext context, WidgetRef ref, MyLibraryDb dataBase,
+      AppLocalizations l10n) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snapshot) {
+            final version =
+                snapshot.hasData ? 'v${snapshot.data!.version}' : '';
+            final scheme = Theme.of(context).colorScheme;
+            return Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: scheme.primary.withValues(alpha: 0.24),
+                            blurRadius: 22,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        'O',
+                        style: TextStyle(
+                          color: scheme.onPrimary,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'OpenlibExtended',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelLarge
+                                ?.copyWith(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            version.isEmpty
+                                ? 'AGPL-3.0'
+                                : '$version · AGPL-3.0',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'AGPL-3.0',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: scheme.secondary,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        _SettingsSectionHeader(l10n.infoSection),
+        _SettingsGroup(
+          children: [
+            _SettingsTile(
+              title: l10n.changelogTitle,
+              icon: Icons.history,
+              onTap: () => _launchUrl(
+                context,
+                'https://github.com/lzoreal/OpenlibExtended/releases',
+              ),
+            ),
+            _SettingsTile(
+              title: l10n.openSourceLicenses,
+              icon: Icons.gavel_outlined,
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'OpenlibExtended',
+              ),
+            ),
+            _SettingsTile(
+              title: l10n.projectHome,
+              icon: Icons.language,
+              onTap: () => _launchUrl(
+                context,
+                'https://github.com/lzoreal/OpenlibExtended',
+              ),
+            ),
             _SettingsTile(
               title: l10n.aboutOpenlib,
               icon: Icons.info_outline,
@@ -470,64 +613,78 @@ class SettingsPage extends ConsumerWidget {
                     MaterialPageRoute(builder: (context) => const AboutPage()));
               },
             ),
-            _SettingsTile(
-              title: l10n.redoOnboarding,
-              subtitle: l10n.resetAppSetup,
-              icon: Icons.restart_alt,
-              onTap: () async {
-                // Clear relevant preferences
-                await dataBase.savePreference('onboardingCompleted', 0);
-
-                if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                        builder: (context) => const OnboardingPage()),
-                    (route) => false,
-                  );
-                }
-              },
-            ),
-            _SettingsTile(
-              title: l10n.exportLogs,
-              subtitle: l10n.shareDiagnosticLogs,
-              icon: Icons.bug_report,
-              onTap: () async {
-                final l10n = AppLocalizations.of(context);
-                try {
-                  await AppLogger().exportLogs();
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text(l10n.failedExportLogs('$e'))),
-                    );
-                  }
-                }
-              },
-            ),
-            const SizedBox(height: 20),
-            FutureBuilder<PackageInfo>(
-              future: PackageInfo.fromPlatform(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  return Center(
-                    child: Text(
-                      "Version ${snapshot.data!.version}+${snapshot.data!.buildNumber}",
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.tertiary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            const SizedBox(height: 20),
           ],
         ),
-      ),
+        _SettingsSectionHeader(l10n.thanksSection),
+        _SettingsGroup(
+          children: [
+            _SettingsTile(
+              title: l10n.slumCatalogue,
+              subtitle: l10n.slumCatalogueSubtitle,
+              icon: Icons.dns_outlined,
+              onTap: () => _launchUrl(context, 'https://open-slum.org'),
+            ),
+            _SettingsTile(
+              title: l10n.challengeSolverTitle,
+              subtitle: l10n.challengeSolverSubtitle,
+              icon: Icons.shield_outlined,
+              showChevron: false,
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+          child: Text(
+            l10n.aboutDisclaimer,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                  fontSize: 10.5,
+                  height: 1.7,
+                ),
+          ),
+        ),
+      ],
     );
+  }
+
+  Future<void> _launchUrl(BuildContext context, String url) async {
+    final l10n = AppLocalizations.of(context);
+    if (!await launchUrl(Uri.parse(url),
+        mode: LaunchMode.externalApplication)) {
+      if (context.mounted) {
+        showSnackBar(context: context, message: l10n.couldNotLaunch(url));
+      }
+    }
+  }
+
+  Future<void> _exportLogs(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      await AppLogger().exportLogs(
+        saveDialogTitle: l10n.exportLogs,
+        shareSubject: l10n.appLogsShareSubject,
+        shareText:
+            l10n.appLogsShareText(AppLogger.logRetentionDuration.inMinutes),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.failedExportLogs('$e'))),
+        );
+      }
+    }
+  }
+
+  Future<void> _redoOnboarding(
+      BuildContext context, MyLibraryDb dataBase) async {
+    await dataBase.savePreference('onboardingCompleted', 0);
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const OnboardingPage()),
+        (route) => false,
+      );
+    }
   }
 
   void _showDonationKeyDialog(
@@ -612,9 +769,7 @@ class _UpdateSettingsWidgetState extends State<_UpdateSettingsWidget> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text(updateL10n.onLatestVersion(result.currentVersion)),
-            backgroundColor: Colors.green,
+            content: Text(updateL10n.onLatestVersion(result.currentVersion)),
           ),
         );
       }
@@ -623,7 +778,6 @@ class _UpdateSettingsWidgetState extends State<_UpdateSettingsWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(updateL10n.failedCheckUpdates(e.toString())),
-          backgroundColor: Colors.red,
         ),
       );
     } finally {
@@ -638,11 +792,12 @@ class _UpdateSettingsWidgetState extends State<_UpdateSettingsWidget> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Column(
+    return _SettingsGroup(
       children: [
         _SettingsSwitchTile(
           title: l10n.includeBetaUpdates,
           subtitle: l10n.getPreReleaseVersions,
+          icon: Icons.science_outlined,
           value: _includePrereleases,
           onChanged: (bool value) async {
             setState(() {
@@ -664,62 +819,420 @@ class _UpdateSettingsWidgetState extends State<_UpdateSettingsWidget> {
 
 /// Toggles which catalogs the search fans out to. Disabling the last
 /// source is refused - there is nothing to search without one.
+///
+/// The cards also carry the automatic chain's order: dragging one onto
+/// another drops it into that slot. The stored order is shared with the
+/// search capsules, the suggestions panel and the manager's fallback.
 class _SearchProvidersWidget extends ConsumerWidget {
   const _SearchProvidersWidget();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final enabled = ref.watch(searchProviderToggles);
+    // The grid has to stay on screen across the refresh that follows a
+    // drop, so an in-flight save keeps showing the order it started from.
+    final order = ref.watch(searchSourceOrderProvider).valueOrNull ??
+        fallbackSearchSourceOrder;
+    final touch = theme.platform == TargetPlatform.android ||
+        theme.platform == TargetPlatform.iOS;
 
     return enabled.when(
       data: (enabledIds) {
         final manager = SearchManager();
+        final catalog = {
+          SearchProviderId.annasArchive: (
+            name: "Anna's Archive",
+            subtitle: l10n.providerSourceOriginal,
+            mark: 'AA',
+          ),
+          SearchProviderId.libgen: (
+            name: 'LibGen',
+            subtitle: l10n.providerLibgenCatalog,
+            mark: 'LG',
+          ),
+          SearchProviderId.zlibrary: (
+            name: 'Z-Library',
+            subtitle: l10n.providerZlibMirrors,
+            mark: 'ZL',
+          ),
+          SearchProviderId.welib: (
+            name: 'WeLib',
+            subtitle: l10n.providerWelibCatalog,
+            mark: 'WL',
+          ),
+        };
+        final ids = order.where(catalog.containsKey).toList(growable: false);
+
+        Future<void> moveTo(SearchProviderId dragged, int targetIndex) async {
+          final next = [...ids];
+          final from = next.indexOf(dragged);
+          if (from < 0 || from == targetIndex) return;
+          next.removeAt(from);
+          // The dragged card takes the target's slot; removing it first
+          // shifts everything after it, so the target index still lands
+          // right in both directions.
+          next.insert(targetIndex, dragged);
+          await manager.setSourceOrder(next);
+          // ignore: unused_result
+          ref.refresh(searchSourceOrderProvider);
+        }
+
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final provider in [
-              (
-                SearchProviderId.annasArchive,
-                "Anna's Archive",
-                l10n.providerSourceOriginal
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+              child: Text(
+                l10n.searchSourcesIntro,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  height: 1.6,
+                ),
               ),
-              (
-                SearchProviderId.libgen,
-                'Library Genesis',
-                l10n.providerLibgenCatalog
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.searchOrderHint,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.outline,
+                        fontSize: 10.5,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await manager.resetSourceOrder();
+                      // ignore: unused_result
+                      ref.refresh(searchSourceOrderProvider);
+                    },
+                    style: TextButton.styleFrom(
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      l10n.searchOrderReset,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              (
-                SearchProviderId.zlibrary,
-                'Z-Library',
-                l10n.providerZlibMirrors
-              ),
-              (
-                SearchProviderId.welib,
-                'WeLib',
-                'Cloudflare-gated search and open book pages'
-              ),
-            ])
-              _SettingsSwitchTile(
-                title: provider.$2,
-                subtitle: provider.$3,
-                value: enabledIds.contains(provider.$1),
-                onChanged: (on) async {
-                  if (!on && enabledIds.length == 1) {
-                    showSnackBar(
-                        context: context,
-                        message: l10n.atLeastOneSource);
-                    return;
+            ),
+            for (var index = 0; index < ids.length; index++) ...[
+              Builder(
+                builder: (context) {
+                  final id = ids[index];
+                  final provider = catalog[id]!;
+                  final selected = enabledIds.contains(id);
+
+                  Future<void> toggle() async {
+                    if (selected && enabledIds.length == 1) {
+                      showSnackBar(
+                          context: context, message: l10n.atLeastOneSource);
+                      return;
+                    }
+                    await manager.setProviderEnabled(id, !selected);
+                    // ignore: unused_result
+                    ref.refresh(searchProviderToggles);
                   }
-                  await manager.setProviderEnabled(provider.$1, on);
-                  // ignore: unused_result
-                  ref.refresh(searchProviderToggles);
+
+                  return _DraggableProviderCard(
+                    key: ValueKey(id.name),
+                    id: id,
+                    touch: touch,
+                    onDropped: (dragged) => moveTo(dragged, index),
+                    child: _ProviderCard(
+                      mark: provider.mark,
+                      name: provider.name,
+                      subtitle: provider.subtitle,
+                      selected: selected,
+                      longPressTooltip: !touch,
+                      onTap: toggle,
+                      onOpenMirrors: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const InstancesPage(),
+                          ),
+                        );
+                      },
+                    ),
+                  );
                 },
               ),
+              if (index < ids.length - 1) const SizedBox(height: 9),
+            ],
           ],
         );
       },
       loading: () => const SizedBox.shrink(),
       error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+/// One source card that can be dropped onto another slot.
+///
+/// Touch screens need a long press first, otherwise the settings page's
+/// scroll view takes the drag. Desktop uses the immediate drag, which the
+/// scroll view ignores for mouse pointers.
+class _DraggableProviderCard extends StatelessWidget {
+  const _DraggableProviderCard({
+    super.key,
+    required this.id,
+    required this.touch,
+    required this.onDropped,
+    required this.child,
+  });
+
+  final SearchProviderId id;
+  final bool touch;
+  final ValueChanged<SearchProviderId> onDropped;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return DragTarget<SearchProviderId>(
+      onWillAcceptWithDetails: (details) => details.data != id,
+      onAcceptWithDetails: (details) => onDropped(details.data),
+      builder: (context, candidates, rejected) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final feedback = SizedBox(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+              child: Material(
+                elevation: 10,
+                borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.antiAlias,
+                child: child,
+              ),
+            );
+            final dragging = touch
+                ? LongPressDraggable<SearchProviderId>(
+                    data: id,
+                    feedback: feedback,
+                    childWhenDragging: Opacity(opacity: 0.35, child: child),
+                    child: child,
+                  )
+                : Draggable<SearchProviderId>(
+                    data: id,
+                    feedback: feedback,
+                    childWhenDragging: Opacity(opacity: 0.35, child: child),
+                    child: child,
+                  );
+
+            return Stack(
+              children: [
+                dragging,
+                if (candidates.isNotEmpty)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: scheme.primary, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ProviderCard extends StatelessWidget {
+  const _ProviderCard({
+    required this.mark,
+    required this.name,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+    required this.onOpenMirrors,
+    this.longPressTooltip = true,
+  });
+
+  final String mark;
+  final String name;
+  final String subtitle;
+  final bool selected;
+  // Touch drags start with a long press, so the tooltip cannot also wait
+  // for one; its text stays in the semantics tree either way.
+  final bool longPressTooltip;
+  final VoidCallback onTap;
+  final VoidCallback onOpenMirrors;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final (logoBackground, logoForeground) = switch (mark) {
+      'AA' => (scheme.primaryContainer, scheme.onPrimaryContainer),
+      'ZL' => (scheme.tertiaryContainer, scheme.tertiary),
+      _ => (scheme.surfaceContainer, scheme.onSurfaceVariant),
+    };
+
+    return Semantics(
+      button: true,
+      toggled: selected,
+      label: name,
+      child: Tooltip(
+        message: subtitle,
+        triggerMode: longPressTooltip
+            ? TooltipTriggerMode.longPress
+            : TooltipTriggerMode.manual,
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: scheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: selected
+                  ? scheme.primary.withValues(alpha: 0.35)
+                  : scheme.outlineVariant,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 13, 14, 10),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: logoBackground,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          mark,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: logoForeground,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: selected,
+                        onChanged: (_) => onTap(),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.only(top: 10),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: scheme.outlineVariant.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: selected ? scheme.secondary : scheme.outline,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          selected ? l10n.sourceOn : l10n.sourceOff,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: selected ? scheme.secondary : scheme.outline,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: onOpenMirrors,
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            l10n.mirrorsShort,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -763,7 +1276,7 @@ class _BackupSettingsWidget extends ConsumerWidget {
         await file.writeAsString(json);
         await SharePlus.instance.share(ShareParams(
           files: [XFile(file.path)],
-          text: 'OpenlibExtended backup',
+          text: exportL10n.backupShareText,
         ));
       }
     } catch (e) {
@@ -788,9 +1301,7 @@ class _BackupSettingsWidget extends ConsumerWidget {
       final restored = await service.restoreBackupFile(path);
       if (!restored) {
         if (context.mounted) {
-          showSnackBar(
-              context: context,
-              message: importL10n.notABackup);
+          showSnackBar(context: context, message: importL10n.notABackup);
         }
         return;
       }
@@ -812,17 +1323,18 @@ class _BackupSettingsWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
+    final l10n = AppLocalizations.of(context);
+    return _SettingsGroup(
       children: [
         _SettingsTile(
-          title: 'Export Backup',
-          subtitle: 'Save settings, books and instances to a JSON file',
+          title: l10n.exportBackupTitle,
+          subtitle: l10n.exportBackupSubtitle,
           icon: Icons.file_upload_outlined,
           onTap: () => _export(context),
         ),
         _SettingsTile(
-          title: 'Import Backup',
-          subtitle: 'Restore from a backup file (replaces current data)',
+          title: l10n.importBackupTitle,
+          subtitle: l10n.importBackupSubtitle,
           icon: Icons.file_download_outlined,
           onTap: () => _import(context, ref),
         ),
@@ -837,45 +1349,674 @@ class _BackupSettingsWidget extends ConsumerWidget {
 // follows the system default. Choice persists in the preferences
 // table under the 'locale' key.
 // ====================================================================
-class _LanguageSelectorWidget extends ConsumerWidget {
+const _nativeLanguageNames = {
+  'en': 'English',
+  'de': 'Deutsch',
+  'fr': 'Français',
+  'es': 'Español',
+  'zh': '中文',
+};
+
+/// Collapsed language row that expands into a two/three-column option grid
+/// only when tapped, keeping the appearance tab short by default.
+class _LanguageSelectorWidget extends ConsumerStatefulWidget {
+  const _LanguageSelectorWidget();
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LanguageSelectorWidget> createState() =>
+      _LanguageSelectorWidgetState();
+}
+
+class _LanguageSelectorWidgetState
+    extends ConsumerState<_LanguageSelectorWidget> {
+  bool _expanded = false;
+
+  void _select(Locale? value) {
+    ref.read(localeOverrideProvider.notifier).state = value;
+    ref
+        .read(downloadManagerProvider)
+        .setLocale(value ?? WidgetsBinding.instance.platformDispatcher.locale);
+    MyLibraryDb.instance
+        .savePreference('locale', value?.languageCode ?? '')
+        .catchError((_) => 0);
+    setState(() => _expanded = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final locale = ref.watch(localeOverrideProvider);
     final l10n = AppLocalizations.of(context);
-
-    // Native display names: a French user should see 'Francais' even
-    // while the app still renders in English.
-    const nativeNames = {
-      'en': 'English',
-      'de': 'Deutsch',
-      'fr': 'Français',
-      'es': 'Español',
-    };
-
-    return DropdownButtonFormField<Locale?>(
-      initialValue: locale,
-      decoration: const InputDecoration(
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.zero,
+    final activeCode = Localizations.localeOf(context).languageCode;
+    final systemNative = _nativeLanguageNames[activeCode] ?? activeCode;
+    final nativeName =
+        _nativeLanguageNames[locale?.languageCode ?? activeCode] ?? activeCode;
+    final options = <Widget>[
+      _LanguageRow(
+        code: 'AUTO',
+        title: l10n.systemLanguage,
+        subtitle: locale == null ? l10n.currentLanguage : systemNative,
+        selected: locale == null,
+        onTap: () => _select(null),
       ),
-      items: [
-        DropdownMenuItem(
-          value: null,
-          child: Text(l10n.systemLanguage),
+      for (final supported in AppLocalizations.supportedLocales)
+        _LanguageRow(
+          code: supported.languageCode == 'zh'
+              ? '中'
+              : supported.languageCode.toUpperCase(),
+          title: _nativeLanguageNames[supported.languageCode] ??
+              supported.languageCode,
+          subtitle: locale?.languageCode == supported.languageCode
+              ? l10n.currentLanguage
+              : supported.languageCode.toUpperCase(),
+          selected: locale?.languageCode == supported.languageCode,
+          onTap: () => _select(supported),
         ),
-        ...AppLocalizations.supportedLocales.map(
-          (loc) => DropdownMenuItem(
-            value: loc,
-            child: Text(nativeNames[loc.languageCode] ?? loc.languageCode),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const ValueKey('language-selector-toggle'),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(
+                      Icons.translate_rounded,
+                      size: 19,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.languageSetting,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.languageCardHint,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    nativeName,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.outline,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    child: Icon(
+                      Icons.expand_more_rounded,
+                      size: 20,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: _expanded
+              ? Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: scheme.outlineVariant.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < options.length; index++) ...[
+                        if (index > 0)
+                          Divider(
+                            height: 1,
+                            color:
+                                scheme.outlineVariant.withValues(alpha: 0.55),
+                          ),
+                        options[index],
+                      ],
+                    ],
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
+    );
+  }
+}
+
+class _LanguageRow extends StatelessWidget {
+  const _LanguageRow({
+    required this.code,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String code;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      color: selected
+          ? scheme.primaryContainer.withValues(alpha: 0.35)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? scheme.primaryContainer
+                      : scheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  code,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: selected
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurfaceVariant,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.04,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: selected ? scheme.primary : scheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10.5,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 20,
+                height: 20,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? scheme.primary : scheme.outline,
+                    width: selected ? 2 : 1.8,
+                  ),
+                ),
+                child: selected
+                    ? Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      )
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pick a theme by looking at it: three miniature app previews instead of
+/// a text dropdown.
+class _ThemeSelectorWidget extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
+    final l10n = AppLocalizations.of(context);
+
+    void select(ThemeMode value) {
+      ref.read(themeModeProvider.notifier).setTheme(value);
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: _ThemeOption(
+            mode: ThemeMode.light,
+            label: l10n.themeLightShort,
+            selected: mode == ThemeMode.light,
+            onTap: () => select(ThemeMode.light),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _ThemeOption(
+            mode: ThemeMode.dark,
+            label: l10n.themeDarkShort,
+            selected: mode == ThemeMode.dark,
+            onTap: () => select(ThemeMode.dark),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _ThemeOption(
+            mode: ThemeMode.system,
+            label: l10n.followSystem,
+            selected: mode == ThemeMode.system,
+            onTap: () => select(ThemeMode.system),
           ),
         ),
       ],
-      onChanged: (Locale? val) {
-        ref.read(localeOverrideProvider.notifier).state = val;
-        MyLibraryDb.instance
-            .savePreference('locale', val?.languageCode ?? '')
-            .catchError((_) => 0);
-      },
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  const _ThemeOption({
+    required this.mode,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ThemeMode mode;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color:
+                selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      height: 46,
+                      width: double.infinity,
+                      child: mode == ThemeMode.system
+                          ? Row(
+                              children: [
+                                Expanded(
+                                  child: _ThemeSwatch(
+                                      scheme:
+                                          openlibColorScheme(Brightness.light)),
+                                ),
+                                Expanded(
+                                  child: _ThemeSwatch(
+                                      scheme:
+                                          openlibColorScheme(Brightness.dark)),
+                                ),
+                              ],
+                            )
+                          : _ThemeSwatch(
+                              scheme: openlibColorScheme(
+                                mode == ThemeMode.dark
+                                    ? Brightness.dark
+                                    : Brightness.light,
+                              ),
+                            ),
+                    ),
+                  ),
+                  if (selected)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: scheme.surface, width: 1.5),
+                        ),
+                        child: Icon(Icons.check_rounded,
+                            size: 10, color: scheme.onPrimary),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color:
+                      selected ? scheme.onPrimaryContainer : scheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeSwatch extends StatelessWidget {
+  const _ThemeSwatch({required this.scheme});
+
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+      ),
+      padding: const EdgeInsets.all(5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _dot(scheme.outlineVariant),
+              const SizedBox(width: 3),
+              _dot(scheme.primary),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          FractionallySizedBox(
+            widthFactor: 0.55,
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                color: scheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dot(Color color) => Container(
+        width: 4,
+        height: 4,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+}
+
+class _FontSizeSelector extends ConsumerWidget {
+  const _FontSizeSelector({required this.dataBase});
+
+  final MyLibraryDb dataBase;
+
+  static const _min = 0.8;
+  static const _max = 2.0;
+
+  static double _normalize(double value) =>
+      (value.clamp(_min, _max) * 10).roundToDouble() / 10;
+
+  Future<void> _persist(double value) async {
+    await dataBase.savePreference('fontSizeScale', value.toString());
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final scale = ref.watch(fontSizeScaleProvider);
+
+    void select(double value) {
+      final next = _normalize(value);
+      ref.read(fontSizeScaleProvider.notifier).state = next;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(
+                Icons.text_fields,
+                size: 19,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.fontSizeTitle,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '${(scale * 100).round()}%',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Text(
+                'Aa',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                  color: scheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  l10n.fontPreviewSample,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textScaler: TextScaler.linear(scale),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _StepButton(
+              label: 'A−',
+              onTap: scale > _min
+                  ? () {
+                      final next = _normalize(scale - 0.1);
+                      select(next);
+                      _persist(next);
+                    }
+                  : null,
+            ),
+            Expanded(
+              child: Slider(
+                value: scale,
+                min: _min,
+                max: _max,
+                divisions: 12,
+                label: '${scale.toStringAsFixed(1)}×',
+                onChanged: select,
+                onChangeEnd: _persist,
+              ),
+            ),
+            _StepButton(
+              label: 'A+',
+              onTap: scale < _max
+                  ? () {
+                      final next = _normalize(scale + 0.1);
+                      select(next);
+                      _persist(next);
+                    }
+                  : null,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return SizedBox(
+      width: 38,
+      height: 34,
+      child: Material(
+        color: onTap == null
+            ? scheme.surfaceContainerLow
+            : scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Center(
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: onTap == null ? scheme.outline : scheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

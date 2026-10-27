@@ -5,9 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
+import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/components/page_title_widget.dart';
+import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/components/settings_row.dart';
+import 'package:openlib/ui/swiss_grid.dart';
+import 'package:openlib/ui/components/inline_hint.dart';
 
 /// Settings > Mirrors.
 ///
@@ -16,8 +20,8 @@ import 'package:openlib/ui/components/page_title_widget.dart';
 /// shows SLUM's status, the protection gate and its latency, and can be
 /// switched off. Ordering is automatic by default (easiest protection
 /// first, then fastest); flipping the switch to manual lets the user
-/// drag the order themselves. A mirror SLUM reports DOWN is shown greyed
-/// out and is never contacted.
+/// reorder the mirrors themselves. A mirror SLUM reports DOWN is shown
+/// greyed out and is never contacted.
 class InstancesPage extends ConsumerStatefulWidget {
   const InstancesPage({super.key});
 
@@ -55,17 +59,28 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     MirrorService.annasArchive: "Anna's Archive",
   };
 
-  static const _serviceSubtitles = {
-    MirrorService.libgen: 'Fast, challenge-free downloads when a mirror is up',
-    MirrorService.zlibrary: 'DiamWall mirrors solve headlessly',
-    MirrorService.welib: 'Cloudflare-gated search, open book pages',
-    MirrorService.annasArchive: 'Reading, details and downloads',
+  static const _serviceMarks = {
+    MirrorService.libgen: 'LG',
+    MirrorService.zlibrary: 'ZL',
+    MirrorService.welib: 'WL',
+    MirrorService.annasArchive: 'AA',
   };
+
+  static String _statusLabel(AppLocalizations l10n, SlumStatus status) {
+    return switch (status) {
+      SlumStatus.up => l10n.mirrorStatusUp,
+      SlumStatus.degraded => l10n.mirrorStatusDegraded,
+      SlumStatus.protected => l10n.mirrorStatusProtected,
+      SlumStatus.down => l10n.mirrorStatusDown,
+      SlumStatus.unknown => l10n.unknown,
+    };
+  }
 
   Future<void> _refresh() async {
     if (_refreshing) return;
     setState(() => _refreshing = true);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
     try {
       final result = await ref.read(instanceManagerProvider).refresh();
       if (!mounted) return;
@@ -76,23 +91,20 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
         // Nothing is known - saying "up to date" would claim the empty
         // list is SLUM's answer.
         messenger.showSnackBar(SnackBar(
-          content: const Text(
-              'Could not reach open-slum.org - no mirror list available'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          content: Text(l10n.mirrorCatalogueUnreachable),
         ));
         return;
       }
       messenger.showSnackBar(SnackBar(
         content: Text(result.changes.isEmpty
-            ? 'Mirror list is up to date'
-            : 'Mirror list updated: ${result.changes.length} change(s)'),
+            ? l10n.mirrorListUpToDate
+            : l10n.mirrorListUpdated(result.changes.length)),
         duration: const Duration(seconds: 2),
       ));
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
-        content: Text('Refresh failed: $e'),
-        backgroundColor: Theme.of(context).colorScheme.error,
+        content: Text(l10n.mirrorRefreshFailed('$e')),
       ));
     } finally {
       if (mounted) setState(() => _refreshing = false);
@@ -101,194 +113,319 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final autoMode = ref.watch(instanceAutoModeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const TitleText('Mirrors')),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 32),
-          children: [
-            _buildModeCard(autoMode),
-            for (final service in _serviceOrder) ...[
-              _sectionHeader(context, service),
-              _serviceList(service, autoMode),
+      appBar: AppBar(
+        title: Text(l10n.mirrorsAndProviders),
+        actions: [
+          IconButton(
+            onPressed: _refreshing ? null : _refresh,
+            tooltip: l10n.refreshMirrors,
+            icon: _refreshing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded, size: 20),
+          ),
+        ],
+      ),
+      body: ContentWidth(
+        maxWidth: 840,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            children: [
+              InlineHint(
+                  message: l10n.mirrorFooterNote, icon: Icons.shield_outlined),
+              for (final service in _serviceOrder)
+                _serviceList(service, autoMode),
+              const SizedBox(height: 16),
+              _buildModeCard(autoMode),
             ],
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
-              child: Text(
-                'Mirror addresses and their status come from open-slum.org '
-                'and refresh automatically. A mirror reported DOWN is never '
-                'contacted.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildModeCard(bool autoMode) {
+    final l10n = AppLocalizations.of(context);
     return Card(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: SwitchListTile(
-        value: autoMode,
-        onChanged: (value) async {
-          await ref.read(instanceManagerProvider).setAutoMode(value);
-          ref.read(instanceAutoModeProvider.notifier).state = value;
-          for (final service in _serviceOrder) {
-            ref.invalidate(serviceInstancesProvider(service));
-          }
-        },
-        title: const Text('Automatic mirror order'),
-        subtitle: Text(autoMode
-            ? 'Easiest protection first, then fastest. Recommended.'
-            : 'Manual: use the arrows to set your own order.'),
-        secondary: Icon(autoMode ? Icons.auto_awesome : Icons.touch_app),
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: SettingsRow(
+        icon: autoMode ? Icons.auto_awesome : Icons.touch_app,
+        title: l10n.automaticMirrorOrder,
+        subtitle:
+            autoMode ? l10n.mirrorOrderAutoHint : l10n.mirrorOrderManualHint,
+        trailing: Switch(
+          value: autoMode,
+          onChanged: (value) async {
+            await ref.read(instanceManagerProvider).setAutoMode(value);
+            ref.read(instanceAutoModeProvider.notifier).state = value;
+            for (final service in _serviceOrder) {
+              ref.invalidate(serviceInstancesProvider(service));
+            }
+          },
+        ),
       ),
     );
   }
 
-  Widget _sectionHeader(BuildContext context, MirrorService service) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _serviceList(MirrorService service, bool autoMode) {
+    final l10n = AppLocalizations.of(context);
+    final async = ref.watch(serviceInstancesProvider(service));
+
+    return async.when(
+      data: (views) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _sectionLabel(service, views.length, l10n),
+            if (views.isEmpty)
+              Card(
+                child: SettingsRow(
+                  icon: Icons.cloud_off,
+                  title: l10n.noMirrorsReported,
+                  subtitle: l10n.noMirrorsReportedHint,
+                  trailing: IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _refresh,
+                  ),
+                ),
+              )
+            else
+              for (var i = 0; i < views.length; i++) ...[
+                _mirrorCard(service, views[i], i, views.length, autoMode),
+                if (i < views.length - 1) const SizedBox(height: 8),
+              ],
+          ],
+        );
+      },
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            _serviceTitles[service] ?? service.name,
-            style: Theme.of(context).textTheme.titleMedium,
+          _sectionLabel(service, 0, l10n),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
           ),
-          Text(
-            _serviceSubtitles[service] ?? '',
-            style: Theme.of(context).textTheme.bodySmall,
+        ],
+      ),
+      error: (error, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _sectionLabel(service, 0, l10n),
+          Card(
+            child: SettingsRow(
+              icon: Icons.error_outline,
+              title: l10n.couldNotLoadMirrors,
+              subtitle: '$error',
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _serviceList(MirrorService service, bool autoMode) {
-    final async = ref.watch(serviceInstancesProvider(service));
-
-    return async.when(
-      data: (views) {
-        if (views.isEmpty) {
-          return ListTile(
-            dense: true,
-            leading: const Icon(Icons.cloud_off),
-            title: const Text('No mirrors reported'),
-            subtitle: const Text(
-                'open-slum.org has no entry (yet) or could not be reached.'),
-            trailing: IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _refresh,
-            ),
-          );
-        }
-        return Column(
-          children: [
-            for (var i = 0; i < views.length; i++)
-              _mirrorTile(service, views[i], i, views.length, autoMode),
-          ],
-        );
-      },
-      loading: () => const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (error, _) => ListTile(
-        dense: true,
-        leading: const Icon(Icons.error_outline),
-        title: const Text('Could not load mirrors'),
-        subtitle: Text('$error'),
+  Widget _sectionLabel(
+    MirrorService service,
+    int count,
+    AppLocalizations l10n,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      child: Text(
+        '${_serviceTitles[service]} · ${l10n.mirrorNodeCount(count)}',
+        style: SwissText.micro.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.66,
+        ),
       ),
     );
   }
 
-  Widget _mirrorTile(MirrorService service, InstanceView view, int index,
+  Widget _mirrorCard(MirrorService service, InstanceView view, int index,
       int total, bool autoMode) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
     final site = view.site;
     final down = site.isDown;
+    final mark = _serviceMarks[service] ?? '?';
+    final (logoBackground, logoForeground) = switch (mark) {
+      'AA' => (scheme.primaryContainer, scheme.onPrimaryContainer),
+      'ZL' => (scheme.tertiaryContainer, scheme.tertiary),
+      _ => (scheme.surfaceContainer, scheme.onSurfaceVariant),
+    };
+    final subtitle = site.protection == Protection.none
+        ? l10n.mirrorStatusUp
+        : site.protection.label;
 
     return Opacity(
       opacity: down ? 0.55 : 1,
-      child: ListTile(
-        dense: true,
-        leading: _statusDot(site.status),
-        title: Text(
-          site.host,
-          style: TextStyle(
-            decoration: down ? TextDecoration.lineThrough : null,
-          ),
+      child: Card(
+        margin: EdgeInsets.zero,
+        color: scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SwissRadius.card),
+          side: BorderSide(color: scheme.outlineVariant),
         ),
-        subtitle: Text(
-          [
-            site.status.name.toUpperCase(),
-            if (site.protection != Protection.none) site.protection.label,
-            if (site.latencyMs != null) '${site.latencyMs}ms',
-            if (down) 'reported down - never contacted',
-          ].join(' · '),
-          style: const TextStyle(fontSize: 12),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!autoMode) ...[
-              IconButton(
-                icon: const Icon(Icons.keyboard_arrow_up),
-                iconSize: 20,
-                tooltip: 'Move up',
-                onPressed: index == 0
-                    ? null
-                    : () async {
-                        await ref
-                            .read(instanceManagerProvider)
-                            .move(service, site.host, -1);
-                        ref.invalidate(serviceInstancesProvider(service));
-                      },
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: logoBackground,
+                      borderRadius: BorderRadius.circular(SwissRadius.sm),
+                    ),
+                    child: Text(
+                      mark,
+                      style: SwissText.micro.copyWith(
+                        color: logoForeground,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          site.host,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SwissText.label.copyWith(
+                            color: scheme.onSurface,
+                            decoration:
+                                down ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SwissText.micro.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: view.enabled && !down,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: down
+                        ? null
+                        : (value) async {
+                            await ref
+                                .read(instanceManagerProvider)
+                                .setEnabled(service, site.host, value);
+                            ref.invalidate(serviceInstancesProvider(service));
+                          },
+                  ),
+                ],
               ),
-              IconButton(
-                icon: const Icon(Icons.keyboard_arrow_down),
-                iconSize: 20,
-                tooltip: 'Move down',
-                onPressed: index == total - 1
-                    ? null
-                    : () async {
-                        await ref
-                            .read(instanceManagerProvider)
-                            .move(service, site.host, 1);
-                        ref.invalidate(serviceInstancesProvider(service));
-                      },
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.only(top: 10),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: scheme.outlineVariant.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: _statusColor(scheme, site.status),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        [
+                          _statusLabel(l10n, site.status),
+                          if (site.latencyMs != null) '${site.latencyMs}ms',
+                          if (down) l10n.reportedDownNeverContacted,
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SwissText.micro.copyWith(
+                          color:
+                              down ? scheme.tertiary : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (!autoMode) ...[
+                      IconButton(
+                        icon: const Icon(Icons.keyboard_arrow_up, size: 18),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: l10n.moveUp,
+                        onPressed: index == 0
+                            ? null
+                            : () async {
+                                await ref
+                                    .read(instanceManagerProvider)
+                                    .move(service, site.host, -1);
+                                ref.invalidate(
+                                    serviceInstancesProvider(service));
+                              },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: l10n.moveDown,
+                        onPressed: index == total - 1
+                            ? null
+                            : () async {
+                                await ref
+                                    .read(instanceManagerProvider)
+                                    .move(service, site.host, 1);
+                                ref.invalidate(
+                                    serviceInstancesProvider(service));
+                              },
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
-            Switch(
-              value: view.enabled && !down,
-              onChanged: down
-                  ? null
-                  : (value) async {
-                      await ref
-                          .read(instanceManagerProvider)
-                          .setEnabled(service, site.host, value);
-                      ref.invalidate(serviceInstancesProvider(service));
-                    },
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _statusDot(SlumStatus status) {
-    final (color, icon) = switch (status) {
-      SlumStatus.up => (Colors.green, Icons.check_circle),
-      SlumStatus.degraded => (Colors.orange, Icons.error_outline),
-      SlumStatus.protected => (Colors.blue, Icons.shield),
-      SlumStatus.down => (Colors.red, Icons.cancel),
-      SlumStatus.unknown => (Colors.grey, Icons.help_outline),
+  Color _statusColor(ColorScheme scheme, SlumStatus status) {
+    return switch (status) {
+      SlumStatus.up => scheme.primary,
+      SlumStatus.degraded => scheme.tertiary,
+      SlumStatus.protected => scheme.secondary,
+      SlumStatus.down => scheme.error,
+      SlumStatus.unknown => scheme.outline,
     };
-    return Icon(icon, color: color);
   }
 }

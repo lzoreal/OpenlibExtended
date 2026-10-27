@@ -24,123 +24,31 @@ class ShowDeleteDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(15.0),
-          child: Container(
-            width: double.infinity,
-            height: 219,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              color: Theme.of(context).colorScheme.tertiaryContainer,
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(
-                      AppLocalizations.of(context).deleteBook,
-                      style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.tertiary,
-                          decoration: TextDecoration.none),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(
-                      AppLocalizations.of(context)
-                          .deletePermanentWarning,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .tertiary
-                              .withAlpha(170),
-                          decoration: TextDecoration.none),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                      textAlign: TextAlign.start,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          style: ButtonStyle(
-                            shape: WidgetStateProperty.all(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(50.0),
-                                side: BorderSide(
-                                    width: 3,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .secondary),
-                              ),
-                            ),
-                          ),
-                          onPressed: () {
-                            ref.read(deleteFileFromMyLib(FileName(
-                                md5: id, format: format, fileName: fileName)));
-                            Navigator.of(context).pop();
-
-                            showSnackBar(
-                                context: context,
-                                message: AppLocalizations.of(context)
-                                    .bookDeleted);
-
-                            onDelete();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(5.0),
-                            child: Text(
-                              AppLocalizations.of(context).delete,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.tertiary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(
-                          width: 10,
-                        ),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.secondary,
-                              textStyle: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              )),
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(5.0),
-                            child: Text(
-                                AppLocalizations.of(context).cancel),
-                          ),
-                        )
-                      ],
-                    ),
-                  )
-                ],
-              ),
-            ),
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.deleteBook),
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+      content: Text(l10n.deletePermanentWarning),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
           ),
+          onPressed: () {
+            ref.read(deleteFileFromMyLib(
+                FileName(md5: id, format: format, fileName: fileName)));
+            Navigator.of(context).pop();
+            showSnackBar(context: context, message: l10n.bookDeleted);
+            onDelete();
+          },
+          child: Text(l10n.delete),
         ),
       ],
     );

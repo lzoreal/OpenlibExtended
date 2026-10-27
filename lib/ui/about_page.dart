@@ -8,7 +8,9 @@ import 'package:yaml/yaml.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/components/page_title_widget.dart';
+import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/components/settings_row.dart';
+import 'package:openlib/ui/swiss_grid.dart';
 import 'package:openlib/ui/components/snack_bar_widget.dart';
 
 class AboutPage extends StatefulWidget {
@@ -45,97 +47,146 @@ class _AboutPageState extends State<AboutPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(l10n.appTitle),
-        titleTextStyle: Theme.of(context).textTheme.displayLarge,
+      appBar: AppBar(title: Text(l10n.about)),
+      body: ContentWidth(
+        maxWidth: 840,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(SwissRadius.field),
+                      child: Image.asset(
+                        'assets/icons/appIcon.png',
+                        width: 64,
+                        height: 64,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'OpenlibExtended',
+                      textAlign: TextAlign.center,
+                      style: SwissText.headline.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.aboutDescription,
+                      textAlign: TextAlign.center,
+                      style: SwissText.body.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _AboutChip(
+                          label:
+                              '${l10n.version} ${_version.isEmpty ? l10n.loading : _version}',
+                        ),
+                        _AboutChip(label: l10n.gplLicense),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.aboutForkNote,
+                      style: SwissText.body.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.aboutOriginalNote,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  _LinkTile(
+                    icon: Icons.code,
+                    text: l10n.thisForkByMaintainer,
+                    url: 'https://github.com/lzoreal/OpenlibExtended',
+                  ),
+                  const Divider(indent: 16, endIndent: 16),
+                  _LinkTile(
+                    icon: Icons.bug_report_outlined,
+                    text: l10n.reportAnIssue,
+                    url: 'https://github.com/lzoreal/OpenlibExtended/issues',
+                  ),
+                  const Divider(indent: 16, endIndent: 16),
+                  _LinkTile(
+                    icon: Icons.history,
+                    text: l10n.originalProject,
+                    url: 'https://github.com/dstark5/Openlib',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: _LinkTile(
+                icon: Icons.gavel_outlined,
+                text: l10n.gplLicense,
+                subtitle: l10n.licence,
+                url: 'https://www.gnu.org/licenses/gpl-3.0.en.html',
+              ),
+            ),
+          ],
+        ),
       ),
-      body: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 5, right: 5, top: 10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TitleText(l10n.about),
-              Padding(
-                padding: const EdgeInsets.only(
-                    left: 7, right: 7, top: 13, bottom: 10),
-                child: Text(
-                  l10n.aboutDescription,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 7, right: 7, top: 10),
-                child: Text(
-                  l10n.aboutForkNote,
-                  style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 7, right: 7, top: 5),
-                child: Text(
-                  l10n.aboutOriginalNote,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.grey),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 7, right: 7, top: 15),
-                child: Text(
-                  l10n.version,
-                  style: const TextStyle(
-                      fontSize: 19, fontWeight: FontWeight.bold),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 7, right: 7, top: 5),
-                child: Text(
-                  _version.isEmpty ? l10n.loading : _version,
-                  style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 7, right: 7, top: 15),
-                child: Text(
-                  l10n.github,
-                  style: const TextStyle(
-                      fontSize: 19, fontWeight: FontWeight.bold),
-                ),
-              ),
-              _UrlText(
-                  text: l10n.thisForkByWarreth,
-                  url: 'https://github.com/warreth/OpenlibExtended'),
-              _UrlText(
-                  text: l10n.reportAnIssue,
-                  url: 'https://github.com/warreth/OpenlibExtended/issues'),
-              _UrlText(
-                  text: l10n.originalProject,
-                  url: 'https://github.com/dstark5/Openlib'),
-              Padding(
-                padding: const EdgeInsets.only(left: 7, right: 7, top: 15),
-                child: Text(
-                  l10n.licence,
-                  style: const TextStyle(
-                      fontSize: 19, fontWeight: FontWeight.bold),
-                ),
-              ),
-              _UrlText(
-                  text: l10n.gplLicense,
-                  url: 'https://www.gnu.org/licenses/gpl-3.0.en.html'),
-            ],
+    );
+  }
+}
+
+class _AboutChip extends StatelessWidget {
+  const _AboutChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(SwissRadius.pill),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: SwissText.micro.copyWith(
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -143,47 +194,39 @@ class _AboutPageState extends State<AboutPage> {
   }
 }
 
-class _UrlText extends StatelessWidget {
-  const _UrlText({required this.text, required this.url});
+class _LinkTile extends StatelessWidget {
+  const _LinkTile({
+    required this.icon,
+    required this.text,
+    required this.url,
+    this.subtitle,
+  });
 
-  final String url;
+  final IconData icon;
   final String text;
+  final String? subtitle;
+  final String url;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 7, right: 7, top: 5),
-      child: InkWell(
-        onTap: () async {
-          final l10n = AppLocalizations.of(context);
-          final Uri uri = Uri.parse(url);
-          if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-            final message = l10n.couldNotLaunch('$uri');
-            // ignore: use_build_context_synchronously
-            showSnackBar(context: context, message: message);
-          }
-        },
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              text,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Colors.blueAccent,
-              ),
-            ),
-            const SizedBox(
-              width: 2,
-            ),
-            const Icon(
-              Icons.launch,
-              size: 17,
-              color: Colors.blueAccent,
-            )
-          ],
-        ),
+    return SettingsRow(
+      icon: icon,
+      title: text,
+      subtitle: subtitle,
+      trailing: Icon(
+        Icons.open_in_new,
+        size: 16,
+        color: Theme.of(context).colorScheme.primary,
       ),
+      onTap: () async {
+        final l10n = AppLocalizations.of(context);
+        final uri = Uri.parse(url);
+        if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+          final message = l10n.couldNotLaunch('$uri');
+          // ignore: use_build_context_synchronously
+          showSnackBar(context: context, message: message);
+        }
+      },
     );
   }
 }
