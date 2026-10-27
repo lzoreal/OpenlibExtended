@@ -252,15 +252,16 @@ class GenresPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final categories = categoriesTypeValues(l10n);
+    final tileHeight = _genreTileHeight(context);
 
     return CustomScrollView(
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisExtent: 64,
+              mainAxisExtent: tileHeight,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
             ),
@@ -306,6 +307,7 @@ class GenreShortcutSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final categories = categoriesTypeValues(l10n).take(count).toList();
+    final tileHeight = _genreTileHeight(context);
     return Padding(
       padding: padding,
       child: Column(
@@ -319,9 +321,9 @@ class GenreShortcutSection extends StatelessWidget {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisExtent: 64,
+              mainAxisExtent: tileHeight,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
             ),
@@ -338,6 +340,12 @@ class GenreShortcutSection extends StatelessWidget {
       ),
     );
   }
+}
+
+double _genreTileHeight(BuildContext context) {
+  final scaler = MediaQuery.textScalerOf(context);
+  final content = 16 + scaler.scale(20) + 4 + scaler.scale(16);
+  return content < 64 ? 64 : content;
 }
 
 class _GenreCard extends StatelessWidget {
@@ -421,13 +429,20 @@ class CategoryListingPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final booksBasedOnGenre = ref.watch(getSubCategoryTypeList(url));
     final width = MediaQuery.sizeOf(context).width;
-    final tileExtent = width >= 1200
-        ? 200.0
-        : width >= 840
-            ? 184.0
-            : 160.0;
+    final contentWidth = (width > 840 ? 840.0 : width) - 32;
+    final columns = width < 600
+        ? 2
+        : width < 900
+            ? 3
+            : 4;
+    final cardWidth = (contentWidth - 8 * (columns - 1)) / columns;
+    // 72 covers the two-line title plus author and meta lines; 30 is the
+    // vertical gaps and card padding around them.
+    final textHeight = MediaQuery.textScalerOf(context).scale(72);
+    final cardHeight = cardWidth * 1.5 + textHeight + 30;
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: ContentWidth(
@@ -440,19 +455,22 @@ class CategoryListingPage extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                   sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: tileExtent,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
-                      mainAxisExtent: tileExtent == 160
-                          ? 294
-                          : tileExtent == 184
-                              ? 320
-                              : 344,
+                      childAspectRatio: cardWidth / cardHeight,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (BuildContext context, int index) {
                         final book = data[index];
+                        final rating = book.rating;
+                        final published = book.published;
+                        final meta = [
+                          if (rating != null && rating.isNotEmpty) '★ $rating',
+                          if (published != null && published.isNotEmpty)
+                            published,
+                        ].join(' · ');
                         return Card(
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
@@ -479,22 +497,18 @@ class CategoryListingPage extends ConsumerWidget {
                                         fit: BoxFit.cover,
                                         placeholder: (context, url) =>
                                             ColoredBox(
-                                          color: theme.colorScheme
-                                              .surfaceContainerHighest,
+                                          color: scheme.surfaceContainerHighest,
                                           child: Icon(
                                             Icons.menu_book_outlined,
-                                            color: theme
-                                                .colorScheme.onSurfaceVariant,
+                                            color: scheme.onSurfaceVariant,
                                           ),
                                         ),
                                         errorWidget: (context, url, error) =>
                                             ColoredBox(
-                                          color: theme.colorScheme
-                                              .surfaceContainerHighest,
+                                          color: scheme.surfaceContainerHighest,
                                           child: Icon(
                                             Icons.image_not_supported_outlined,
-                                            color: theme
-                                                .colorScheme.onSurfaceVariant,
+                                            color: scheme.onSurfaceVariant,
                                           ),
                                         ),
                                       ),
@@ -503,10 +517,33 @@ class CategoryListingPage extends ConsumerWidget {
                                   const SizedBox(height: 8),
                                   Text(
                                     book.title!,
-                                    style: theme.textTheme.titleSmall,
+                                    style: SwissText.label,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                  if (book.author != null &&
+                                      book.author!.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      book.author!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: SwissText.micro.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                  if (meta.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      meta,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: SwissText.micro.copyWith(
+                                        color: scheme.outline,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

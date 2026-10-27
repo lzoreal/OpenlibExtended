@@ -4,172 +4,160 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/categories_page.dart';
 import 'package:openlib/ui/components/active_downloads_widget.dart';
-import 'package:openlib/ui/components/page_title_widget.dart';
+import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/components/page_header.dart';
+import 'package:openlib/ui/components/pill_tabs.dart';
 import 'package:openlib/ui/trending_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  ConsumerState<ConsumerStatefulWidget> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
-  final List<Widget> _pages = const [
+class _HomePageState extends ConsumerState<HomePage>
+    with SingleTickerProviderStateMixin {
+  static const _pages = <Widget>[
     TrendingPage(),
     GenresPage(),
   ];
 
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: _pages.length,
+      vsync: this,
+      initialIndex: ref.read(homePageSelectedIndexProvider),
+    );
+    _tabController.addListener(_syncMode);
+    ref.listenManual<int>(homePageSelectedIndexProvider, (previous, next) {
+      if (next != _tabController.index) {
+        _tabController.animateTo(next);
+      }
+    });
+  }
+
+  void _syncMode() {
+    final index = _tabController.index;
+    if (ref.read(homePageSelectedIndexProvider) != index) {
+      ref.read(homePageSelectedIndexProvider.notifier).state = index;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(homePageSelectedIndexProvider);
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
-      body: Column(
-        children: [
-          const SizedBox(height: 8),
-          const ActiveDownloadsWidget(),
-          Padding(
-            padding:
-                const EdgeInsets.only(left: 5, right: 5, top: 10, bottom: 5),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TitleText(selectedIndex == 0
-        ? AppLocalizations.of(context).trending
-        : AppLocalizations.of(context).genres),
-                PelletContainer(
-                  selectedIndex: selectedIndex,
-                  onTrendingSelected: () => {
-                    ref.read(homePageSelectedIndexProvider.notifier).state = 0
-                  },
-                  onCategoriesSelected: () => {
-                    ref.read(homePageSelectedIndexProvider.notifier).state = 1
-                  },
-                ),
+      body: ContentWidth(
+        maxWidth: 900,
+        child: Column(
+          children: [
+            PageHeader(
+              eyebrow:
+                  selectedIndex == 0 ? l10n.homeEyebrow : l10n.browseEyebrow,
+              title: selectedIndex == 0 ? l10n.homeTitle : l10n.genres,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: ActiveDownloadsWidget(),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _HomeSearchButton(
+                hint: selectedIndex == 0
+                    ? l10n.homeSearchHint
+                    : l10n.categorySearchHint,
+                showFilter: selectedIndex == 0,
+                onTap: () {
+                  ref.read(selectedIndexProvider.notifier).state = 1;
+                },
+              ),
+            ),
+            PillTabs(
+              controller: _tabController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              tabs: [
+                Tab(text: l10n.trending),
+                Tab(text: l10n.genres),
               ],
             ),
-          ),
-          Expanded(child: _pages[selectedIndex]), // Display the selected page
-        ],
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: _pages,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class PelletContainer extends StatelessWidget {
-  final int selectedIndex;
-  final VoidCallback onTrendingSelected;
-  final VoidCallback onCategoriesSelected;
-
-  const PelletContainer({
-    super.key,
-    required this.selectedIndex,
-    required this.onTrendingSelected,
-    required this.onCategoriesSelected,
+class _HomeSearchButton extends StatelessWidget {
+  const _HomeSearchButton({
+    required this.hint,
+    required this.showFilter,
+    required this.onTap,
   });
+
+  final String hint;
+  final bool showFilter;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 30,
-      width: 105,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        color: Theme.of(context).colorScheme.secondary,
-        // Border matches secondary color to avoid white border in dark mode
-        border: Border.all(color: Theme.of(context).colorScheme.secondary),
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      shape: StadiumBorder(
+        side: BorderSide(color: scheme.outlineVariant),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Left Button (Trending)
-          Expanded(
-            child: GestureDetector(
-              onTap: onTrendingSelected,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                decoration: BoxDecoration(
-                  color: selectedIndex == 0
-                      ? Theme.of(context).colorScheme.secondary
-                      : (Theme.of(context).brightness == Brightness.dark
-                          ? const Color(
-                              0xFF1E1E1E) // Dark Grey for unselected in Dark Mode
-                          : Theme.of(context)
-                              .colorScheme
-                              .primary), // White for unselected in Light Mode
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(25),
-                    bottomLeft: Radius.circular(25),
-                    topRight: Radius.circular(0),
-                    bottomRight: Radius.circular(0),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          key: const ValueKey('home-search-field'),
+          height: 52,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(Icons.search, size: 20, color: scheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                   ),
                 ),
-                child: TextButton.icon(
-                  onPressed: null, // Disable direct onPressed to avoid conflict
-                  icon: Icon(
-                    Icons.trending_up,
-                    color: selectedIndex == 0
-                        ? Colors.white // Always white when selected (on Red)
-                        : Theme.of(context)
-                            .colorScheme
-                            .tertiary, // Black/White based on theme when unselected
+                if (showFilter)
+                  Icon(
+                    Icons.tune,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
                   ),
-                  label: const Text(''), // Empty label
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                ),
-              ),
+              ],
             ),
           ),
-          const VerticalDivider(
-            width: 0,
-            thickness: 1,
-            color: Colors.grey,
-          ),
-          // Right Button (Categories)
-          Expanded(
-            child: GestureDetector(
-              onTap: onCategoriesSelected,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                decoration: BoxDecoration(
-                  color: selectedIndex == 1
-                      ? Theme.of(context).colorScheme.secondary
-                      : (Theme.of(context).brightness == Brightness.dark
-                          ? const Color(
-                              0xFF1E1E1E) // Dark Grey for unselected in Dark Mode
-                          : Theme.of(context)
-                              .colorScheme
-                              .primary), // White for unselected in Light Mode
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(0),
-                    bottomLeft: Radius.circular(0),
-                    topRight: Radius.circular(25),
-                    bottomRight: Radius.circular(25),
-                  ),
-                ),
-                child: TextButton.icon(
-                  onPressed: null,
-                  icon: Icon(
-                    Icons.dashboard_rounded,
-                    color: selectedIndex == 1
-                        ? Colors.white // Always white when selected (on Red)
-                        : Theme.of(context)
-                            .colorScheme
-                            .tertiary, // Black/White based on theme when unselected
-                  ),
-                  label: const Text(''), // Empty label
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

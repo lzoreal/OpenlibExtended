@@ -35,9 +35,11 @@ Future<ShareOutcome> shareBook(
   String thumbnailPath, {
   String? fileName,
   String? format,
+  String? message,
 }) async {
   try {
-    final message = 'Discover this amazing book: "$title"\nRead more : $link';
+    final shareMessage =
+        message ?? 'Discover this amazing book: "$title"\nRead more : $link';
 
     // Prefer the real file when the book is downloaded.
     if (fileName != null || format != null) {
@@ -47,15 +49,15 @@ Future<ShareOutcome> shareBook(
           await Clipboard.setData(ClipboardData(text: bookFile.path));
           return ShareOutcome.pathCopied;
         }
-        await SharePlus.instance
-            .share(ShareParams(files: [XFile(bookFile.path)], text: message));
+        await SharePlus.instance.share(
+            ShareParams(files: [XFile(bookFile.path)], text: shareMessage));
         return ShareOutcome.shared;
       }
     }
 
     if (PlatformUtils.isDesktop) {
       // No share sheet, no file on disk: at least keep the link handy.
-      await Clipboard.setData(ClipboardData(text: message));
+      await Clipboard.setData(ClipboardData(text: shareMessage));
       return ShareOutcome.pathCopied;
     }
 
@@ -63,9 +65,9 @@ Future<ShareOutcome> shareBook(
     final imagePath = await saveAndGetImagePath(thumbnailPath);
     if (imagePath.isNotEmpty) {
       await SharePlus.instance
-          .share(ShareParams(files: [XFile(imagePath)], text: message));
+          .share(ShareParams(files: [XFile(imagePath)], text: shareMessage));
     } else {
-      await SharePlus.instance.share(ShareParams(text: message));
+      await SharePlus.instance.share(ShareParams(text: shareMessage));
     }
     return ShareOutcome.shared;
   } catch (e) {

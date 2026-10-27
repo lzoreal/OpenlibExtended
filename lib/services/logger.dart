@@ -83,8 +83,9 @@ class AppLogger {
 
   // Store logs with larger buffer and longer retention
   final Queue<LogEntry> _logs = Queue<LogEntry>();
-  static const Duration _logRetentionDuration = Duration(hours: 2);
-  static const int _maxLogEntries = 10000; // Increased buffer to retain full debugging history
+  static const Duration logRetentionDuration = Duration(hours: 2);
+  static const int _maxLogEntries =
+      10000; // Increased buffer to retain full debugging history
 
   /// Add a log entry
   void _addLog(String level, String message,
@@ -120,7 +121,7 @@ class AppLogger {
 
   /// Remove logs older than 5 minutes
   void _cleanOldLogs() {
-    final cutoffTime = DateTime.now().subtract(_logRetentionDuration);
+    final cutoffTime = DateTime.now().subtract(logRetentionDuration);
     while (_logs.isNotEmpty && _logs.first.timestamp.isBefore(cutoffTime)) {
       _logs.removeFirst();
     }
@@ -240,7 +241,7 @@ class AppLogger {
     buffer.writeln('');
     buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
     buffer.writeln(
-        'Log retention: Last ${_logRetentionDuration.inMinutes} minutes');
+        'Log retention: Last ${logRetentionDuration.inMinutes} minutes');
     buffer.writeln('Total entries: ${_logs.length}');
     buffer.writeln('');
     buffer.writeln(
@@ -274,7 +275,11 @@ class AppLogger {
   }
 
   /// Export logs to a file and share
-  Future<void> exportLogs() async {
+  Future<void> exportLogs({
+    String saveDialogTitle = 'Save Logs',
+    String shareSubject = 'OpenlibExtended App Logs',
+    String? shareText,
+  }) async {
     try {
       final logsContent = getAllLogs();
       final timestamp = DateTime.now()
@@ -286,7 +291,7 @@ class AppLogger {
       if (PlatformUtils.isDesktop) {
         // file_picker 12: saveFile takes the bytes and returns a file Uri.
         final outputFile = await FilePicker.saveFile(
-          dialogTitle: 'Save Logs',
+          dialogTitle: saveDialogTitle,
           fileName: fileName,
           type: FileType.custom,
           allowedExtensions: ['txt'],
@@ -308,9 +313,10 @@ class AppLogger {
         await SharePlus.instance.share(
           ShareParams(
             files: [XFile(file.path)],
-            subject: 'OpenlibExtended App Logs - $timestamp',
-            text:
-                'OpenlibExtended app logs for the past ${_logRetentionDuration.inMinutes} minutes',
+            subject: '$shareSubject - $timestamp',
+            text: shareText ??
+                'OpenlibExtended app logs for the past '
+                    '${logRetentionDuration.inMinutes} minutes',
           ),
         );
       }

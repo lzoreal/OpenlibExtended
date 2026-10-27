@@ -299,7 +299,9 @@ class MyLibraryDb {
     final rows = await dbInstance.query('booktags');
     final map = <String, Set<String>>{};
     for (final row in rows) {
-      map.putIfAbsent(row['bookId'].toString(), () => {}).add(row['tag'].toString());
+      map
+          .putIfAbsent(row['bookId'].toString(), () => {})
+          .add(row['tag'].toString());
     }
     return map;
   }
@@ -323,8 +325,8 @@ class MyLibraryDb {
   /// True when the book is flagged completed.
   Future<bool> isCompleted(String fileName) async {
     final dbInstance = await instance.database;
-    final rows = await dbInstance.query('bookposition',
-        where: 'fileName = ?', whereArgs: [fileName]);
+    final rows = await dbInstance
+        .query('bookposition', where: 'fileName = ?', whereArgs: [fileName]);
     if (rows.isEmpty) return false;
     return rows.first['completed'] == 1;
   }
@@ -334,7 +336,10 @@ class MyLibraryDb {
   Future<Map<String, String?>> getPositionsForAll() async {
     final dbInstance = await instance.database;
     final rows = await dbInstance.query('bookposition');
-    return {for (final row in rows) row['fileName'].toString(): row['position']?.toString()};
+    return {
+      for (final row in rows)
+        row['fileName'].toString(): row['position']?.toString()
+    };
   }
 
   /// Map of fileName to completed flag for the whole library.
@@ -342,8 +347,7 @@ class MyLibraryDb {
     final dbInstance = await instance.database;
     final rows = await dbInstance.query('bookposition');
     return {
-      for (final row in rows)
-        row['fileName'].toString(): row['completed'] == 1
+      for (final row in rows) row['fileName'].toString(): row['completed'] == 1
     };
   }
 

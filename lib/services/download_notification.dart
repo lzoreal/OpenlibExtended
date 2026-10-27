@@ -34,6 +34,14 @@ class DownloadNotificationService {
 
   bool _initialized = false;
 
+  String _channelName = 'Downloads';
+  String _channelDescription = 'Book download progress notifications';
+
+  void setChannelLabels(String name, String description) {
+    _channelName = name;
+    _channelDescription = description;
+  }
+
   Future<bool> requestNotificationPermission() async {
     // Desktop platforms don't need runtime notification permissions
     if (PlatformUtils.isDesktop) return true;
@@ -95,8 +103,8 @@ class DownloadNotificationService {
     if (progress >= 0 && progress < 100) {
       androidDetails = AndroidNotificationDetails(
         'download_channel',
-        'Downloads',
-        channelDescription: 'Book download progress notifications',
+        _channelName,
+        channelDescription: _channelDescription,
         importance: Importance.low,
         priority: Priority.low,
         showProgress: true,
@@ -119,8 +127,8 @@ class DownloadNotificationService {
     } else {
       androidDetails = AndroidNotificationDetails(
         'download_channel',
-        'Downloads',
-        channelDescription: 'Book download progress notifications',
+        _channelName,
+        channelDescription: _channelDescription,
         importance: Importance.low,
         priority: Priority.low,
         ongoing: false,

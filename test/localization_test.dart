@@ -21,7 +21,7 @@ Map<String, dynamic> _readArb(String locale) {
 }
 
 void main() {
-  final locales = ['en', 'de', 'fr', 'es'];
+  final locales = ['en', 'de', 'fr', 'es', 'zh'];
 
   test('generated delegates expose exactly the shipped locales', () {
     expect(AppLocalizations.supportedLocales.map((l) => l.languageCode),
@@ -77,6 +77,7 @@ void main() {
   testWidgets('localized strings resolve per locale', (tester) async {
     late AppLocalizations de;
     late AppLocalizations fr;
+    late AppLocalizations zh;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -100,11 +101,24 @@ void main() {
         },
       ),
     );
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('zh'),
+        builder: (context, _) {
+          zh = AppLocalizations.of(context);
+          return const SizedBox();
+        },
+      ),
+    );
 
     expect(de.settingsTitle, 'Einstellungen');
     expect(de.cancel, 'Abbrechen');
     expect(fr.settingsTitle, 'Paramètres');
     expect(fr.cancel, 'Annuler');
+    expect(zh.settingsTitle, '设置');
+    expect(zh.cancel, '取消');
   });
 
   testWidgets('the language dropdown writes the locale preference',
@@ -125,9 +139,19 @@ void main() {
     // The settings page polls mirror health, so it never settles; a fixed
     // frame budget is enough to assert the rendered strings.
     await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 100));
 
-    // The Language settings card must be present and labeled.
+    // Language lives on the Appearance tab of the tabbed settings page.
+    tester.widget<TabBar>(find.byType(TabBar)).controller!.index = 1;
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 100));
+
     expect(find.text('Language'), findsOneWidget);
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('language-selector-toggle')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('language-selector-toggle')));
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('System default'), findsOneWidget);
   });
 

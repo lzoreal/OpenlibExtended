@@ -2,15 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/share_book.dart';
-import 'package:openlib/ui/components/snack_bar_widget.dart';
 import 'package:openlib/ui/components/book_info_widget.dart';
+import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/components/error_widget.dart';
 import 'package:openlib/ui/components/file_buttons_widget.dart';
+import 'package:openlib/ui/components/share_icon.dart';
+import 'package:openlib/ui/components/snack_bar_widget.dart';
 
 class BookPage extends StatelessWidget {
   const BookPage({super.key, required this.id});
@@ -19,80 +19,74 @@ class BookPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    MyLibraryDb dataBase = MyLibraryDb.instance;
-    final bookInfo = dataBase.getId(id);
+    final l10n = AppLocalizations.of(context);
+    final bookInfo = MyLibraryDb.instance.getId(id);
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(AppLocalizations.of(context).appTitle),
-        titleTextStyle: Theme.of(context).textTheme.displayLarge,
-        actions: [
-          FutureBuilder(
-              future: bookInfo,
-              builder: (BuildContext context, AsyncSnapshot<MyBook?> snapshot) {
-                if (snapshot.hasData &&
-                    snapshot.data?.title != null &&
-                    snapshot.data?.link != null) {
-                  return IconButton(
-                    icon: Icon(
-                      Icons.share_sharp,
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
-                    iconSize: 19.0,
-                    onPressed: () async {
-                      final outcome = await shareBook(snapshot.data!.title,
-                          snapshot.data!.link, snapshot.data?.thumbnail ?? '',
-                          fileName: snapshot.data?.fileName,
-                          format: snapshot.data?.format);
-                      if (context.mounted &&
-                          outcome == ShareOutcome.pathCopied) {
-                        showSnackBar(
-                            context: context,
-                            message: AppLocalizations.of(context)
-                                .copiedBookPath);
-                      }
-                    },
-                  );
-                } else {
-                  return const SizedBox.shrink();
-                }
-              })
-        ],
-      ),
-      body: Consumer(
-        builder: (BuildContext context, WidgetRef ref, _) {
-          return FutureBuilder(
-              future: bookInfo,
-              builder: (BuildContext context, AsyncSnapshot<MyBook?> snapshot) {
-                if (snapshot.hasData) {
-                  return BookInfoWidget(
-                      data: snapshot.data,
-                      child: FileOpenAndDeleteButtons(
-                        id: snapshot.data!.id,
-                        format: snapshot.data!.format!,
-                        fileName: snapshot.data!.fileName,
-                        onDelete: () {
-                          Navigator.of(context).pop();
-                        },
-                      ));
-                } else if (snapshot.hasError) {
-                  return Center(
-                    child: Text(snapshot.toString()),
-                  );
-                } else {
-                  return Center(
-                      child: SizedBox(
-                    width: 25,
-                    height: 25,
-                    child: CircularProgressIndicator(
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                  ));
-                }
-              });
-        },
-      ),
+    return FutureBuilder<MyBook?>(
+      future: bookInfo,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          final book = snapshot.data!;
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(l10n.bookDetailsTitle),
+              actions: [
+                IconButton(
+                  icon: ShareIcon(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  onPressed: () async {
+                    final outcome = await shareBook(
+                        book.title, book.link, book.thumbnail ?? '',
+                        fileName: book.fileName,
+                        format: book.format,
+                        message: l10n.shareBookMessage(book.title, book.link));
+                    if (context.mounted && outcome == ShareOutcome.pathCopied) {
+                      showSnackBar(
+                          context: context, message: l10n.copiedBookPath);
+                    }
+                  },
+                ),
+              ],
+            ),
+            body: ContentWidth(
+              maxWidth: 840,
+              child: BookInfoWidget(
+                data: book,
+                source: sourceLabelForUrl(book.link, l10n),
+              ),
+            ),
+            bottomNavigationBar: FileOpenAndDeleteButtons(
+              id: book.id,
+              format: book.format!,
+              fileName: book.fileName,
+              onDelete: () => Navigator.of(context).pop(),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
+            body: ContentWidth(
+              maxWidth: 840,
+              child: CustomErrorWidget(
+                error: snapshot.error!,
+                stackTrace: snapshot.stackTrace ?? StackTrace.empty,
+              ),
+            ),
+          );
+        }
+        return Scaffold(
+          appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
+          body: const Center(
+            child: SizedBox(
+              width: 25,
+              height: 25,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ),
+        );
+      },
     );
   }
 }

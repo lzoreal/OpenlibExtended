@@ -141,44 +141,36 @@ Future<void> requestStoragePermission() async {
 // sections share one card shape, spacing and typography.
 // ---------------------------------------------------------------------------
 
-/// Section label above a group of tiles.
-class _SettingsSectionHeader extends StatelessWidget {
-  const _SettingsSectionHeader(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
-      child: Text(
-        title,
-        style: SwissText.micro.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.66,
-        ),
-      ),
-    );
-  }
-}
-
-/// Groups rows into one tonal card with inset dividers.
+/// Groups rows into one card with an optional in-card section label.
 class _SettingsGroup extends StatelessWidget {
-  const _SettingsGroup({required this.children});
+  const _SettingsGroup({this.title, required this.children});
 
+  final String? title;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (title != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Text(
+                title!.toUpperCase(),
+                style: SwissText.micro.copyWith(
+                  color: scheme.outline,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.32,
+                ),
+              ),
+            ),
           for (var index = 0; index < children.length; index++) ...[
-            if (index > 0) const Divider(height: 1, indent: 56, endIndent: 16),
+            if (index > 0) const Divider(height: 1),
             children[index],
           ],
         ],
@@ -329,8 +321,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         const _SearchProvidersWidget(),
-        _SettingsSectionHeader(l10n.sourceBehaviorSection),
+        const SizedBox(height: 12),
         _SettingsGroup(
+          title: l10n.sourceBehaviorSection,
           children: [
             _SettingsTile(
               title: l10n.mirrorsAndProviders,
@@ -363,22 +356,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
         _SettingsGroup(
           children: const [_LanguageSelectorWidget()],
         ),
-        _SettingsSectionHeader(l10n.themeTitle),
         _SettingsGroup(
+          title: l10n.themeTitle,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: _ThemeSelectorWidget(),
             ),
           ],
         ),
-        _SettingsSectionHeader(l10n.displaySection),
         _SettingsGroup(
+          title: l10n.displaySection,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: _FontSizeSelector(dataBase: dataBase),
-            ),
+            _FontSizeSelector(dataBase: dataBase),
           ],
         ),
       ],
@@ -395,8 +385,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        _SettingsSectionHeader(l10n.generalSection),
         _SettingsGroup(
+          title: l10n.generalSection,
           children: [
             FutureBuilder<dynamic>(
               future: dataBase.getPreference('bookStorageDirectory'),
@@ -432,8 +422,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
             ),
           ],
         ),
-        _SettingsSectionHeader(l10n.behaviorSection),
         _SettingsGroup(
+          title: l10n.behaviorSection,
           children: [
             _SettingsSwitchTile(
               title: l10n.manualDownloadButton,
@@ -459,10 +449,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           ],
         ),
         const _UpdateSettingsWidget(),
-        _SettingsSectionHeader(l10n.backupSection),
         _BackupSettingsWidget(database: dataBase),
-        _SettingsSectionHeader(l10n.maintenanceSection),
         _SettingsGroup(
+          title: l10n.maintenanceSection,
           children: [
             _SettingsTile(
               title: l10n.exportLogs,
@@ -501,9 +490,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                     Container(
                       width: 52,
                       height: 52,
-                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: scheme.primary,
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
@@ -513,11 +500,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                           ),
                         ],
                       ),
-                      child: Text(
-                        'O',
-                        style: SwissText.headline.copyWith(
-                          color: scheme.onPrimary,
-                          fontWeight: FontWeight.w800,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/icons/appIcon.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
@@ -569,8 +558,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
             );
           },
         ),
-        _SettingsSectionHeader(l10n.infoSection),
+        const SizedBox(height: 12),
         _SettingsGroup(
+          title: l10n.infoSection,
           children: [
             _SettingsTile(
               title: l10n.changelogTitle,
@@ -606,8 +596,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
             ),
           ],
         ),
-        _SettingsSectionHeader(l10n.thanksSection),
         _SettingsGroup(
+          title: l10n.thanksSection,
           children: [
             _SettingsTile(
               title: l10n.slumCatalogue,
@@ -782,6 +772,7 @@ class _UpdateSettingsWidgetState extends State<_UpdateSettingsWidget> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return _SettingsGroup(
+      title: l10n.updatesSection,
       children: [
         _SettingsSwitchTile(
           title: l10n.includeBetaUpdates,
@@ -880,43 +871,6 @@ class _SearchProvidersWidget extends ConsumerWidget {
                   color: scheme.onSurfaceVariant,
                   height: 1.6,
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.searchOrderHint,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: SwissText.micro.copyWith(color: scheme.outline),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      await manager.resetSourceOrder();
-                      // ignore: unused_result
-                      ref.refresh(searchSourceOrderProvider);
-                    },
-                    style: TextButton.styleFrom(
-                      minimumSize: Size.zero,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      l10n.searchOrderReset,
-                      style: SwissText.micro.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
             for (var index = 0; index < ids.length; index++) ...[
@@ -1302,6 +1256,7 @@ class _BackupSettingsWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     return _SettingsGroup(
+      title: l10n.backupSection,
       children: [
         _SettingsTile(
           title: l10n.exportBackupTitle,
@@ -1671,82 +1626,58 @@ class _ThemeOption extends StatelessWidget {
       label: label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(SwissRadius.field),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.all(7),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color:
                 selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(SwissRadius.field),
             border: Border.all(
               color: selected ? scheme.primary : scheme.outlineVariant,
-              width: selected ? 1.5 : 1,
+              width: selected ? 2 : 1,
             ),
           ),
           child: Column(
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(
-                      height: 46,
-                      width: double.infinity,
-                      child: mode == ThemeMode.system
-                          ? Row(
-                              children: [
-                                Expanded(
-                                  child: _ThemeSwatch(
-                                      scheme:
-                                          openlibColorScheme(Brightness.light)),
-                                ),
-                                Expanded(
-                                  child: _ThemeSwatch(
-                                      scheme:
-                                          openlibColorScheme(Brightness.dark)),
-                                ),
-                              ],
-                            )
-                          : _ThemeSwatch(
-                              scheme: openlibColorScheme(
-                                mode == ThemeMode.dark
-                                    ? Brightness.dark
-                                    : Brightness.light,
-                              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(SwissRadius.sm),
+                child: SizedBox(
+                  height: 44,
+                  width: double.infinity,
+                  child: mode == ThemeMode.system
+                      ? Row(
+                          children: [
+                            Expanded(
+                              child: _ThemeSwatch(
+                                  scheme: openlibColorScheme(Brightness.light)),
                             ),
-                    ),
-                  ),
-                  if (selected)
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: scheme.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: scheme.surface, width: 1.5),
+                            Expanded(
+                              child: _ThemeSwatch(
+                                  scheme: openlibColorScheme(Brightness.dark)),
+                            ),
+                          ],
+                        )
+                      : _ThemeSwatch(
+                          scheme: openlibColorScheme(
+                            mode == ThemeMode.dark
+                                ? Brightness.dark
+                                : Brightness.light,
+                          ),
                         ),
-                        child: Icon(Icons.check_rounded,
-                            size: 10, color: scheme.onPrimary),
-                      ),
-                    ),
-                ],
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: SwissText.badge.copyWith(
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  color:
-                      selected ? scheme.onPrimaryContainer : scheme.onSurface,
+                style: SwissText.micro.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: selected ? scheme.primary : scheme.onSurface,
                 ),
               ),
             ],
@@ -1841,143 +1772,75 @@ class _FontSizeSelector extends ConsumerWidget {
       ref.read(fontSizeScaleProvider.notifier).state = next;
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(
-                Icons.text_fields,
-                size: 19,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                l10n.fontSizeTitle,
-                style: SwissText.label,
-              ),
-            ),
-            Text(
-              '${(scale * 100).round()}%',
-              style: SwissText.caption.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Text(
-                'Aa',
-                style: SwissText.title.copyWith(
-                  letterSpacing: -1,
-                  color: scheme.primary,
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.text_fields,
+                  size: 16,
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  l10n.fontPreviewSample,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textScaler: TextScaler.linear(scale),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
+                  l10n.fontSizeTitle,
+                  style: SwissText.label.copyWith(color: scheme.onSurface),
+                ),
+              ),
+              Text(
+                '${(scale * 100).round()}%',
+                style: SwissText.caption.copyWith(color: scheme.outline),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                'Aa',
+                style: SwissText.micro.copyWith(color: scheme.outline),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 9),
                   ),
+                  child: Slider(
+                    value: scale,
+                    min: _min,
+                    max: _max,
+                    divisions: 12,
+                    label: '${scale.toStringAsFixed(1)}×',
+                    onChanged: select,
+                    onChangeEnd: _persist,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Aa',
+                style: SwissText.subtitle.copyWith(
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            _StepButton(
-              label: 'A−',
-              onTap: scale > _min
-                  ? () {
-                      final next = _normalize(scale - 0.1);
-                      select(next);
-                      _persist(next);
-                    }
-                  : null,
-            ),
-            Expanded(
-              child: Slider(
-                value: scale,
-                min: _min,
-                max: _max,
-                divisions: 12,
-                label: '${scale.toStringAsFixed(1)}×',
-                onChanged: select,
-                onChangeEnd: _persist,
-              ),
-            ),
-            _StepButton(
-              label: 'A+',
-              onTap: scale < _max
-                  ? () {
-                      final next = _normalize(scale + 0.1);
-                      select(next);
-                      _persist(next);
-                    }
-                  : null,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _StepButton extends StatelessWidget {
-  const _StepButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return SizedBox(
-      width: 38,
-      height: 34,
-      child: Material(
-        color: onTap == null
-            ? scheme.surfaceContainerLow
-            : scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(999),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
-          child: Center(
-            child: Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: onTap == null ? scheme.outline : scheme.onSurface,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }

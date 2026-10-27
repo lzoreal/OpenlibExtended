@@ -80,6 +80,21 @@ void main() {
           isTrue);
     });
 
+    test('detects a localized Cloudflare challenge title', () {
+      for (final title in [
+        '请稍候…',
+        'Einen Moment…',
+        'Un instant…',
+        'Un momento…',
+      ]) {
+        expect(
+            WebviewChallengeSolver.isChallengePage(
+                title: title, bodySnippet: ''),
+            isTrue,
+            reason: title);
+      }
+    });
+
     test('does not flag real search results', () {
       expect(
           WebviewChallengeSolver.isChallengePage(

@@ -12,8 +12,14 @@ import 'package:openlib/services/upgrade_detector.dart';
 import 'package:openlib/services/search_manager.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
+  _FakePathProvider()
+      : _base =
+            Directory.systemTemp.createTempSync('openlib_upgrade_test').path;
+
+  final String _base;
+
   Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_upgrade_test/$name');
+    final dir = Directory('$_base/$name');
     await dir.create(recursive: true);
     return dir.path;
   }

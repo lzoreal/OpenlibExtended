@@ -312,9 +312,23 @@ class _MainScreenState extends ConsumerState<MainScreen>
     SettingsPage(),
   ];
 
+  late final PageController _pageController;
+
   @override
   void initState() {
     super.initState();
+    _pageController =
+        PageController(initialPage: ref.read(selectedIndexProvider));
+    ref.listenManual<int>(selectedIndexProvider, (previous, next) {
+      if (_pageController.hasClients &&
+          (_pageController.page?.round() ?? next) != next) {
+        _pageController.animateToPage(
+          next,
+          duration: kPageSwitchDuration,
+          curve: kPageSwitchCurve,
+        );
+      }
+    });
     WidgetsBinding.instance.addObserver(this);
     // Request notification permission after first frame (only on mobile)
     if (PlatformUtils.isMobile) {
@@ -347,6 +361,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -476,14 +491,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
       body: SafeArea(
         bottom: false,
         child: ContentWidth(
-          child: AnimatedSwitcher(
-            duration: kPageSwitchDuration,
-            switchInCurve: kPageSwitchCurve,
-            switchOutCurve: Curves.easeIn,
-            child: KeyedSubtree(
-              key: ValueKey(selectedIndex),
-              child: _widgetOptions.elementAt(selectedIndex),
-            ),
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              if (ref.read(selectedIndexProvider) != index) {
+                ref.read(selectedIndexProvider.notifier).state = index;
+              }
+            },
+            children: _widgetOptions,
           ),
         ),
       ),

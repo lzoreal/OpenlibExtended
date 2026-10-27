@@ -59,6 +59,7 @@ class _WebviewState extends ConsumerState<Webview> {
 
   Future<void> _openDesktopWebview() async {
     try {
+      final l10n = AppLocalizations.of(context);
       _logger.info("Opening desktop webview for Desktop",
           tag: "WebView", metadata: {"url": widget.url});
 
@@ -73,7 +74,7 @@ class _WebviewState extends ConsumerState<Webview> {
         configuration: desktop_webview.CreateConfiguration(
           windowHeight: 720,
           windowWidth: 1280,
-          title: "Verify Access - OpenLibExtended",
+          title: l10n.webviewWindowTitle,
           userDataFolderWindows: webviewDataDir.path,
         ),
       );
@@ -289,6 +290,7 @@ class _WebviewState extends ConsumerState<Webview> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Desktop (Linux/Windows): Show waiting message for desktop webview
     if (PlatformUtils.isLinux || PlatformUtils.isWindows) {
       return Scaffold(
@@ -324,37 +326,26 @@ class _WebviewState extends ConsumerState<Webview> {
               const SizedBox(height: 20),
               Text(
                 _isDesktopWebviewOpen
-                    ? "Browser window is open"
-                    : "Opening browser window...",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.tertiary,
-                ),
+                    ? l10n.webviewBrowserOpen
+                    : l10n.webviewBrowserOpening,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(16),
+              Card(
                 margin: const EdgeInsets.symmetric(horizontal: 32),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.info_outline, size: 20),
-                    const SizedBox(height: 8),
-                    Text(
-                      "1. Solve the CAPTCHA in the browser window\n"
-                      "2. Wait for the page to fully load\n"
-                      "3. Click 'Done' button above to continue",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.info_outline, size: 20),
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.webviewInstructions,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -444,33 +435,22 @@ class _WebviewState extends ConsumerState<Webview> {
                         SizedBox(
                           width: 40,
                           height: 40,
-                          child: CircularProgressIndicator(
-                            color: Theme.of(context).colorScheme.secondary,
+                          child: const CircularProgressIndicator(
                             strokeWidth: 3,
                           ),
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          'Preparing download...',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.tertiary,
-                          ),
+                          l10n.webviewPreparingDownload,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 10),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 40),
                           child: Text(
-                            'Please wait while we verify access and fetch download links',
+                            l10n.webviewPreparingHint,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .tertiary
-                                  .withValues(alpha: 0.67),
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
                       ],

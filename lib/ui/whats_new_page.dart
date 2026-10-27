@@ -11,6 +11,7 @@ import 'package:openlib/main.dart' show MainScreen;
 import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/services/search_manager.dart';
 import 'package:openlib/services/update_checker.dart';
+import 'package:openlib/ui/components/pill_tabs.dart';
 
 /// Shown once after an app upgrade (not on first install): what's
 /// new, plus a tab that offers re-syncing the stored mirror list
@@ -20,7 +21,8 @@ import 'package:openlib/services/update_checker.dart';
 /// running version (rendered as markdown, matching what the release
 /// page shows) and falls back to short built-in notes offline.
 class WhatsNewPage extends ConsumerStatefulWidget {
-  const WhatsNewPage({super.key, required this.fromVersion, required this.toVersion});
+  const WhatsNewPage(
+      {super.key, required this.fromVersion, required this.toVersion});
 
   /// Version the user upgraded from ('' when unknown).
   final String fromVersion;
@@ -34,7 +36,8 @@ class WhatsNewPage extends ConsumerStatefulWidget {
 
 class _WhatsNewPageState extends ConsumerState<WhatsNewPage>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 2, vsync: this);
+  late final TabController _tabController =
+      TabController(length: 2, vsync: this);
 
   bool _instancesUpdated = false;
   List<String> _changes = const [];
@@ -100,7 +103,7 @@ class _WhatsNewPageState extends ConsumerState<WhatsNewPage>
                   Row(
                     children: [
                       Icon(Icons.upgrade_rounded,
-                          size: 34, color: theme.colorScheme.secondary),
+                          size: 34, color: theme.colorScheme.primary),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -114,15 +117,14 @@ class _WhatsNewPageState extends ConsumerState<WhatsNewPage>
                   ),
                   const SizedBox(height: 6),
                   Text(l10n.whatsNewIntro,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),
-            TabBar(
+            PillTabs(
               controller: _tabController,
-              labelColor: theme.colorScheme.secondary,
-              indicatorColor: theme.colorScheme.secondary,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               tabs: [
                 Tab(text: l10n.whatsNewTabFeatures),
                 Tab(text: l10n.whatsNewTabSources),
@@ -182,13 +184,12 @@ class _FeaturesTab extends ConsumerWidget {
         styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
           h2: theme.textTheme.titleMedium
               ?.copyWith(fontWeight: FontWeight.bold),
-          h3: theme.textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
+          h3: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           p: theme.textTheme.bodyMedium
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           listBullet: theme.textTheme.bodyMedium
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          a: TextStyle(color: theme.colorScheme.secondary),
+          a: TextStyle(color: theme.colorScheme.primary),
         ),
       );
     }
@@ -204,18 +205,12 @@ class _FeaturesTab extends ConsumerWidget {
       children: [
         for (final (icon, text) in notes)
           Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, size: 22, color: theme.colorScheme.secondary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(text,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant)),
-                ),
-              ],
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Card(
+              child: ListTile(
+                leading: Icon(icon, color: theme.colorScheme.primary),
+                title: Text(text),
+              ),
             ),
           ),
       ],
@@ -245,14 +240,14 @@ class _SourcesTab extends ConsumerWidget {
       padding: const EdgeInsets.all(20),
       children: [
         Text(l10n.whatsNewProvidersHint,
-            style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant)),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 16),
         if (updated) ...[
           Row(
             children: [
               Icon(Icons.check_circle_rounded,
-                  color: Colors.green.shade600, size: 20),
+                  color: theme.colorScheme.primary, size: 20),
               const SizedBox(width: 8),
               Text(l10n.whatsNewInstancesUpdated,
                   style: theme.textTheme.bodyMedium
@@ -265,8 +260,8 @@ class _SourcesTab extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 28, bottom: 4),
                 child: Text(change,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant)),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ),
           ],
         ] else

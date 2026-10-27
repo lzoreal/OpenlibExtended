@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Project imports:
 import 'package:openlib/state/state.dart'
     show checkIdExists, languageCodeToDisplay, resultCoverProvider;
-import 'package:openlib/ui/extensions.dart';
 
 // Extract file type from book info string
 String? getFileType(String? info) {
@@ -89,8 +88,10 @@ class BookInfoCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    String? fileType = getFileType(info);
-    String? language = getLanguage(info);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fileType = getFileType(info);
+    final language = getLanguage(info);
 
     // Check if book is downloaded (only if md5 is provided)
     final isDownloaded = md5 != null
@@ -100,223 +101,167 @@ class BookInfoCard extends ConsumerWidget {
     // LibGen search rows ship without covers; resolve one lazily from
     // the book's ads.php page (it carries the cover URL).
     final hasThumbnail = thumbnail != null && thumbnail!.isNotEmpty;
-    final lazyCover = hasThumbnail
-        ? null
-        : ref.watch(resultCoverProvider(link)).valueOrNull;
+    final lazyCover =
+        hasThumbnail ? null : ref.watch(resultCoverProvider(link)).valueOrNull;
     final coverUrl = hasThumbnail ? thumbnail : lazyCover;
 
-    return InkWell(
-      onTap: onClick,
-      onLongPress: onLongPress,
-      child: Container(
-        width: double.infinity,
-        height: 120,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          color: Theme.of(context).colorScheme.tertiaryContainer,
-        ),
-        margin: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            // Book thumbnail with download indicator
-            Stack(
-              children: [
-                CachedNetworkImage(
-                  height: 120,
-                  width: 90,
-                  imageUrl: coverUrl ?? "",
-                  // libgen mirrors serve /covers/ only with a same-host
-                  // ads.php Referer; without it the response is 200 but
-                  // empty. The host comes from the cover URL itself, so
-                  // no mirror address is baked into the app.
-                  httpHeaders: _coverHeaders(coverUrl),
-                  imageBuilder: (context, imageProvider) => Container(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.all(Radius.circular(5)),
-                      image: DecorationImage(
-                        image: imageProvider,
-                        fit: BoxFit.fill,
-                      ),
-                    ),
-                  ),
-                  placeholder: (context, url) => Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(5),
-                      color: "#F8C0C8".toColor(),
-                    ),
-                    height: 120,
-                    width: 90,
-                  ),
-                  errorWidget: (context, url, error) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(5),
-                        color: "#F8C0C8".toColor(),
-                      ),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onClick,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: CachedNetworkImage(
                       height: 120,
-                      width: 90,
-                      child: const Center(
-                        child: Icon(Icons.image_rounded),
+                      width: 84,
+                      fit: BoxFit.cover,
+                      imageUrl: coverUrl ?? "",
+                      // libgen mirrors serve /covers/ only with a
+                      // same-host ads.php Referer; without it the
+                      // response is 200 but empty. The host comes from
+                      // the cover URL itself, so no mirror address is
+                      // baked into the app.
+                      httpHeaders: _coverHeaders(coverUrl),
+                      placeholder: (context, url) => Container(
+                        color: scheme.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.menu_book_outlined,
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
-                    );
-                  },
-                ),
-                // Downloaded checkmark indicator
-                if (isDownloaded.valueOrNull == true)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        color: Colors.white,
-                        size: 16,
+                      errorWidget: (context, url, error) => Container(
+                        color: scheme.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),
-              ],
-            ),
-            Expanded(
-                child: Padding(
-              padding: const EdgeInsets.all(5),
-              child: SizedBox(
-                width: double.infinity,
+                  if (isDownloaded.valueOrNull == true)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: scheme.surfaceContainerLow,
+                            width: 2,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.check,
+                          color: scheme.onPrimary,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.tertiary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
                       maxLines: 2,
-                    ),
-                    Text(
-                      publisher,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color:
-                            Theme.of(context).textTheme.headlineMedium?.color,
-                      ),
                       overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    if (publisher.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        publisher,
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         if (source != null && source!.isNotEmpty)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .secondary
-                                  .withAlpha(200),
-                              borderRadius: BorderRadius.circular(2.5),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(3, 2, 3, 2),
-                              child: Text(
-                                source!,
-                                style: const TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                          ),
-                        if (source != null && source!.isNotEmpty)
-                          const SizedBox(
-                            width: 3,
+                          _MetaBadge(
+                            label: source!,
+                            background: scheme.primaryContainer,
+                            foreground: scheme.onPrimaryContainer,
                           ),
                         if (fileType != null)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: "#a5a5a5".toColor(),
-                              borderRadius: BorderRadius.circular(2.5),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(3, 2, 3, 2),
-                              child: Text(
-                                fileType,
-                                style: const TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                          ),
-                        if (fileType != null)
-                          const SizedBox(
-                            width: 3,
-                          ),
-                        // Language badge
-                        if (language != null)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: "#6b8cce".toColor(),
-                              borderRadius: BorderRadius.circular(2.5),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(3, 2, 3, 2),
-                              child: Text(
-                                language,
-                                style: const TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
+                          _MetaBadge(
+                            label: fileType,
+                            background: scheme.secondaryContainer,
+                            foreground: scheme.onSecondaryContainer,
                           ),
                         if (language != null)
-                          const SizedBox(
-                            width: 3,
+                          _MetaBadge(
+                            label: language,
+                            background: scheme.tertiaryContainer,
+                            foreground: scheme.onTertiaryContainer,
                           ),
-                        Expanded(
-                          child: Text(
-                            author,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.color,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
+                        Text(
+                          author,
+                          style: theme.textTheme.labelMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-            ))
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _MetaBadge extends StatelessWidget {
+  const _MetaBadge({
+    required this.label,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w600,
+              height: 1.455,
+            ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

@@ -5,17 +5,15 @@ class TitleText extends StatelessWidget {
   const TitleText(this.text, {super.key});
 
   final String text;
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 10, bottom: 7),
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 19,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.secondary,
-        ),
+        style: theme.textTheme.headlineMedium,
       ),
     );
   }

@@ -6,6 +6,9 @@
 // Dart imports:
 import 'dart:io';
 
+// Package imports:
+import 'package:path/path.dart' as p;
+
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
 
@@ -85,7 +88,7 @@ void main() {
     test('Nunito ships exactly the weights the app renders', () {
       final dir = Directory('google_fonts');
       final fonts =
-          dir.listSync().map((f) => f.path.split('/').last).toList()..sort();
+          dir.listSync().map((f) => p.basename(f.path)).toList()..sort();
       // FontWeight values used across lib/: 400 (normal), 500, 600, 700
       // (bold), 900 (w900). Nunito file names map to those weights.
       expect(fonts, [
@@ -103,8 +106,8 @@ void main() {
         if (entity is! File) continue;
         // Launcher icons are build-time inputs for flutter_launcher_icons,
         // declared in pubspec's flutter_icons: section - not runtime assets.
-        if (entity.path.contains('assets/icons/')) continue;
-        final name = entity.path.split('/').last;
+        if (p.split(entity.path).contains('icons')) continue;
+        final name = p.basename(entity.path);
         expect(referenced, contains(name),
             reason: 'asset $name is shipped but never referenced');
       }
@@ -151,7 +154,7 @@ Set<String> _referencedAssetNames() {
     final source = entity.readAsStringSync();
     for (final assetEntity in Directory('assets').listSync(recursive: true)) {
       if (assetEntity is! File) continue;
-      final name = assetEntity.path.split('/').last;
+      final name = p.basename(assetEntity.path);
       if (source.contains(name)) names.add(name);
     }
   }

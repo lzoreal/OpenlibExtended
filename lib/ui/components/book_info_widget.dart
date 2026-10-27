@@ -34,6 +34,20 @@ String? openInSiteUrl({
   return link.isEmpty ? null : link;
 }
 
+String? _isbnFromInfo(String info) {
+  final labelled = RegExp(
+    r'ISBN(?:-1[03])?\s*:?\s*([0-9][0-9Xx -]{8,16}[0-9Xx])',
+    caseSensitive: false,
+  ).firstMatch(info)?.group(1);
+  final candidate =
+      labelled ?? RegExp(r'\b97[89][0-9]{10}\b').firstMatch(info)?.group(0);
+  if (candidate == null) return null;
+  final normalized =
+      candidate.replaceAll(RegExp(r'[^0-9Xx]'), '').toUpperCase();
+  if (normalized.length == 10 || normalized.length == 13) return normalized;
+  return null;
+}
+
 /// Best-effort source label for a stored book whose search-result tag was
 /// never persisted.
 String? sourceLabelForUrl(String? url, AppLocalizations l10n) {
@@ -88,6 +102,7 @@ class BookInfoWidget extends ConsumerWidget {
         ? l10n.noDescriptionAvailable
         : rawDescription;
     final info = (data.info ?? '').toString();
+    final isbn = _isbnFromInfo(info);
     final format =
         ((data.format ?? getFileType(info)) ?? '').toString().toUpperCase();
     final language = getLanguage(info) ?? '';
@@ -131,8 +146,8 @@ class BookInfoWidget extends ConsumerWidget {
                 children: [
                   Container(
                     key: const ValueKey('detail-cover'),
-                    width: 112,
-                    height: 168,
+                    width: 128,
+                    height: 192,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(SwissRadius.field),
                       boxShadow: [
@@ -218,10 +233,16 @@ class BookInfoWidget extends ConsumerWidget {
                         title: l10n.fileInfoTitle,
                       ),
                       const SizedBox(height: 4),
+                      if (isbn != null)
+                        _InfoRow(
+                          label: l10n.isbnLabel,
+                          value: isbn,
+                          first: true,
+                        ),
                       _InfoRow(
                         label: l10n.languageSetting,
                         value: language.isEmpty ? '—' : language,
-                        first: true,
+                        first: isbn == null,
                       ),
                       _InfoRow(
                         label: l10n.publishedYearLabel,

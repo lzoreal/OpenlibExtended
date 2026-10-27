@@ -1,12 +1,14 @@
 // Dart imports:
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show Locale;
 
 // Package imports:
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
 
 // Project imports:
+import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/database.dart' show MyLibraryDb, MyBook;
 import 'package:openlib/services/download_notification.dart';
 import 'package:openlib/services/files.dart' show generateBookFileName;
@@ -31,11 +33,15 @@ enum DownloadStatus {
 String mirrorSourceLabel(String url) {
   final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
   if (host.isEmpty) return url;
-  if (host.contains('libgen') || host.contains('lgli') || host.contains('libgen')) {
+  if (host.contains('libgen') ||
+      host.contains('lgli') ||
+      host.contains('libgen')) {
     return 'LibGen';
   }
-  if (host.contains('z-lib') || host.contains('zlibrary') ||
-      host.contains('1lib') || host.contains('artificial')) {
+  if (host.contains('z-lib') ||
+      host.contains('zlibrary') ||
+      host.contains('1lib') ||
+      host.contains('artificial')) {
     return 'Z-Library';
   }
   if (host.contains('ipfs')) return 'IPFS';
@@ -140,6 +146,35 @@ class DownloadManager {
   final DownloadNotificationService _notificationService =
       DownloadNotificationService();
   final AppLogger _logger = AppLogger();
+
+  AppLocalizations _l10n = lookupAppLocalizations(const Locale('en'));
+
+  void setLocale(Locale locale) {
+    final supported = AppLocalizations.supportedLocales.firstWhere(
+      (l) => l.languageCode == locale.languageCode,
+      orElse: () => const Locale('en'),
+    );
+    _l10n = lookupAppLocalizations(supported);
+    _notificationService.setChannelLabels(
+        _l10n.downloadsTitle, _l10n.notificationChannelDescription);
+  }
+
+  String _localizedFailure(String message) {
+    const savePrefix = 'Could not save to library:';
+    if (message.startsWith(savePrefix)) {
+      return _l10n
+          .downloadCouldNotSave(message.substring(savePrefix.length).trim());
+    }
+    return switch (message) {
+      'No mirrors available!' ||
+      'No working mirrors available!' =>
+        _l10n.noMirrorsAvailable,
+      'Error getting mirrors' => _l10n.downloadErrorGettingMirrors,
+      'All mirrors failed!' => _l10n.downloadAllMirrorsFailed,
+      'Manual verification required' => _l10n.manualVerificationRequired,
+      _ => message,
+    };
+  }
 
   final Map<String, DownloadTask> _activeDownloads = {};
   final StreamController<Map<String, DownloadTask>> _downloadsController =
@@ -254,7 +289,7 @@ class DownloadManager {
       if (!_activeDownloads.containsKey(task.id)) {
         await _notificationService.showDownloadNotification(
           id: task.md5.hashCode,
-          title: 'Already downloading: $title',
+          title: _l10n.notificationAlreadyDownloading(title),
           progress: -1,
         );
       }
@@ -273,7 +308,7 @@ class DownloadManager {
 
     await _notificationService.showDownloadNotification(
       id: task.id.hashCode,
-      title: 'Queued: ${task.title}',
+      title: _l10n.notificationQueued(task.title),
       progress: 0,
     );
 
@@ -296,7 +331,7 @@ class DownloadManager {
 
     await _notificationService.showDownloadNotification(
       id: task.id.hashCode,
-      title: 'Queued: ${task.title}',
+      title: _l10n.notificationQueued(task.title),
       progress: 0,
     );
 
@@ -316,7 +351,7 @@ class DownloadManager {
         await _notificationService.showDownloadNotification(
           id: task.id.hashCode,
           title: task.title,
-          body: 'Paused',
+          body: _l10n.downloadPaused,
           progress: (task.progress * 100).toInt(),
         );
       }
@@ -347,6 +382,30 @@ class DownloadManager {
       } else {
         _startDownload(taskToStart);
       }
+    }
+  }
+
+  Future<void> pauseAll() async {
+    final ids = _activeDownloads.values
+        .where((task) =>
+            task.status == DownloadStatus.queued ||
+            task.status == DownloadStatus.fetchingMirrors ||
+            task.status == DownloadStatus.downloadingMirrors ||
+            task.status == DownloadStatus.downloading)
+        .map((task) => task.id)
+        .toList();
+    for (final id in ids) {
+      await pauseDownload(id);
+    }
+  }
+
+  Future<void> resumeAll() async {
+    final ids = _activeDownloads.values
+        .where((task) => task.status == DownloadStatus.paused)
+        .map((task) => task.id)
+        .toList();
+    for (final id in ids) {
+      await resumeDownload(id);
     }
   }
 
@@ -453,14 +512,14 @@ class DownloadManager {
       } else {
         // Failed tasks: retry, but keep the partial file so the Range
         // request continues instead of restarting from zero.
-        await _retryDownloadKeepingPartial(id);
+        await retryDownloadKeepingPartial(id);
       }
     }
   }
 
   /// Retry that does NOT delete the partial file first, so the server's
   /// Range support picks up from the last byte on disk.
-  Future<void> _retryDownloadKeepingPartial(String taskId) async {
+  Future<void> retryDownloadKeepingPartial(String taskId) async {
     if (!_activeDownloads.containsKey(taskId)) return;
     final task = _activeDownloads[taskId]!;
     if (task.status != DownloadStatus.failed) return;
@@ -535,8 +594,8 @@ class DownloadManager {
         id: task.id.hashCode,
         title: task.title,
         body: task.isDirectLink
-            ? 'Starting fast download...'
-            : 'Getting mirrors...',
+            ? _l10n.notificationStartingFastDownload
+            : _l10n.downloadGettingMirrors,
         progress: 0,
       );
 
@@ -581,7 +640,7 @@ class DownloadManager {
         await _notificationService.showDownloadNotification(
           id: task.id.hashCode,
           title: task.title,
-          body: 'Manual verification needed',
+          body: _l10n.manualVerificationRequired,
           progress: -1,
         );
         await Future.delayed(_notificationClearDelay);
@@ -635,7 +694,7 @@ class DownloadManager {
     await _notificationService.showDownloadNotification(
       id: task.id.hashCode,
       title: task.title,
-      body: 'Finding available mirror...',
+      body: _l10n.downloadFindingMirror,
       progress: (task.progress * 100).toInt(),
     );
 
@@ -686,7 +745,7 @@ class DownloadManager {
         await _notificationService.showDownloadNotification(
           id: task.id.hashCode,
           title: task.title,
-          body: 'Downloading from ${mirrorSourceLabel(currentMirror)}...',
+          body: _l10n.downloadFrom(mirrorSourceLabel(currentMirror)),
           progress: (task.progress * 100).toInt(),
         );
 
@@ -871,8 +930,9 @@ class DownloadManager {
             lastNotifiedPercent = percent;
             _notificationService.showDownloadNotification(
               id: taskId.hashCode,
-              title: _activeDownloads[taskId]?.title ?? 'Downloading',
-              body: 'Downloading... $percent%',
+              title:
+                  _activeDownloads[taskId]?.title ?? _l10n.downloadDownloading,
+              body: _l10n.notificationDownloadingPercent(percent),
               progress: percent,
             );
           }
@@ -915,8 +975,8 @@ class DownloadManager {
     _updateTaskStatus(taskId, DownloadStatus.failed, errorMessage: message);
     await _notificationService.showDownloadNotification(
       id: taskId.hashCode,
-      title: _activeDownloads[taskId]?.title ?? 'Download',
-      body: 'Failed: $message',
+      title: _activeDownloads[taskId]?.title ?? _l10n.notificationDownloadTitle,
+      body: _l10n.notificationFailed(_localizedFailure(message)),
       progress: -1,
     );
     await Future.delayed(_notificationClearDelay);
@@ -932,7 +992,7 @@ class DownloadManager {
     await _notificationService.showDownloadNotification(
       id: task.id.hashCode,
       title: task.title,
-      body: 'Verifying file...',
+      body: _l10n.notificationVerifyingFile,
       progress: 100,
     );
 
@@ -973,8 +1033,8 @@ class DownloadManager {
       id: task.id.hashCode,
       title: task.title,
       body: checkSumValid
-          ? 'Download completed!'
-          : 'Download completed (checksum failed)',
+          ? _l10n.notificationDownloadComplete
+          : _l10n.notificationDownloadCompleteChecksumFailed,
       progress: -1,
     );
 

@@ -1,8 +1,3 @@
-// Real pagination behavior of the results page: page 1 renders, the
-// next page loads as the list scrolls near its end, an empty page stops
-// the pager. The search provider is overridden with deterministic pages;
-// the page widget under test is the real one.
-
 // Flutter imports:
 import 'package:flutter/material.dart';
 
@@ -11,155 +6,253 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/services/annas_archieve.dart';
+import 'package:openlib/services/search_manager.dart';
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/components/book_card_widget.dart';
+import 'package:openlib/ui/components/search_result_card.dart';
+import 'package:openlib/ui/components/source_journey_card.dart';
 import 'package:openlib/ui/results_page.dart';
 
-/// Builds a page of books with recognizable titles.
-List<BookData> fakePage(int page, {String? source}) {
+List<BookData> _sourceBooks(String tag, String displayName, int page, int count) {
   return List.generate(
-      20,
-      (i) => BookData(
-            title: 'Book $page-$i',
-            author: 'Author $page$i',
-            link: 'https://example.com/md5/p$page-$i',
-            md5: 'md5-p$page-$i',
-            source: source,
-          ));
+    count,
+    (i) => BookData(
+      title: '$tag $page-$i',
+      author: 'Author $tag',
+      link: 'https://example.com/md5/$tag-$page-$i',
+      md5: 'md5-$tag-$page-$i',
+      source: displayName,
+    ),
+  );
 }
 
-Future<List<BookData>> fakeSearch(SearchPageKey key) async {
-  // Page 3 exists but is empty: the pager must stop there.
-  if (key.page >= 3) return [];
-  await Future<void>.delayed(const Duration(milliseconds: 10));
-  return fakePage(key.page);
+/// One parallel page: every source answers with its own list.
+SearchManagerResult multiSourcePage(int page) {
+  final libgen = _sourceBooks('LibGen', 'Library Genesis', page, 2);
+  final zlibrary = _sourceBooks('Z-Library', 'Z-Library', page, 20);
+  final welib = _sourceBooks('WeLib', 'WeLib', page, 3);
+  final anna = _sourceBooks('Anna', "Anna's Archive", page, 1);
+  final all = [...libgen, ...zlibrary, ...welib, ...anna];
+  return SearchManagerResult(
+    books: all,
+    failedProviders: const [],
+    resultSource: 'Library Genesis',
+    resultSourceId: SearchProviderId.libgen,
+    sources: [
+      SearchSourceRun(
+        id: SearchProviderId.libgen,
+        displayName: 'Library Genesis',
+        resultCount: libgen.length,
+        status: SearchSourceStatus.hit,
+      ),
+      SearchSourceRun(
+        id: SearchProviderId.zlibrary,
+        displayName: 'Z-Library',
+        resultCount: zlibrary.length,
+        status: SearchSourceStatus.hit,
+      ),
+      SearchSourceRun(
+        id: SearchProviderId.welib,
+        displayName: 'WeLib',
+        resultCount: welib.length,
+        status: SearchSourceStatus.hit,
+      ),
+      SearchSourceRun(
+        id: SearchProviderId.annasArchive,
+        displayName: "Anna's Archive",
+        resultCount: anna.length,
+        status: SearchSourceStatus.hit,
+      ),
+    ],
+    booksBySource: {
+      SearchProviderId.libgen: libgen,
+      SearchProviderId.zlibrary: zlibrary,
+      SearchProviderId.welib: welib,
+      SearchProviderId.annasArchive: anna,
+    },
+  );
 }
 
 void main() {
-  Future<void> pumpResults(WidgetTester tester, {double height = 600}) async {
+  Future<List<SearchPageKey>> pumpResults(
+    WidgetTester tester, {
+    required Future<SearchManagerResult> Function(SearchPageKey key) search,
+    String query = 'docker',
+    SearchProviderId? source,
+  }) async {
+    final keys = <SearchPageKey>[];
     await tester.pumpWidget(ProviderScope(
       overrides: [
-        searchProvider.overrideWith((ref, key) => fakeSearch(key)),
+        initialSearchProvider.overrideWith((ref, key) {
+          keys.add(key);
+          return Stream.fromFuture(search(key));
+        }),
+        searchProvider.overrideWith((ref, key) {
+          keys.add(key);
+          return search(key);
+        }),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: const ResultPage(searchQuery: 'docker'),
+        home: ResultPage(searchQuery: query, source: source),
       ),
     ));
-    // Bounded pumping: the bottom loader keeps its animation alive, so
-    // pumpAndSettle never settles.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
+    return keys;
   }
 
-  testWidgets('renders the first page of results', (tester) async {
-    await pumpResults(tester);
+  Finder sourceTile(String label) => find.descendant(
+        of: find.byType(SourceJourneyCard),
+        matching: find.text(label),
+      );
 
-    // Lazy slivers only build what is visible; page 1's data must at
-    // least fill the screen with its items.
-    expect(find.text('Book 1-0'), findsOneWidget);
-    expect(find.byType(BookInfoCard), findsWidgets);
-  });
-
-  testWidgets('scrolling to the bottom loads the next page and appends',
+  testWidgets('renders the merged list and the source switcher',
       (tester) async {
-    await pumpResults(tester);
+    await pumpResults(tester, search: (key) async => multiSourcePage(key.page));
 
-    // Drag far down: past the 200px pre-fetch margin, into page 2.
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -4000));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // Page 2 items are now in the data: at least one page-2 card must
-    // have been built as the list shows them.
-    final visiblePage2 = find
-        .byWidgetPredicate((w) =>
-            w is BookInfoCard &&
-            w.title.startsWith('Book 2-'))
-        .evaluate()
-        .length;
-    expect(visiblePage2, greaterThan(0),
-        reason: 'page 2 items must append after scrolling');
-  });
-
-  testWidgets('an empty page ends the pager instead of fetching forever',
-      (tester) async {
-    await pumpResults(tester);
-
-    // First scroll loads page 2, second reaches for page 3, which is
-    // empty - the pager must stop.
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -4000));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -8000));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // Page 3 returned nothing: no page-3 book ever renders, and the
-    // pager stops instead of fetching page 4 (whose books would also be
-    // absent, but the empty response proves the fetch ran once and
-    // stopped).
+    expect(find.byType(SearchResultCard), findsWidgets);
+    expect(find.byType(SourceJourneyCard), findsOneWidget);
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+    expect(sourceTile(l10n.searchSourceAuto), findsOneWidget);
     expect(
-        find.byWidgetPredicate((w) =>
-            w is BookInfoCard && w.title.startsWith('Book 3-')),
-        findsNothing);
+      find.descendant(
+        of: find.byType(SourceJourneyCard),
+        matching: find.text('26'),
+      ),
+      findsOneWidget,
+    );
+    expect(sourceTile(l10n.sourceWelib), findsOneWidget);
+    expect(find.text('LibGen 1-0'), findsWidgets);
   });
 
-  testWidgets('shows the source chip on tagged results and the header line',
+  testWidgets('tapping a source switches the visible result list',
       (tester) async {
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        searchProvider.overrideWith((ref, key) async {
-          if (key.page >= 2) return [];
-          return fakePage(1, source: 'LibGen');
-        }),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const ResultPage(searchQuery: 'docker'),
-      ),
-    ));
+    await pumpResults(tester, search: (key) async => multiSourcePage(key.page));
+
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+    await tester.tap(sourceTile(l10n.sourceWelib));
+    await tester.pump();
+
+    expect(find.text('WeLib 1-0'), findsWidgets);
+    expect(find.text('LibGen 1-0'), findsNothing);
+
+    await tester.tap(sourceTile(l10n.searchSourceAuto));
+    await tester.pump();
+    expect(find.text('LibGen 1-0'), findsWidgets);
+  });
+
+  testWidgets('the merged view paginates without pinning a source',
+      (tester) async {
+    final keys = await pumpResults(
+      tester,
+      search: (key) async => key.page >= 3
+          ? const SearchManagerResult(books: [], failedProviders: [])
+          : multiSourcePage(key.page),
+    );
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -4000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final pageTwo = keys.where((key) => key.page == 2).toList();
+    expect(pageTwo, isNotEmpty);
+    expect(pageTwo.first.source, isNull);
+    expect(find.text('Z-Library 2-0'), findsWidgets);
+  });
+
+  testWidgets('a switched source paginates within that source', (tester) async {
+    final keys = await pumpResults(
+      tester,
+      search: (key) async => key.page >= 3
+          ? const SearchManagerResult(books: [], failedProviders: [])
+          : multiSourcePage(key.page),
+    );
+
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+    await tester.tap(sourceTile(l10n.sourceZlibShort));
+    await tester.pump();
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -4000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final pageTwo = keys.where((key) => key.page == 2).toList();
+    expect(pageTwo, isNotEmpty);
+    expect(pageTwo.first.source, SearchProviderId.zlibrary);
+  });
+
+  testWidgets('an empty result shows the switcher and clear-filter retry',
+      (tester) async {
+    var calls = 0;
+    await pumpResults(
+      tester,
+      search: (key) async {
+        calls++;
+        return const SearchManagerResult(
+          books: [],
+          failedProviders: [],
+          sources: [
+            SearchSourceRun(
+              id: SearchProviderId.libgen,
+              displayName: 'Library Genesis',
+              resultCount: 0,
+              status: SearchSourceStatus.empty,
+            ),
+            SearchSourceRun(
+              id: SearchProviderId.zlibrary,
+              displayName: 'Z-Library',
+              resultCount: 0,
+              status: SearchSourceStatus.empty,
+            ),
+            SearchSourceRun(
+              id: SearchProviderId.welib,
+              displayName: 'WeLib',
+              resultCount: 0,
+              status: SearchSourceStatus.failed,
+            ),
+            SearchSourceRun(
+              id: SearchProviderId.annasArchive,
+              displayName: "Anna's Archive",
+              resultCount: 0,
+              status: SearchSourceStatus.empty,
+            ),
+          ],
+        );
+      },
+    );
+
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+    expect(find.byType(SourceJourneyCard), findsOneWidget);
+    expect(find.text(l10n.noResultsFor('docker')), findsOneWidget);
+    expect(find.text(l10n.clearFiltersRetry), findsOneWidget);
+
+    await tester.tap(find.text(l10n.clearFiltersRetry));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    // Every visible card carries the catalog chip...
-    expect(find.text('LibGen'), findsWidgets);
-
-    // ...and the list header states where the results came from.
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
-    expect(find.text(l10n.searchingOn('LibGen')), findsOneWidget);
+    expect(calls, greaterThan(1));
   });
 
-  testWidgets('untagged results render without a source chip',
+  testWidgets('a source route opens on that source but still fetches all',
       (tester) async {
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        searchProvider.overrideWith((ref, key) async {
-          if (key.page >= 2) return [];
-          return fakePage(1); // no source
-        }),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const ResultPage(searchQuery: 'docker'),
-      ),
-    ));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    final keys = await pumpResults(
+      tester,
+      source: SearchProviderId.welib,
+      search: (key) async => multiSourcePage(key.page),
+    );
 
-    // No 'LibGen'/'Z-Library' chip anywhere, and no header line for a
-    // source that does not exist.
-    expect(find.text('LibGen'), findsNothing);
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
-    expect(find.text(l10n.searchingOn('LibGen')), findsNothing);
+    expect(keys.first.source, isNull,
+        reason: 'the first page always queries every source');
+    expect(find.text('WeLib 1-0'), findsWidgets);
+    expect(find.text('LibGen 1-0'), findsNothing);
   });
 }

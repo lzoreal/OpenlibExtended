@@ -1,6 +1,7 @@
 // The book info page must expose its text for copying: SelectionArea wraps
-// the scroll view so title, author, info and description are selectable,
-// while buttons inside the child slot keep working.
+// the scroll view so the title, author, metadata and description are
+// selectable. Actions now live in the page's bottom bar, outside the
+// selection area.
 
 // Flutter imports:
 import 'package:flutter/material.dart';
@@ -15,8 +16,10 @@ import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/components/book_info_widget.dart';
 
 class _FakeBookData {
+  final String? format = 'epub';
   final String md5 = '7b2e2c05501894b229e309e39ec0d05d';
-  final String link = 'https://annas-archive.gl/md5/7b2e2c05501894b229e309e39ec0d05d';
+  final String link =
+      'https://annas-archive.gl/md5/7b2e2c05501894b229e309e39ec0d05d';
   final String title = 'Structure of Scientific Revolutions';
   final String author = 'Thomas S. Kuhn';
   final String publisher = 'University of Chicago Press';
@@ -41,13 +44,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: BookInfoWidget(
-            data: data,
-            child: ElevatedButton(
-              onPressed: () {},
-              child: const Text('Add To My Library'),
-            ),
-          ),
+          body: BookInfoWidget(data: data),
         ),
       ),
     ));
@@ -57,13 +54,12 @@ void main() {
     // The selectable region wraps the text content.
     expect(find.byType(SelectionArea), findsOneWidget);
 
-    // Title, author, metadata and description all render inside it.
-    expect(find.text(data.title), findsOneWidget);
-    expect(find.text(data.author), findsOneWidget);
-    expect(find.text(data.info), findsOneWidget);
+    // Title, author, publisher and description all render inside it. The
+    // title also appears in the cover fallback, and author/publisher share
+    // the byline.
+    expect(find.text(data.title), findsWidgets);
+    expect(find.textContaining(data.author), findsOneWidget);
+    expect(find.textContaining(data.publisher), findsOneWidget);
     expect(find.text(data.description), findsOneWidget);
-
-    // The button in the child slot still exists and is reachable.
-    expect(find.byType(ElevatedButton), findsOneWidget);
   });
 }

@@ -41,11 +41,12 @@ class _FakePathProvider extends PathProviderPlatform {
 
 /// A provider the test fully controls.
 class _FakeProvider implements SearchProvider {
-  _FakeProvider(this.idName, this.results, {this.error});
+  _FakeProvider(this.idName, this.results, {this.error, this.delay});
 
   final String idName;
   final List<BookData> results;
   final Object? error;
+  final Duration? delay;
 
   int calls = 0;
 
@@ -59,6 +60,7 @@ class _FakeProvider implements SearchProvider {
   @override
   Future<List<BookData>> search(SearchQuery query) async {
     calls++;
+    if (delay != null) await Future<void>.delayed(delay!);
     if (error != null) throw error!;
     return results;
   }
@@ -208,20 +210,19 @@ void main() {
   });
 
   group('SearchManager fan-out', () {
-    test('stops at the first provider with results, reports failures',
-        () async {
-      // Libgen first in the chain: fails -> chain moves on to AA, which
-      // delivers, and zlib (never reached) stays at 0 calls.
+    test('queries every enabled provider and reports failures', () async {
+      // All enabled sources run in parallel: a failing libgen still leaves
+      // zlibrary and Anna's Archive contributing their own results.
       final failing = _FakeProvider('libgen', [], error: Exception('down'));
-      final ok = _FakeProvider('annasArchive', [
-        BookData(title: 'AA Book', link: 'https://a/md5/x1', md5: 'md5-1'),
-      ]);
-      final never = _FakeProvider('zlibrary', [
+      final zlib = _FakeProvider('zlibrary', [
         BookData(title: 'Z', link: 'https://z/md5/x1', md5: 'md5-z'),
+      ]);
+      final anna = _FakeProvider('annasArchive', [
+        BookData(title: 'AA Book', link: 'https://a/md5/x1', md5: 'md5-1'),
       ]);
       final manager = SearchManager(
         database: MyLibraryDb.instance,
-        providers: [failing, ok, never],
+        providers: [failing, anna, zlib],
       );
       await manager.setProviderEnabled(SearchProviderId.libgen, true);
       await manager.setProviderEnabled(SearchProviderId.annasArchive, true);
@@ -229,11 +230,77 @@ void main() {
 
       final result = await manager.search(const SearchQuery(text: 'wizard'));
 
-      expect(result.books.length, 1);
-      expect(result.books.first.title, 'AA Book');
+      expect(result.books.length, 2);
+      expect(result.books.first.title, 'Z');
       expect(result.failedProviders, ['libgen']);
-      expect(failing.calls, 1); // it was tried, not skipped
-      expect(never.calls, 0); // chain stopped at the first hit
+      expect(failing.calls, 1);
+      expect(zlib.calls, 1);
+      expect(anna.calls, 1, reason: 'a hit must not stop the other sources');
+      expect(result.booksBySource[SearchProviderId.zlibrary]!.single.title, 'Z');
+      expect(result.booksBySource[SearchProviderId.annasArchive]!.single.title,
+          'AA Book');
+    });
+
+    test('applies the file type filter to every provider result', () async {
+      final libgen = _FakeProvider('libgen', [
+        BookData(
+            title: 'EPUB Libgen',
+            link: 'https://l/epub',
+            md5: 'l-epub',
+            info: 'English, EPUB, 2 MB'),
+        BookData(
+            title: 'PDF Libgen',
+            link: 'https://l/pdf',
+            md5: 'l-pdf',
+            info: 'English, PDF, 4 MB'),
+      ]);
+      final zlib = _FakeProvider('zlibrary', [
+        BookData(
+            title: 'PDF Zlib',
+            link: 'https://z/pdf',
+            md5: 'z-pdf',
+            info: 'English, PDF, 3 MB'),
+        BookData(
+            title: 'EPUB Zlib',
+            link: 'https://z/epub',
+            md5: 'z-epub',
+            info: 'English, EPUB, 1 MB'),
+      ]);
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [libgen, zlib],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.zlibrary, true);
+
+      final filtered = await manager.search(const SearchQuery(
+        text: 'q',
+        fileType: 'epub',
+        filtersEnabled: true,
+      ));
+
+      expect(
+        filtered.books.map((book) => book.title),
+        unorderedEquals(['EPUB Libgen', 'EPUB Zlib']),
+      );
+      expect(
+        filtered.booksBySource[SearchProviderId.libgen]!.single.title,
+        'EPUB Libgen',
+      );
+      expect(
+        filtered.booksBySource[SearchProviderId.zlibrary]!.single.title,
+        'EPUB Zlib',
+      );
+
+      final unfiltered = await manager.search(const SearchQuery(text: 'q'));
+      expect(unfiltered.books.length, 4);
+
+      final allFormats = await manager.search(const SearchQuery(
+        text: 'q',
+        fileType: 'All',
+        filtersEnabled: true,
+      ));
+      expect(allFormats.books.length, 4);
     });
 
     test('tags results with the provider that produced them', () async {
@@ -266,8 +333,8 @@ void main() {
       expect(book.source, isNull); // original untouched
     });
 
-    test('redirect chain moves on when a working source is empty', () async {
-      // libgen answers fine but has nothing; zlibrary must then run.
+    test('an empty source does not block the others', () async {
+      // libgen answers fine but has nothing; zlibrary still contributes.
       final empty = _FakeProvider('libgen', []);
       final next = _FakeProvider('zlibrary', [
         BookData(title: 'Z Book', link: 'https://z/1', md5: 'z-md5'),
@@ -290,9 +357,8 @@ void main() {
     });
 
     test('drops duplicate md5s within one provider result page', () async {
-      // The chain stops at the first provider with hits, so dedupe now
-      // matters inside a single provider's page (libgen mirrors can
-      // return the same edition twice).
+      // Mirrors can return the same edition twice; per-source book lists
+      // are de-duplicated before they reach the source switcher.
       final dupe = BookData(
           title: 'From Libgen', link: 'https://l/md5/x', md5: 'same-md5');
       final provider = _FakeProvider('libgen', [
@@ -331,6 +397,148 @@ void main() {
 
       expect(result.books.length, 1);
       expect(off.calls, 0);
+    });
+
+    test('a query source restricts the chain to that provider', () async {
+      final libgen = _FakeProvider('libgen', [
+        BookData(title: 'L', link: 'https://l/1', md5: 'l-md5'),
+      ]);
+      final zlib = _FakeProvider('zlibrary', [
+        BookData(title: 'Z', link: 'https://z/1', md5: 'z-md5'),
+      ]);
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [libgen, zlib],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.zlibrary, true);
+
+      final result = await manager.search(
+          const SearchQuery(text: 'q', source: SearchProviderId.zlibrary));
+
+      expect(libgen.calls, 0);
+      expect(zlib.calls, 1);
+      expect(result.books.single.title, 'Z');
+    });
+
+    test('watch streams the first hit before slow sources finish', () async {
+      final fast = _FakeProvider('libgen', [
+        BookData(title: 'Fast', link: 'https://l/1', md5: 'fast'),
+      ]);
+      final slow = _FakeProvider('annasArchive', [
+        BookData(title: 'Slow', link: 'https://a/1', md5: 'slow'),
+      ], delay: const Duration(milliseconds: 60));
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [fast, slow],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.annasArchive, true);
+      await manager.setProviderEnabled(SearchProviderId.zlibrary, false);
+      await manager.setProviderEnabled(SearchProviderId.welib, false);
+
+      final snapshots =
+          await manager.watch(const SearchQuery(text: 'stream')).toList();
+
+      expect(snapshots.length, 2);
+      expect(snapshots.first.books.single.title, 'Fast');
+      expect(
+        snapshots.first.sources
+            .firstWhere((run) => run.id == SearchProviderId.annasArchive)
+            .status,
+        SearchSourceStatus.pending,
+      );
+      expect(snapshots.last.books.map((book) => book.title),
+          containsAll(['Fast', 'Slow']));
+      expect(
+        snapshots.last.sources
+            .firstWhere((run) => run.id == SearchProviderId.annasArchive)
+            .status,
+        SearchSourceStatus.hit,
+      );
+    });
+
+    test('reports one run per queried source, in configured order', () async {
+      final empty = _FakeProvider('libgen', []);
+      final hit = _FakeProvider('zlibrary', [
+        BookData(title: 'Z1', link: 'https://z/1', md5: 'z-1'),
+        BookData(title: 'Z2', link: 'https://z/2', md5: 'z-2'),
+      ]);
+      final otherEmpty = _FakeProvider('welib', []);
+      final thirdEmpty = _FakeProvider('annasArchive', []);
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [empty, hit, otherEmpty, thirdEmpty],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.zlibrary, true);
+      await manager.setProviderEnabled(SearchProviderId.welib, true);
+      await manager.setProviderEnabled(SearchProviderId.annasArchive, true);
+
+      final result = await manager.search(const SearchQuery(text: 'x'));
+
+      expect(
+        result.sources.map((source) => source.id),
+        [
+          SearchProviderId.libgen,
+          SearchProviderId.zlibrary,
+          SearchProviderId.welib,
+          SearchProviderId.annasArchive,
+        ],
+      );
+      expect(result.sources.every((run) => run.wasAttempted), isTrue);
+      expect(result.sources[0].status, SearchSourceStatus.empty);
+      expect(result.sources[0].resultCount, 0);
+      expect(result.sources[1].status, SearchSourceStatus.hit);
+      expect(result.sources[1].resultCount, 2);
+      expect(result.sources[2].status, SearchSourceStatus.empty);
+      expect(result.sources[3].status, SearchSourceStatus.empty);
+      expect(otherEmpty.calls, 1);
+      expect(thirdEmpty.calls, 1);
+      expect(result.resultSourceId, SearchProviderId.zlibrary);
+      expect(result.resultSource, 'zlibrary');
+    });
+
+    test('marks a failed source as failed in the run list', () async {
+      final failing = _FakeProvider('libgen', [], error: Exception('down'));
+      final hit = _FakeProvider('annasArchive', [
+        BookData(title: 'AA', link: 'https://a/1', md5: 'a-1'),
+      ]);
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [failing, hit],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.annasArchive, true);
+
+      final result = await manager.search(const SearchQuery(text: 'x'));
+
+      expect(result.sources.first.status, SearchSourceStatus.failed);
+      expect(result.sources.first.resultCount, 0);
+      expect(result.sources.last.status, SearchSourceStatus.hit);
+    });
+
+    test('a query source reports only the selected source', () async {
+      final libgen = _FakeProvider('libgen', [
+        BookData(title: 'L', link: 'https://l/1', md5: 'l-md5'),
+      ]);
+      final zlib = _FakeProvider('zlibrary', [
+        BookData(title: 'Z', link: 'https://z/1', md5: 'z-md5'),
+      ]);
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [libgen, zlib],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.zlibrary, true);
+
+      final result = await manager.search(
+          const SearchQuery(text: 'q', source: SearchProviderId.zlibrary));
+
+      expect(result.sources, hasLength(1));
+      expect(result.sources.single.id, SearchProviderId.zlibrary);
+      expect(result.sources.single.status, SearchSourceStatus.hit);
+      expect(result.resultSourceId, SearchProviderId.zlibrary);
     });
 
     // A fresh install has no stored preference; the chain must cover
@@ -377,6 +585,97 @@ void main() {
       final afterOff = await SearchManager(database: MyLibraryDb.instance)
           .enabledProviders();
       expect(afterOff, isNot(contains(SearchProviderId.zlibrary)));
+    });
+  });
+
+  // The settings page lets the user drag the chain order; the manager must
+  // run that order and the journey must report it.
+  group('search source order', () {
+    const shipped = defaultSearchSourceOrder;
+
+    tearDown(() async {
+      await MyLibraryDb.instance.savePreference(
+          'searchSourceOrder', shipped.map((id) => id.name).join(','));
+    });
+
+    test('defaults to the shipped chain before anything is saved', () async {
+      final db = MyLibraryDb.instance;
+      final raw = await db.database;
+      await raw.delete('preferences',
+          where: 'name = ?', whereArgs: ['searchSourceOrder']);
+
+      expect(await SearchManager(database: db).sourceOrder(), shipped);
+    });
+
+    test('persists the dragged order', () async {
+      const dragged = [
+        SearchProviderId.annasArchive,
+        SearchProviderId.welib,
+        SearchProviderId.libgen,
+        SearchProviderId.zlibrary,
+      ];
+      await SearchManager(database: MyLibraryDb.instance)
+          .setSourceOrder(dragged);
+
+      expect(
+          await SearchManager(database: MyLibraryDb.instance).sourceOrder(),
+          dragged);
+    });
+
+    test('keeps providers a saved order never mentions', () async {
+      final db = MyLibraryDb.instance;
+      // An old install that only knew about WeLib when it saved.
+      await db.savePreference('searchSourceOrder', 'welib');
+
+      expect(await SearchManager(database: db).sourceOrder(), [
+        SearchProviderId.welib,
+        SearchProviderId.libgen,
+        SearchProviderId.zlibrary,
+        SearchProviderId.annasArchive,
+      ]);
+    });
+
+    test('resets to the shipped order', () async {
+      final manager = SearchManager(database: MyLibraryDb.instance);
+      await manager.setSourceOrder(const [
+        SearchProviderId.annasArchive,
+        SearchProviderId.zlibrary,
+        SearchProviderId.welib,
+        SearchProviderId.libgen,
+      ]);
+
+      await manager.resetSourceOrder();
+
+      expect(await manager.sourceOrder(), shipped);
+    });
+
+    test('runs every source and keeps the saved order for the merge', () async {
+      final db = MyLibraryDb.instance;
+      await db.savePreference('searchProviders',
+          SearchProviderId.values.map((p) => p.name).join(','));
+      await SearchManager(database: db).setSourceOrder(const [
+        SearchProviderId.welib,
+        SearchProviderId.zlibrary,
+        SearchProviderId.libgen,
+        SearchProviderId.annasArchive,
+      ]);
+
+      final welib = _FakeProvider('welib', [
+        BookData(title: 'W', link: 'https://w/md5/1', md5: 'w-md5'),
+      ]);
+      final libgen = _FakeProvider('libgen', [
+        BookData(title: 'L', link: 'https://l/md5/1', md5: 'l-md5'),
+      ]);
+
+      final result = await SearchManager(database: db, providers: [libgen, welib])
+          .search(const SearchQuery(text: 'order'));
+
+      expect(result.resultSourceId, SearchProviderId.welib);
+      expect(result.books.map((book) => book.title), ['W', 'L']);
+      expect(libgen.calls, 1,
+          reason: 'all sources run in parallel, not just the first');
+      expect(result.sources.first.id, SearchProviderId.welib);
+      expect(result.sources.first.status, SearchSourceStatus.hit);
     });
   });
 

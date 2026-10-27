@@ -25,9 +25,11 @@ class ChallengeHtmlCache {
   static void store(String url, String html) {
     if (url.isEmpty || html.isEmpty) return;
     _entries[url] = _CacheEntry(html: html, capturedAt: DateTime.now());
-    _logger.debug('Cached challenge HTML',
-        tag: 'ChallengeCache',
-        metadata: {'url': url, 'size': html.length, 'entries': _entries.length});
+    _logger.debug('Cached challenge HTML', tag: 'ChallengeCache', metadata: {
+      'url': url,
+      'size': html.length,
+      'entries': _entries.length
+    });
   }
 
   /// Returns the cached HTML for [url] if it is fresh, otherwise null.

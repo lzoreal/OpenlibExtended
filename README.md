@@ -4,17 +4,17 @@
 
 # OpenlibExtended
 
-**The ultimate open-source cross-platform client for Anna's Archive. <br/> Download, organize, and read your favorite books on any device.**
-> Fork from [openlib](https://github.com/dstark5/Openlib) with more features and desktop support!
+**The ultimate open-source cross-platform client for shadow libraries. <br/> Download, organize, and read your favorite books from Anna's Archive, LibGen, and Z-Library on any device.**
+> Fork of [warreth/OpenlibExtended](https://github.com/warreth/OpenlibExtended), originally from [openlib](https://github.com/dstark5/Openlib).
 
 [![made-with-flutter](https://img.shields.io/badge/Made%20with-Flutter-4361ee.svg?style=for-the-badge)](https://flutter.dev/)
 [![AGPLv3 License](https://img.shields.io/badge/License-AGPL%20v3-e63946.svg?style=for-the-badge)](https://opensource.org/licenses/)
-[![Latest release](https://img.shields.io/github/release/warreth/OpenlibExtended.svg?style=for-the-badge)](https://github.com/warreth/OpenlibExtended/releases)
-[![Downloads](https://img.shields.io/github/downloads/warreth/OpenlibExtended/total.svg?style=for-the-badge)](https://github.com/warreth/OpenlibExtended/releases)
+[![Latest release](https://img.shields.io/github/release/lzoreal/OpenlibExtended.svg?style=for-the-badge)](https://github.com/lzoreal/OpenlibExtended/releases)
+[![Downloads](https://img.shields.io/github/downloads/lzoreal/OpenlibExtended/total.svg?style=for-the-badge)](https://github.com/lzoreal/OpenlibExtended/releases)
 
 [<img src="github_releases.png"
      alt="Get it on GitHub"
-     height="110">](https://github.com/warreth/OpenlibExtended/releases)
+     height="110">](https://github.com/lzoreal/OpenlibExtended/releases)
 
 **[📖 Frequently Asked Questions (FAQ)](./FAQ.md)**
 </div>
@@ -38,7 +38,7 @@
 
 ## Star History ⭐️
 
-[![Star History Chart](https://api.star-history.com/svg?repos=warreth/OpenlibExtended&type=Date)](https://star-history.com/#warreth/OpenlibExtended&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=lzoreal/OpenlibExtended&type=Date)](https://star-history.com/#lzoreal/OpenlibExtended&Date)
 
 ## Roadmap 🎯
 
@@ -58,14 +58,14 @@
 
 ## Installation 📦
 
-Grab the latest release from [GitHub Releases](https://github.com/warreth/OpenlibExtended/releases).
+Grab the latest release from [GitHub Releases](https://github.com/lzoreal/OpenlibExtended/releases).
 
 ### Windows (Scoop)
 
 Install via the [Scoop](https://scoop.sh) package manager using this repository as a bucket:
 
 ```powershell
-scoop bucket add openlibextended https://github.com/warreth/OpenlibExtended
+scoop bucket add openlibextended https://github.com/lzoreal/OpenlibExtended
 scoop install openlibextended
 ```
 
@@ -73,7 +73,7 @@ The manifest (`bucket/openlibextended.json`) is updated automatically whenever a
 
 ### Other platforms
 
-Download the APK, IPA, AppImage, tar.gz or Windows installer directly from the [releases page](https://github.com/warreth/OpenlibExtended/releases).
+Download the APK, IPA, AppImage, tar.gz or Windows installer directly from the [releases page](https://github.com/lzoreal/OpenlibExtended/releases).
 
 **Android:** releases ship per-ABI APKs — pick the one matching your device's architecture: `arm64-v8a` (most modern phones), `armeabi-v7a` (older 32-bit devices) or `x86_64` (emulators). Each APK contains only the native libraries for its architecture, keeping downloads roughly a third of a universal APK.
 
@@ -82,7 +82,7 @@ Download the APK, IPA, AppImage, tar.gz or Windows installer directly from the [
 ## Development 🛠️
 
 ```bash
-git clone https://github.com/warreth/OpenlibExtended.git
+git clone https://github.com/lzoreal/OpenlibExtended.git
 flutter pub get
 flutter run
 ```
@@ -94,7 +94,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 If you like the app, consider supporting the original source or the development of this client.
 
 - [**Donate To Anna’s Archive**](https://annas-archive.org/donate?tier=1) (Support the library itself)
-- [**Sponsor me on GitHub 💖**](https://github.com/sponsors/warreth) (Support the app development)
+- [**Sponsor the upstream maintainer on GitHub 💖**](https://github.com/sponsors/warreth) (Support the upstream project)
 
 ## License 📜
 

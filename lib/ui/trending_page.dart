@@ -23,6 +23,7 @@ class TrendingPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final trendingBooks = ref.watch(getTrendingBooks);
+    final labelHeight = MediaQuery.textScalerOf(context).scale(32);
 
     return trendingBooks.when(
       skipLoadingOnRefresh: false,
@@ -41,7 +42,8 @@ class TrendingPage extends ConsumerWidget {
             ),
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 232,
+                key: const ValueKey('trending-strip'),
+                height: 200 + labelHeight,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),

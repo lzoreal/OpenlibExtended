@@ -76,6 +76,11 @@ class WebviewChallengeSolver {
       'just a moment',
       'attention required',
       'checking your browser',
+      // Cloudflare localizes the interstitial title to the browser locale.
+      '请稍候',
+      'einen moment',
+      'un instant',
+      'un momento',
     ];
     const bodyMarkers = [
       'ddos-guard/js-challenge',
@@ -254,7 +259,10 @@ class WebviewChallengeSolver {
         ),
       );
       webview.onClose.then((_) => closedByUser = true);
-      webview.launch(url);
+      // The plugin cancels the first navigation and only re-issues it after a
+      // Dart URL-request callback; without one the window stays about:blank.
+      webview.setOnUrlRequestCallback((_) => true);
+      webview.launch(url, triggerOnUrlRequestEvent: false);
 
       final deadline = DateTime.now().add(timeout);
       var titleOkPolls = 0;
@@ -292,11 +300,23 @@ class WebviewChallengeSolver {
           if (titleOkPolls < 10) continue;
         }
 
+        // Some results pages inject their list after readyState flips;
+        // capturing straight away stores the empty shell and parses to zero.
+        await Future.delayed(const Duration(seconds: 2));
+        final settledTitle = await _js(webview, "document.title") ?? '';
+        if (isChallengePage(title: settledTitle, bodySnippet: '')) {
+          titleOkPolls = 0;
+          _logger.debug('Challenge reappeared while settling',
+              tag: 'ChallengeSolver');
+          continue;
+        }
+
         final html = await _js(webview, "document.documentElement.outerHTML");
         if (html != null && html.isNotEmpty) {
           _logger.info('Challenge solved, captured page HTML',
               tag: 'ChallengeSolver',
               metadata: {'length': html.length, 'title': title});
+          _closeSolvedWindow(webview);
           return html;
         }
       }
@@ -310,6 +330,18 @@ class WebviewChallengeSolver {
       // Closing programmatically crashed GTK in earlier versions; the user
       // closes the window manually.
       webview = null;
+    }
+  }
+
+  /// Windows keeps the native verification window open after a successful
+  /// solve; close it so the user is not left with a stale page. Linux still
+  /// needs a manual close because programmatic closing crashed GTK.
+  static void _closeSolvedWindow(desktop_webview.Webview webview) {
+    if (!PlatformUtils.isWindows) return;
+    try {
+      webview.close();
+    } catch (_) {
+      // Already closed by the user.
     }
   }
 

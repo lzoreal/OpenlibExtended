@@ -1,0 +1,2529 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenlibExtended · 全站 UI 原型</title>
+<style>
+  /* ── 设计令牌 ───────────────────────────────────────────── */
+  :root{
+    --font-ui:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+    --font-mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,monospace;
+
+    --bg:#f4efe6;
+    --surface:#fffdf9;
+    --low:#faf5ec;
+    --container:#f3ece0;
+    --high:#ece2d3;
+    --highest:#e3d6c2;
+
+    --ink:#211c17;
+    --muted:#726558;
+    --faint:#9a8d7f;
+
+    --primary:#0f6b5c;
+    --on-primary:#ffffff;
+    --p-container:#d9efe9;
+    --on-p-container:#0a4c41;
+    --p-soft:#eef8f5;
+
+    --secondary:#4f6a62;
+    --s-container:#dcebe6;
+    --tertiary:#96482a;
+    --t-container:#ffe3d5;
+
+    --outline:#a99a89;
+    --outline-v:#e2d8ca;
+    --line:rgba(33,28,23,.075);
+    --error:#b3261e;
+    --error-c:#fbe9e7;
+
+    --r-xs:8px; --r-sm:12px; --r-card:20px;
+    --r-field:16px; --r-sheet:28px; --r-pill:999px;
+
+    --sh-1:0 1px 2px rgba(33,28,23,.05);
+    --sh-2:0 6px 18px rgba(33,28,23,.09);
+    --sh-3:0 14px 32px rgba(33,28,23,.15);
+    --sh-primary:0 10px 22px rgba(15,107,92,.24);
+
+    --bezel:#17130f;
+    --deck-bg:#eee7dc;
+    --ease:cubic-bezier(.2,0,0,1);
+    color-scheme:light;
+  }
+
+  /* 深色屏（仅 .phone.dark 作用域内覆盖令牌） */
+  .phone.dark{
+    --bg:#151310;
+    --surface:#1e1b17;
+    --low:#25211c;
+    --container:#2b2620;
+    --high:#332d26;
+    --highest:#3e372e;
+    --ink:#f3ebe1;
+    --muted:#a99d8f;
+    --faint:#877c70;
+    --primary:#5fd0b8;
+    --on-primary:#06302a;
+    --p-container:#123f37;
+    --on-p-container:#a7eddd;
+    --p-soft:#0f322c;
+    --secondary:#a8c6bc;
+    --s-container:#26403a;
+    --tertiary:#f0a184;
+    --t-container:#4a2a1c;
+    --outline:#7c7266;
+    --outline-v:#3b352d;
+    --line:rgba(243,235,225,.09);
+    --error:#ffb4ab;
+    --error-c:#49231f;
+    --bezel:#000;
+    --sh-1:0 1px 2px rgba(0,0,0,.4);
+    --sh-2:0 6px 18px rgba(0,0,0,.45);
+    --sh-3:0 14px 32px rgba(0,0,0,.5);
+    --sh-primary:0 10px 22px rgba(0,0,0,.42);
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box}
+  .ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .ic.lg{width:20px;height:20px}
+  .ic.sm{width:16px;height:16px}
+  body{
+    margin:0; background:var(--bezel); font-family:var(--font-ui); color:var(--ink);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+
+  /* ── 展示台 ─────────────────────────────────────────────── */
+  .deck{
+    max-width:1520px; margin:26px auto; padding:32px 32px 44px;
+    border-radius:28px; border:1px solid rgba(255,255,255,.09);
+    background:
+      radial-gradient(44% 32% at 8% 0%, rgba(15,107,92,.20), transparent 70%),
+      radial-gradient(40% 30% at 94% 0%, rgba(150,72,42,.12), transparent 72%),
+      var(--deck-bg);
+  }
+  .deck-head{max-width:920px}
+  .brand{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.14em;color:var(--primary);text-transform:uppercase}
+  .brand i{width:28px;height:28px;border-radius:8px;background:var(--primary);color:#fff;display:grid;place-items:center;font-style:normal;font-size:14px;font-weight:800}
+  h1{margin:16px 0 8px;font-size:34px;line-height:40px;letter-spacing:-.9px;font-weight:800}
+  .deck-head > p{margin:0;max-width:780px;color:var(--muted);font-size:14px;line-height:24px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .legend span{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--r-pill);background:rgba(255,253,249,.78);border:1px solid var(--outline-v);font-size:12px;color:#4e463e}
+  .legend b{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  .spec{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch;margin:24px 0 8px}
+  .spec-card{background:rgba(255,253,249,.85);border:1px solid var(--outline-v);border-radius:16px;padding:16px 16px}
+  .spec-card h3{margin:0 0 8px;font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--faint);font-weight:800}
+  .spec-card p,.spec-card li{font-size:12px;line-height:20px;color:var(--muted);margin:0}
+  .spec-card ul{margin:0;padding-left:16px}
+  .type-demo{display:flex;flex-direction:column;gap:4px}
+  .type-demo b{font-size:24px;letter-spacing:-.5px;line-height:32px}
+  .type-demo span{font-size:12px;color:var(--muted)}
+  .swatches{display:flex;gap:8px;flex-wrap:wrap}
+  .swatches i{width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,0,0,.07);display:block}
+
+  .group + .group{margin-top:8px}
+  .group-head{display:flex;align-items:center;gap:12px;margin:32px 0 16px}
+  .group-head h2{margin:0;font-size:14px;font-weight:800;letter-spacing:.01em;color:#3f3830}
+  .group-head span{font-size:12px;color:#8d8073;white-space:nowrap}
+  .group-head .rule{flex:1;height:1px;background:rgba(138,124,110,.24)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:32px 24px}
+  .frame{display:flex;flex-direction:column;align-items:center;gap:12px;margin:0}
+  .frame figcaption{font-size:12px;font-weight:700;letter-spacing:.04em;color:#6d6155;display:flex;gap:8px;align-items:center}
+  .frame figcaption em{font-style:normal;color:#a99c8d;font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* ── 机身 ───────────────────────────────────────────────── */
+  .phone{
+    width:376px;height:776px;position:relative;overflow:hidden;
+    border-radius:40px;background:var(--bg);
+    border:8px solid var(--bezel);
+    box-shadow:0 24px 50px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.07) inset;
+    color:var(--ink);
+  }
+  .phone::after{
+    content:"";position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
+    width:118px;height:4px;border-radius:4px;background:currentColor;opacity:.22;z-index:25;
+  }
+  .statusbar{
+    height:36px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 24px;font-size:11px;font-weight:700;color:var(--ink);opacity:.82;
+  }
+  .sb-right{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700}
+  .sb-right .bat{width:20px;height:10px;border-radius:3px;border:1.4px solid currentColor;position:relative;opacity:.9}
+  .sb-right .bat::before{content:"";position:absolute;inset:1.5px;right:6px;border-radius:1px;background:currentColor}
+  .sb-right .bat::after{content:"";position:absolute;right:-3px;top:2.5px;width:2px;height:4px;border-radius:0 1px 1px 0;background:currentColor}
+  .screen{position:absolute;inset:36px 0 0;overflow-y:auto;scrollbar-width:none}
+  .screen::-webkit-scrollbar{display:none}
+  .screen.docked{padding-bottom:96px}
+  .screen.full{bottom:0}
+  .pad{padding:0 16px}
+
+  /* 竖向节奏 */
+  .stack-8 > * + *{margin-top:8px}
+  .stack-10 > * + *{margin-top:8px}
+  .stack-12 > * + *{margin-top:12px}
+  .stack-16 > * + *{margin-top:16px}
+
+  /* ── 页头 ───────────────────────────────────────────────── */
+  .pagehead{display:flex;align-items:flex-start;gap:12px;padding:16px 16px 12px}
+  .pagehead .grow{flex:1;min-width:0}
+  .eyebrow{font-size:10px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--primary);margin-bottom:4px}
+  .ptitle{margin:0;font-size:26px;line-height:32px;letter-spacing:-0.6px;font-weight:800;color:var(--ink)}
+  .psub{margin:8px 0 0;font-size:12px;line-height:20px;color:var(--muted)}
+
+  .iconbtn{
+    width:40px;height:40px;border-radius:50%;border:1px solid var(--outline-v);
+    background:var(--surface);display:grid;place-items:center;color:var(--ink);flex:none;
+    box-shadow:var(--sh-1);
+  }
+  .iconbtn.accent{color:var(--on-p-container);background:var(--p-container);border-color:transparent;box-shadow:none}
+  .iconbtn.ghost{background:transparent;border-color:transparent;box-shadow:none}
+  .iconbtn.sm{width:34px;height:34px}
+
+  .appbar{display:flex;align-items:center;gap:8px;padding:12px 16px}
+  .appbar h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.4px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .appbar .iconbtn{box-shadow:none;border-color:transparent;background:transparent}
+
+  .querypill{
+    flex:1;min-width:0;height:42px;border-radius:var(--r-pill);
+    border:1px solid var(--outline-v);background:var(--surface);
+    display:flex;align-items:center;gap:8px;padding:0 12px;box-shadow:var(--sh-1);
+  }
+  .querypill b{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .querypill .edit{margin-left:auto;color:var(--faint)}
+
+  /* ── 卡片 ───────────────────────────────────────────────── */
+  .card{
+    background:var(--surface);border-radius:var(--r-card);
+    border:1px solid var(--outline-v);padding:16px;box-shadow:var(--sh-1);
+  }
+  .card + .card{margin-top:8px}
+  .card.tight{padding:12px 16px}
+  .card.flush{padding:8px 16px}
+  .card-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .card-head.no-gap{margin-bottom:0}
+  .tile-icon{
+    width:36px;height:36px;border-radius:12px;background:var(--container);
+    display:grid;place-items:center;color:var(--muted);flex:none;
+  }
+  .tile-icon.accent{background:var(--p-container);color:var(--on-p-container)}
+  .card-head b{font-size:14px;font-weight:700;letter-spacing:-.1px;color:var(--ink)}
+  .card-head .sub{font-size:11px;line-height:16px;color:var(--muted);margin-top:4px}
+  .spacer{flex:1}
+  .link{font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap}
+
+  /* ── 分段 / 胶囊标签 ─────────────────────────────────────── */
+  .seg{display:flex;padding:2px;border-radius:var(--r-pill);background:var(--container);gap:2px}
+  .seg .opt{
+    flex:1;min-width:0;height:40px;display:flex;align-items:center;justify-content:center;gap:8px;
+    border-radius:var(--r-pill);font-size:12px;font-weight:600;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px;
+  }
+  .seg .opt.on{background:var(--surface);color:var(--ink);font-weight:800;box-shadow:var(--sh-1)}
+  .seg.primary .opt.on{background:var(--primary);color:var(--on-primary);box-shadow:none}
+  .seg .count{font-size:11px;padding:1px 8px;border-radius:var(--r-pill);background:rgba(33,28,23,.07);font-weight:700}
+  .seg .opt.on .count{background:rgba(255,255,255,.5);color:var(--ink)}
+  .seg.primary .opt.on .count{background:rgba(255,255,255,.22);color:var(--on-primary)}
+
+  /* ── 搜索 ───────────────────────────────────────────────── */
+  .searchpill{
+    height:52px;border-radius:var(--r-pill);background:var(--surface);
+    border:1px solid var(--outline-v);display:flex;align-items:center;gap:8px;
+    padding:0 16px;color:var(--faint);font-size:12px;box-shadow:var(--sh-1);
+  }
+  .searchpill .end{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+  .searchbar{
+    height:52px;border-radius:999px;background:var(--surface);border:1.5px solid var(--primary);
+    display:flex;align-items:center;gap:8px;padding:0 8px 0 16px;
+    box-shadow:0 0 0 4px rgba(15,107,92,.10);
+  }
+  .searchbar input{border:0;background:transparent;flex:1;min-width:0;font:inherit;font-size:13px;color:var(--ink);outline:0}
+  .searchbar input::placeholder{color:var(--faint)}
+  .searchbar .caret{width:1.5px;height:18px;background:var(--primary);animation:blink 1.1s steps(1) infinite;margin-left:-8px}
+  @keyframes blink{50%{opacity:0}}
+  .sendbtn{width:36px;height:36px;border-radius:50%;background:var(--primary);color:var(--on-primary);display:grid;place-items:center;flex:none;box-shadow:var(--sh-primary)}
+  .clearbtn{width:24px;height:24px;border-radius:50%;background:var(--container);color:var(--muted);display:grid;place-items:center;flex:none}
+
+  /* ── 搜索建议 / 高级搜索 ─────────────────────────────────── */
+  .suggest-row{display:flex;align-items:center;gap:8px;padding:8px 4px;font-size:12px;color:var(--ink)}
+  .suggest-row + .suggest-row{border-top:1px solid var(--line)}
+  .suggest-row .hl{color:var(--primary);font-weight:800}
+  .suggest-row .go{margin-left:auto;color:var(--faint);flex:none}
+  .suggest-search{
+    margin-top:12px;display:flex;align-items:center;gap:8px;border-radius:16px;
+    background:var(--p-container);color:var(--on-p-container);padding:8px 8px;
+    font-size:11px;font-weight:700;line-height:16px;
+  }
+  .suggest-search .round{
+    width:26px;height:26px;border-radius:50%;background:var(--surface);color:var(--primary);
+    display:grid;place-items:center;flex:none;
+  }
+  .suggest-search .go{
+    margin-left:auto;width:28px;height:28px;border-radius:50%;background:var(--primary);
+    color:var(--on-primary);display:grid;place-items:center;flex:none;
+  }
+  .adv-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .adv-field{
+    min-height:50px;border-radius:16px;background:var(--low);border:1px solid var(--outline-v);
+    padding:8px 12px;display:flex;flex-direction:column;justify-content:center;gap:2px;
+  }
+  .adv-field small{font-size:10px;color:var(--faint)}
+  .adv-field b{font-size:12px;color:var(--ink);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chips.scrollx{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent);padding-bottom:2px}
+  .chips.scrollx::-webkit-scrollbar{display:none}
+  .chip{
+    display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;
+    border-radius:var(--r-pill);border:1px solid var(--outline-v);background:var(--surface);
+    font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;flex:none;
+  }
+  .chip.on{background:var(--p-container);border-color:transparent;color:var(--on-p-container);font-weight:700}
+  .chip .mark{width:18px;height:18px;border-radius:8px;background:var(--container);display:grid;place-items:center;font-size:10px;font-weight:800;color:var(--muted)}
+  .chip.on .mark{background:rgba(10,76,65,.13);color:var(--on-p-container)}
+  .chip.outline{background:transparent}
+
+  /* 结果页来源切换 */
+  .src-row{display:flex;flex-wrap:wrap;gap:8px;padding:2px 0 3px}
+  .src-pill{
+    display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;flex:none;
+    border-radius:var(--r-pill);border:1px solid var(--outline-v);background:var(--surface);
+    font-size:11px;font-weight:700;color:var(--muted);
+  }
+  .src-pill em{font-style:normal;font-size:11px;font-weight:700;color:var(--faint)}
+  .src-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--primary);flex:none}
+  .src-pill .dot.warn{background:var(--tertiary)}
+  .src-pill .dot.pending{background:transparent;border:1.5px solid var(--outline);animation:pulse 1.4s var(--ease) infinite}
+  .src-pill .dot.off{background:var(--outline-v)}
+  @keyframes pulse{50%{opacity:.3}}
+  .src-pill.on{background:var(--primary);border-color:transparent;color:var(--on-primary)}
+  .src-pill.on em{color:rgba(255,255,255,.72)}
+  .src-pill.on .dot{background:var(--on-primary)}
+
+  /* ── 列表行 ─────────────────────────────────────────────── */
+  .row{display:flex;align-items:center;gap:12px;padding:12px 2px}
+  .row + .row{border-top:1px solid var(--line)}
+  .row .grow{flex:1;min-width:0}
+  .row b{display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .row small{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:16px}
+  .chev{color:var(--faint);flex:none}
+
+  .recent .row{padding:12px 2px}
+  .recent .row .tile-icon{width:32px;height:32px;border-radius:8px;background:var(--container);color:var(--faint)}
+  .recent .del{color:var(--faint);flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%}
+
+  /* ── 区块标题 ───────────────────────────────────────────── */
+  .section{margin-top:16px}
+  .section-row{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .section-row h3{margin:0;font-size:13px;font-weight:800;letter-spacing:-.1px;color:var(--ink)}
+  .section-row span{margin-left:auto;font-size:11px;color:var(--faint)}
+  .section-label{font-size:11px;font-weight:800;color:var(--primary);letter-spacing:.06em;margin:20px 0 8px}
+
+  /* ── 封面 / 海报 ────────────────────────────────────────── */
+  .posters{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;padding:2px 16px 4px}
+  .posters::-webkit-scrollbar{display:none}
+  .poster{width:128px;flex:none}
+  .cover{aspect-ratio:2/3;border-radius:16px;position:relative;overflow:hidden;box-shadow:var(--sh-2);display:flex;align-items:flex-end;padding:12px}
+  .cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.34))}
+  .cover b{position:relative;z-index:1;color:#fff;font-size:12px;line-height:20px;font-weight:800;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+  .c1{background:linear-gradient(145deg,#d9694f,#f2b37a 55%,#7f3b2c)}
+  .c2{background:linear-gradient(150deg,#31564f,#7ca79c 55%,#d9efe9)}
+  .c3{background:linear-gradient(150deg,#23395b,#5d7fa8 55%,#d7e8e2)}
+  .c4{background:linear-gradient(150deg,#5b3b6e,#a679b5 60%,#ffe1d3)}
+  .c5{background:linear-gradient(150deg,#7a4b1f,#c99a5b 58%,#f4ede1)}
+  .c6{background:linear-gradient(150deg,#224b3c,#4f8a74 55%,#cde6dc)}
+  .poster p{margin:4px 0 0;font-size:11px;font-weight:600;line-height:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink)}
+
+  .genre-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .genre{
+    height:64px;min-width:0;border-radius:var(--r-field);background:var(--surface);border:1px solid var(--outline-v);
+    display:flex;align-items:center;gap:8px;padding:8px;box-shadow:var(--sh-1);
+  }
+  .genre .ic{
+    width:32px;height:32px;border-radius:12px;background:var(--p-container);color:var(--on-p-container);
+    display:grid;place-items:center;flex:none;
+  }
+  .genre > div:last-child{flex:1;min-width:0}
+  .genre b{display:block;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .genre small{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .genre:active{background:var(--low)}
+
+  .catbook-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .catbook{
+    min-width:0;border-radius:var(--r-card);background:var(--surface);
+    border:1px solid var(--outline-v);padding:8px;box-shadow:var(--sh-1);
+  }
+  .catbook .cover{aspect-ratio:2/3;border-radius:var(--r-field);box-shadow:none}
+  .catbook > b{
+    display:-webkit-box;margin-top:8px;font-size:13px;line-height:20px;font-weight:700;
+    color:var(--ink);overflow:hidden;text-overflow:ellipsis;
+    -webkit-box-orient:vertical;-webkit-line-clamp:2;
+  }
+  .catbook .by{display:block;margin-top:4px;font-size:11px;line-height:16px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .catbook .meta{display:block;margin-top:2px;font-size:11px;line-height:16px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* ── 搜索结果行 ─────────────────────────────────────────── */
+  .res{display:flex;gap:12px;padding:8px 0}
+  .res + .res{border-top:1px solid var(--line)}
+  .res .thumb{
+    width:56px;height:80px;border-radius:12px;flex:none;box-shadow:var(--sh-1);
+    display:flex;align-items:flex-end;padding:8px;overflow:hidden;position:relative;
+  }
+  .res .thumb::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.3))}
+  .res .thumb b{position:relative;z-index:1;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-shadow:0 1px 4px rgba(0,0,0,.45)}
+  .res .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;justify-content:center}
+  .res .info b{font-size:13px;font-weight:700;line-height:20px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink)}
+  .res .info .by{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:1px}
+  .res .meta span{font-size:11px;color:var(--faint);white-space:nowrap}
+  .res .meta .sep{width:2.5px;height:2.5px;border-radius:50%;background:var(--outline-v);flex:none}
+  .res .meta .fmt{
+    font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:8px;
+    background:var(--container);color:var(--muted);
+  }
+  .res .meta .fmt.pdf{background:var(--t-container);color:var(--tertiary)}
+  .res .meta .fmt.epub{background:var(--s-container);color:var(--secondary)}
+  .res .go{align-self:center;color:var(--faint);flex:none}
+
+  .resgroup{border-radius:var(--r-card);background:var(--surface);border:1px solid var(--outline-v);padding:0 16px;box-shadow:var(--sh-1)}
+  .resgroup .res:last-child{border-bottom:0}
+
+  /* ── 详情 ───────────────────────────────────────────────── */
+  .hero{display:flex;gap:16px;padding:8px 16px 8px}
+  .hero .big{
+    width:128px;height:192px;border-radius:16px;flex:none;box-shadow:var(--sh-3);
+    position:relative;overflow:hidden;display:flex;align-items:flex-end;padding:12px;
+  }
+  .hero .big::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 42%,rgba(0,0,0,.35))}
+  .hero .big b{position:relative;z-index:1;color:#fff;font-size:13px;font-weight:800;line-height:20px;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+  .hero .side{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;padding-top:2px}
+  .hero .side h2{margin:0;font-size:16px;line-height:24px;letter-spacing:-.4px;font-weight:800;color:var(--ink)}
+  .hero .side .author{font-size:12px;color:var(--muted);line-height:20px}
+  .hero .stamp{display:flex;flex-wrap:wrap;gap:4px;margin-top:1px}
+  .stamp span{font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--r-pill);background:var(--container);color:var(--muted);white-space:nowrap}
+  .stamp span.accent{background:var(--p-container);color:var(--on-p-container)}
+  .rateline{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--faint)}
+  .rateline .stars{color:#d99b3a;letter-spacing:1px;font-size:11px}
+
+  .desc{font-size:12px;line-height:20px;color:var(--muted)}
+  .desc b{color:var(--ink);font-weight:700}
+
+  .kv{display:flex;align-items:center;gap:12px;padding:8px 0;font-size:12px}
+  .kv + .kv{border-top:1px solid var(--line)}
+  .kv dt{width:64px;flex:none;color:var(--faint);font-size:11px}
+  .kv dd{margin:0;flex:1;color:var(--ink);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+
+  /* 底部操作栏 */
+  .bottombar{
+    position:absolute;left:0;right:0;bottom:0;z-index:20;
+    padding:12px 16px calc(24px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,rgba(244,239,230,0),var(--bg) 34%);
+  }
+  .phone.dark .bottombar{background:linear-gradient(180deg,rgba(21,19,16,0),var(--bg) 34%)}
+  .bottombar .inline{display:flex;gap:8px;align-items:center}
+
+  .btn{
+    height:48px;border-radius:var(--r-pill);border:0;display:flex;align-items:center;justify-content:center;
+    gap:8px;font-size:13px;font-weight:800;font-family:inherit;letter-spacing:.01em;padding:0 20px;
+  }
+  .btn.primary{background:var(--primary);color:var(--on-primary);flex:1;box-shadow:var(--sh-primary)}
+  .btn.outline{background:transparent;border:1.5px solid var(--outline-v);color:var(--ink)}
+  .btn.tonal{background:var(--p-container);color:var(--on-p-container)}
+  .btn.icon{width:48px;padding:0;background:var(--surface);border:1.5px solid var(--outline-v);color:var(--ink)}
+  .btn.sm{height:40px;font-size:12px;padding:0 16px;border-radius:var(--r-pill)}
+  .btn.ghost{background:transparent;color:var(--primary);padding:0 12px}
+
+  /* ── 下载中心 ───────────────────────────────────────────── */
+  .dl-hero{
+    border-radius:var(--r-card);padding:16px;background:var(--surface);
+    border:1px solid var(--outline-v);box-shadow:var(--sh-1);display:flex;gap:16px;align-items:center;
+  }
+  .ring{
+    width:64px;height:64px;border-radius:50%;flex:none;display:grid;place-items:center;
+    background:conic-gradient(var(--primary) var(--p,62%),var(--container) 0);
+  }
+  .ring i{
+    width:50px;height:50px;border-radius:50%;background:var(--surface);display:grid;place-items:center;
+    font-style:normal;font-size:12px;font-weight:800;color:var(--primary);font-variant-numeric:tabular-nums;
+  }
+  .dl-hero .body{flex:1;min-width:0}
+  .dl-hero .body b{display:block;font-size:13px;font-weight:800;line-height:20px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dl-hero .body .stat{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:8px;align-items:center}
+  .dl-hero .body .stat b{display:inline;font-size:11px;font-weight:700;color:var(--primary)}
+  .progress{height:5px;border-radius:3px;background:var(--container);overflow:hidden;margin-top:8px}
+  .progress i{display:block;height:100%;border-radius:3px;background:var(--primary);width:62%}
+  .progress.done i{background:var(--secondary)}
+
+  .task{border-radius:var(--r-card);background:var(--surface);border:1px solid var(--outline-v);padding:12px 16px;box-shadow:var(--sh-1)}
+  .task + .task{margin-top:8px}
+  .task .top{display:flex;gap:12px;align-items:flex-start}
+  .task .mini{
+    width:64px;height:96px;border-radius:12px;flex:none;box-shadow:var(--sh-1);
+    display:flex;align-items:flex-end;padding:4px;overflow:hidden;position:relative;
+  }
+  .task .mini::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.28))}
+  .task .mini b{position:relative;z-index:1;color:#fff;font-size:8px;font-weight:800;line-height:12px;text-shadow:0 1px 3px rgba(0,0,0,.45)}
+  .task .grow{flex:1;min-width:0}
+  .task .grow b{display:block;font-size:12px;font-weight:700;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .task .grow small{display:block;font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .task .actions{display:flex;gap:8px;margin-top:8px;align-items:center}
+  .task .actions .spacer{flex:1}
+  .badge{
+    display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;
+    padding:4px 8px;border-radius:var(--r-pill);white-space:nowrap;
+  }
+  .badge.run{background:var(--p-container);color:var(--on-p-container)}
+  .badge.wait{background:var(--container);color:var(--muted)}
+  .badge.done{background:var(--s-container);color:var(--secondary)}
+  .badge.fail{background:var(--error-c);color:var(--error)}
+  .badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+  .badge.run .dot{animation:pulse 1.4s var(--ease) infinite}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat-box{background:var(--low);border-radius:16px;padding:8px;text-align:center}
+  .stat-box b{display:block;font-size:14px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+  .stat-box small{display:block;font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* ── 设置 ───────────────────────────────────────────────── */
+  .group-card{
+    background:var(--surface);border-radius:var(--r-card);border:1px solid var(--outline-v);
+    box-shadow:var(--sh-1);overflow:hidden;
+  }
+  .group-card + .group-card{margin-top:12px}
+  .group-card > .gh{
+    padding:12px 16px 8px;font-size:11px;font-weight:800;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--faint);
+  }
+  .setrow{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:64px}
+  .setrow + .setrow{border-top:1px solid var(--line)}
+  .setrow .ic{width:32px;height:32px;border-radius:12px;background:var(--container);color:var(--muted);display:grid;place-items:center;flex:none}
+  .setrow .grow{flex:1;min-width:0}
+  .setrow .grow b{display:block;font-size:13px;font-weight:700;color:var(--ink)}
+  .setrow .grow small{display:block;font-size:11px;color:var(--muted);margin-top:2px;line-height:16px}
+  .setrow .val{font-size:12px;color:var(--faint);font-weight:600;white-space:nowrap}
+
+  .toggle{width:44px;height:26px;border-radius:999px;background:var(--container);position:relative;flex:none;border:1px solid var(--outline-v)}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--surface);box-shadow:var(--sh-1);transition:transform .2s var(--ease)}
+  .toggle.on{background:var(--primary);border-color:transparent}
+  .toggle.on::after{transform:translateX(18px);background:var(--on-primary);box-shadow:none}
+
+  .radio{width:20px;height:20px;border-radius:50%;border:1.8px solid var(--outline);flex:none;position:relative}
+  .radio.on{border-color:var(--primary);border-width:2px}
+  .radio.on::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--primary)}
+
+  .slider{height:20px;display:flex;align-items:center;gap:12px}
+  .track{flex:1;height:4px;border-radius:2px;background:var(--container);position:relative}
+  .track i{position:absolute;left:0;top:0;height:100%;border-radius:2px;background:var(--primary)}
+  .track .knob{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:var(--primary);transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(15,107,92,.35)}
+
+  .theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px 16px}
+  .theme-opt{border-radius:var(--r-field);border:1.5px solid var(--outline-v);padding:8px;background:var(--surface)}
+  .theme-opt.on{border-color:var(--primary);border-width:2px;background:var(--p-soft)}
+  .theme-opt .swatch{height:44px;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;gap:3px;padding:8px}
+  .theme-opt .swatch span{height:5px;border-radius:2px;display:block}
+  .theme-opt p{margin:8px 0 0;font-size:11px;font-weight:700;text-align:center;color:var(--ink)}
+
+  .langrow{display:flex;align-items:center;gap:12px;padding:12px 16px}
+  .langrow + .langrow{border-top:1px solid var(--line)}
+  .langrow .code{
+    width:30px;height:22px;border-radius:8px;background:var(--container);color:var(--muted);
+    display:grid;place-items:center;font-size:10px;font-weight:800;letter-spacing:.04em;flex:none;
+  }
+  .langrow.on .code{background:var(--p-container);color:var(--on-p-container)}
+  .langrow .grow{flex:1;min-width:0}
+  .langrow b{display:block;font-size:12px;font-weight:700;color:var(--ink)}
+  .langrow small{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+  .langrow.on b{color:var(--primary)}
+
+  /* 镜像卡 */
+  .mirror{
+    border-radius:var(--r-card);background:var(--surface);border:1px solid var(--outline-v);
+    padding:12px 16px;box-shadow:var(--sh-1);
+  }
+  .mirror + .mirror{margin-top:8px}
+  .mirror .top{display:flex;align-items:center;gap:8px}
+  .mirror .logo{
+    width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;
+    background:var(--container);color:var(--muted);font-size:11px;font-weight:800;letter-spacing:-.2px;
+  }
+  .mirror .logo.aa{background:var(--p-container);color:var(--on-p-container)}
+  .mirror .logo.zl{background:var(--t-container);color:var(--tertiary)}
+  .mirror .grow{flex:1;min-width:0}
+  .mirror .grow b{display:block;font-size:13px;font-weight:700;color:var(--ink)}
+  .mirror .grow small{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mirror .foot{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:11px;color:var(--faint)}
+  .mirror .foot .spacer{flex:1}
+  .lat{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--secondary)}
+  .lat .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+  .lat.slow{color:var(--tertiary)}
+  .lat.local{color:var(--primary)}
+  .lat.stale{color:var(--faint)}
+  .lat.bad{color:var(--error)}
+  .latrow{display:flex;align-items:center;gap:8px}
+  .latrow + .latrow{margin-top:4px}
+  .spinner{
+    width:12px;height:12px;border-radius:50%;flex:none;
+    border:1.5px solid var(--outline-v);border-top-color:var(--primary);
+    animation:spin .9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── 底部导航 ───────────────────────────────────────────── */
+  .navbar{
+    position:absolute;left:0;right:0;bottom:0;z-index:20;
+    display:flex;align-items:center;padding:8px 16px calc(16px + env(safe-area-inset-bottom));
+    background:var(--surface);border-top:1px solid var(--outline-v);
+  }
+  .navbar .tab{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+    color:var(--muted);font-size:10px;font-weight:700;position:relative;
+  }
+  .navbar .tab .pill{
+    width:56px;height:32px;border-radius:var(--r-pill);display:grid;place-items:center;color:inherit;
+  }
+  .navbar .tab.on{color:var(--on-p-container)}
+  .navbar .tab.on .pill{background:var(--p-container);color:var(--on-p-container)}
+  .navbar .tab.on{font-weight:800}
+  .navbar .tab .n{
+    position:absolute;top:-2px;left:calc(50% + 8px);min-width:16px;height:16px;border-radius:8px;
+    background:var(--error);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;padding:0 4px;
+  }
+
+  /* ── 状态 / 空态 / 错误 ─────────────────────────────────── */
+  .center-state{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:52px 32px;gap:4px}
+  .center-state .halo{
+    width:88px;height:88px;border-radius:28px;display:grid;place-items:center;margin-bottom:16px;
+    background:var(--p-container);color:var(--on-p-container);
+  }
+  .center-state .halo.warn{background:var(--error-c);color:var(--error)}
+  .center-state h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.2px;color:var(--ink)}
+  .center-state p{margin:8px 0 0;font-size:12px;line-height:20px;color:var(--muted);max-width:250px}
+  .center-state .btn{margin-top:16px}
+
+  .skeleton{background:linear-gradient(90deg,var(--container) 25%,var(--low) 50%,var(--container) 75%);background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:8px}
+  @keyframes shimmer{to{background-position:-200% 0}}
+
+  .inline-hint{
+    display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--r-sm);
+    background:var(--p-soft);font-size:11px;color:var(--on-p-container);line-height:16px;
+  }
+  .inline-hint.warn{background:var(--t-container);color:var(--tertiary)}
+  .inline-hint .grow{flex:1}
+
+  /* ── 提示条 / SKDOCK ───────────────────────────────────── */
+  .dock{
+    position:absolute;left:14px;right:14px;bottom:14px;z-index:22;
+    background:var(--ink);color:var(--bg);border-radius:16px;
+    padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:11px;
+    box-shadow:var(--sh-3);
+  }
+  .dock.info{background:var(--p-container);color:var(--on-p-container)}
+  .dock .grow{flex:1}
+  .dock b{font-weight:800}
+  .dock .act{font-weight:800;color:var(--primary);white-space:nowrap}
+  .dock.info .act{color:var(--on-p-container);text-decoration:underline}
+
+  .sheet{
+    position:absolute;left:0;right:0;bottom:0;z-index:30;border-radius:var(--r-sheet) var(--r-sheet) 0 0;
+    background:var(--surface);padding:12px 16px calc(24px + env(safe-area-inset-bottom));
+    box-shadow:0 -18px 46px rgba(33,28,23,.24);
+  }
+  .sheet .handle{width:36px;height:4px;border-radius:2px;background:var(--outline-v);margin:4px auto 16px}
+  .sheet h4{margin:0 0 4px;font-size:16px;font-weight:800;letter-spacing:-.2px;color:var(--ink)}
+  .sheet p{margin:0 0 16px;font-size:12px;line-height:20px;color:var(--muted)}
+  .sheet-opt{display:flex;align-items:center;gap:12px;padding:12px 0;font-size:13px;font-weight:600;color:var(--ink)}
+  .sheet-opt + .sheet-opt{border-top:1px solid var(--line)}
+  .sheet-opt .grow{flex:1}
+  .sheet .btn-row{display:flex;gap:8px;margin-top:16px}
+  .sheet .btn-row .btn{flex:1}
+
+  /* ── 页脚 ───────────────────────────────────────────────── */
+  .deck-foot{
+    margin-top:40px;padding-top:20px;border-top:1px solid rgba(138,124,110,.2);
+    display:flex;flex-wrap:wrap;gap:8px 24px;font-size:11px;color:#8a7d70;
+  }
+  .deck-foot b{color:#4e463e;font-weight:800}
+  .deck-foot .spacer{flex:1}
+
+  @media (max-width:900px){
+    .spec{grid-template-columns:1fr 1fr}
+    .deck{padding:20px 16px 32px}
+    h1{font-size:27px}
+    .grid{grid-template-columns:1fr;justify-items:center}
+  }
+  @media (max-width:430px){
+    .phone{width:100%;max-width:376px;height:776px}
+    .spec{grid-template-columns:1fr}
+  }
+
+  /* ── Swiss grid 叠加层（按 G 切换，或 #grid） ───────────────
+     版心 328 = 360 − 2×16；4 列 × 76 + 3×8 gutter；基线 8，主节奏 32。
+     这一层只做证明，不参与布局。 */
+  .gg{position:absolute;top:36px;right:0;bottom:0;left:0;pointer-events:none;z-index:60;display:none}
+  body.show-grid .gg{display:block}
+  .gg::before{content:"";position:absolute;inset:0;
+    background-image:
+      linear-gradient(90deg,rgba(15,107,92,.13) 0 76px,transparent 76px 84px),
+      repeating-linear-gradient(180deg,rgba(15,107,92,.16) 0 1px,transparent 1px 8px),
+      repeating-linear-gradient(180deg,rgba(179,38,30,.20) 0 1px,transparent 1px 32px);
+    background-size:84px 100%,100% 8px,100% 32px;
+    background-position:16px 0,0 0,0 0;
+    background-repeat:repeat-x,repeat,repeat;}
+  .gg::after{content:"4 × 76 + 3 × 8 · 基线 8";position:absolute;right:16px;bottom:8px;
+    font:600 9px/12px var(--font-mono);letter-spacing:.08em;color:rgba(15,107,92,.75)}
+
+  .tnum{font-variant-numeric:tabular-nums}
+  p{text-wrap:pretty}
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <header class="deck-head">
+    <div class="brand"><i>O</i>OpenlibExtended · Design System</div>
+    <h1>全站界面原型</h1>
+    <p>
+      统一用「暖纸 + 翡翠绿」的 Material 3 语汇重绘全部 20 个界面。画板 360 dp，页边距 16，版心 328，
+      按 4 列 × 76 + 3 × 8 沟槽排布；所有间距落在 4 dp 基线上，字阶 10 – 34 的行高都是 4 的倍数，
+      圆角只保留 8 / 12 / 16 / 20 / 28 / 全圆六档，因此跨页跳转时视觉不跳。搜索框、筛选、结果来源切换、
+      下载进度都给出真实状态而非占位灰条。按 G 键叠加网格线。
+    </p>
+    <div class="legend">
+      <span><b style="background:#0f6b5c"></b>primary #0F6B5C</span>
+      <span><b style="background:#d9efe9"></b>primaryContainer #D9EFE9</span>
+      <span><b style="background:#96482a"></b>tertiary #96482A</span>
+      <span><b style="background:#f4efe6;border-color:#e2d8ca"></b>暖纸底 #F4EFE6</span>
+      <span><b style="background:#151310"></b>深色屏 #151310</span>
+    </div>
+  </header>
+
+  <section class="spec">
+    <article class="spec-card">
+      <h3>字阶 · 行高</h3>
+      <div class="type-demo">
+        <b>页面标题 26 / 32</b>
+        <span>区块 20 / 28 · 卡片标题 16 / 24</span>
+        <span>正文 14 / 20 · 次要 13 / 20 · 12 / 20</span>
+        <span>元信息 11 / 16 · 徽标 10 / 16</span>
+      </div>
+    </article>
+    <article class="spec-card">
+      <h3>网格与间距</h3>
+      <ul>
+        <li>页边距 16 · 版心 328 · 4 列 × 76 + 3 × 8</li>
+        <li>基线 4 · 节奏 8 · 强调线 32</li>
+        <li>间距 4 / 8 / 12 / 16 / 24 / 32</li>
+        <li>圆角 8 / 12 / 16 / 20 / 28 · 胶囊全圆</li>
+      </ul>
+    </article>
+    <article class="spec-card">
+      <h3>页头规则</h3>
+      <ul>
+        <li>一级页：小标签 + 26 标题，无副标题</li>
+        <li>二级页：返回 + 20 标题 + 单个操作</li>
+        <li>滚动时标题不吸顶，让内容优先</li>
+      </ul>
+    </article>
+    <article class="spec-card">
+      <h3>选择控件</h3>
+      <ul>
+        <li>轻量筛选：胶囊分组</li>
+        <li>多选项：复选胶囊（点击展开）</li>
+        <li>二选一：分段按钮（全部/单源）</li>
+      </ul>
+    </article>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════
+       A · 发现与搜索入口
+       ══════════════════════════════════════════════════════ -->
+  <section class="group">
+    <div class="group-head">
+      <h2>发现与搜索入口</h2>
+      <span>一级页 · 统一 PageHeader</span>
+      <div class="rule"></div>
+    </div>
+    <div class="grid">
+
+      <!-- 01 发现 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">发现好书</div>
+                <h1 class="ptitle">发现</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="searchpill">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <span>搜索书名、作者或 ISBN</span>
+                <span class="end"><svg class="ic sm" style="width:16px;height:16px"><use href="#i-tune"/></svg></span>
+              </div>
+              <div class="seg" style="margin-top:12px">
+                <div class="opt on">热门</div>
+                <div class="opt">分类</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-row pad">
+                <h3>本周热门</h3>
+                <span>Goodreads 榜单</span>
+              </div>
+              <div class="posters">
+                <div class="poster">
+                  <div class="cover c1"><b>三体</b></div>
+                  <p>三体</p>
+                </div>
+                <div class="poster">
+                  <div class="cover c2"><b>Normal<br>People</b></div>
+                  <p>Normal People</p>
+                </div>
+                <div class="poster">
+                  <div class="cover c3"><b>Breach<br>Road</b></div>
+                  <p>Breach Road</p>
+                </div>
+                <div class="poster">
+                  <div class="cover c5"><b>Educated</b></div>
+                  <p>Educated</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="section pad">
+              <div class="section-row">
+                <h3>继续探索</h3>
+                <span>28 个分类</span>
+              </div>
+              <div class="genre-grid">
+                <div class="genre">
+                  <div class="ic"><svg class="ic"><use href="#i-book"/></svg></div>
+                  <div><b>经典</b><small>历久弥新的文学作品，常因其艺术价值与文化意义而备受推崇。</small></div>
+                </div>
+                <div class="genre">
+                  <div class="ic"><svg class="ic"><use href="#i-heart"/></svg></div>
+                  <div><b>爱情</b><small>聚焦恋爱关系的故事，探索爱情、激情与情感联结。</small></div>
+                </div>
+                <div class="genre">
+                  <div class="ic"><svg class="ic"><use href="#i-book"/></svg></div>
+                  <div><b>小说</b><small>出自想象而非真实事件的叙事文学。</small></div>
+                </div>
+                <div class="genre">
+                  <div class="ic"><svg class="ic"><use href="#i-star"/></svg></div>
+                  <div><b>青少年</b><small>面向青少年读者的书籍，探讨与青春期相关的主题。</small></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>01</em>发现</figcaption>
+      </figure>
+
+      <!-- 02 分类 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">浏览</div>
+                <h1 class="ptitle">分类</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="searchpill">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <span>在分类中查找</span>
+              </div>
+              <div class="seg" style="margin-top:12px">
+                <div class="opt">热门</div>
+                <div class="opt on">分类</div>
+              </div>
+            </div>
+            <div class="pad" style="margin-top:16px">
+              <div class="genre-grid">
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-book"/></svg></div><div><b>经典</b><small>历久弥新的文学作品，常因其艺术价值与文化意义而备受推崇。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-heart"/></svg></div><div><b>爱情</b><small>聚焦恋爱关系的故事，探索爱情、激情与情感联结。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-book"/></svg></div><div><b>小说</b><small>出自想象而非真实事件的叙事文学。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-star"/></svg></div><div><b>青少年</b><small>面向青少年读者的书籍，探讨与青春期相关的主题。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-star"/></svg></div><div><b>奇幻</b><small>包含魔法元素、神话生物与奇幻世界的类型。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-globe"/></svg></div><div><b>科幻</b><small>探索未来构想、先进科技与太空探索的文学。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-book"/></svg></div><div><b>非虚构</b><small>基于事实信息的作品，包括随笔、传记与纪实。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-star"/></svg></div><div><b>儿童</b><small>面向小读者的书籍，通常配有插图、叙事简单。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-clock"/></svg></div><div><b>历史</b><small>考察历史事件、文化与重要历史人物的文学。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-shield"/></svg></div><div><b>悬疑</b><small>以悬念情节为核心的故事，常涉及犯罪或待解谜题。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-book"/></svg></div><div><b>封面</b><small>以视觉形式呈现书籍的艺术与设计，影响读者的兴趣。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-shield"/></svg></div><div><b>恐怖</b><small>通过悬念叙事唤起读者恐惧、不安或惊骇的类型。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-book"/></svg></div><div><b>历史小说</b><small>设定于特定历史时期的小说，将真实事件与虚构人物交织在一起。</small></div></div>
+                <div class="genre"><div class="ic"><svg class="ic"><use href="#i-star"/></svg></div><div><b>精选</b><small>常指广受好评或受欢迎的书籍，通常按榜单或奖项分类。</small></div></div>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>02</em>分类</figcaption>
+      </figure>
+
+      <!-- 03 搜索 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">搜索书源</div>
+                <h1 class="ptitle">搜索</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="searchbar">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <input value="三体" readonly>
+                <span class="caret"></span>
+                <span class="clearbtn"><svg class="ic" style="width:12px;height:12px"><use href="#i-close"/></svg></span>
+                <div class="sendbtn"><svg class="ic"><use href="#i-arrow"/></svg></div>
+              </div>
+
+              <div class="seg" style="margin-top:12px">
+                <div class="opt on"><svg class="ic sm"><use href="#i-search"/></svg>搜索建议</div>
+                <div class="opt"><svg class="ic sm"><use href="#i-tune"/></svg>高级搜索</div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;margin-top:16px">
+                <div class="section-label" style="margin:0">搜索来源</div>
+                <span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--primary)">管理</span>
+              </div>
+              <div class="chips" style="margin-top:8px">
+                <span class="chip on"><span class="mark">全</span>全部</span>
+                <span class="chip"><span class="mark">LG</span>LibGen</span>
+                <span class="chip"><span class="mark">ZL</span>Z-Library</span>
+                <span class="chip"><span class="mark">WL</span>WeLib</span>
+                <span class="chip"><span class="mark">AA</span>Anna's</span>
+              </div>
+
+              <div class="section" style="margin-top:16px">
+                <div class="section-row" style="padding:0">
+                  <h3>最近搜索</h3>
+                  <span>清空</span>
+                </div>
+                <div class="recent">
+                  <div class="row">
+                    <div class="grow"><b>三体</b><small>全部来源</small></div>
+                    <span class="del"><svg class="ic" style="width:15px;height:15px"><use href="#i-close"/></svg></span>
+                  </div>
+                  <div class="row">
+                    <div class="grow"><b>Normal People</b><small>全部来源</small></div>
+                    <span class="del"><svg class="ic" style="width:15px;height:15px"><use href="#i-close"/></svg></span>
+                  </div>
+                  <div class="row">
+                    <div class="grow"><b>9787536692930</b><small>全部来源</small></div>
+                    <span class="del"><svg class="ic" style="width:15px;height:15px"><use href="#i-close"/></svg></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section" style="margin-top:16px">
+                <div class="section-label" style="margin-left:0">试试这些</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+                  <span class="chip" style="justify-content:center">刘慈欣</span>
+                  <span class="chip" style="justify-content:center">暗室手册</span>
+                  <span class="chip" style="justify-content:center">Educated</span>
+                  <span class="chip" style="justify-content:center">经济学人 2024</span>
+                </div>
+              </div>
+
+              <div class="inline-hint" style="margin-top:16px">
+                <svg class="ic"><use href="#i-info"/></svg>
+                <span class="grow">支持书名、作者、ISBN 与 MD5，四个书源会并行检索。</span>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>03</em>搜索 · 空态</figcaption>
+      </figure>
+
+      <!-- 18 搜索 · 输入态（建议） -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">搜索书源</div>
+                <h1 class="ptitle">搜索</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="searchbar">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <input value="za" readonly>
+                <span class="caret"></span>
+                <span class="clearbtn"><svg class="ic" style="width:12px;height:12px"><use href="#i-close"/></svg></span>
+                <div class="sendbtn"><svg class="ic"><use href="#i-arrow"/></svg></div>
+              </div>
+
+              <div class="seg" style="margin-top:12px">
+                <div class="opt on"><svg class="ic sm"><use href="#i-search"/></svg>搜索建议</div>
+                <div class="opt"><svg class="ic sm"><use href="#i-tune"/></svg>高级搜索</div>
+              </div>
+
+              <div class="card" style="margin-top:12px;padding:12px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="src-pill on" style="height:28px;font-size:10px;padding:0 8px"><span class="dot"></span>4 个来源同时搜索</span>
+                  <span class="grow" style="text-align:right;font-size:10px;color:var(--faint)">结果自动合并</span>
+                </div>
+                <div class="section-row" style="padding:0;margin:16px 0 2px">
+                  <h3>搜索建议</h3>
+                  <span>实时联想</span>
+                </div>
+                <div class="suggest-row" style="border-top:0;padding-top:8px">
+                  <svg class="ic sm" style="color:var(--faint)"><use href="#i-search"/></svg>
+                  <span class="grow"><b class="hl">za</b>ra</span>
+                  <svg class="ic sm go"><use href="#i-arrow"/></svg>
+                </div>
+                <div class="suggest-row">
+                  <svg class="ic sm" style="color:var(--faint)"><use href="#i-search"/></svg>
+                  <span class="grow"><b class="hl">Za</b>die Smith</span>
+                  <svg class="ic sm go"><use href="#i-arrow"/></svg>
+                </div>
+                <div class="suggest-row">
+                  <svg class="ic sm" style="color:var(--faint)"><use href="#i-search"/></svg>
+                  <span class="grow"><b class="hl">Za</b>fón, Carlos Ruiz</span>
+                  <svg class="ic sm go"><use href="#i-arrow"/></svg>
+                </div>
+                <div class="suggest-search">
+                  <span class="round"><svg class="ic sm"><use href="#i-search"/></svg></span>
+                  <span class="grow">在全部来源中搜索「za」</span>
+                  <span class="go"><svg class="ic sm"><use href="#i-arrow"/></svg></span>
+                </div>
+              </div>
+
+              <div class="inline-hint" style="margin-top:12px">
+                <svg class="ic sm"><use href="#i-tune"/></svg>
+                <span class="grow">需要限定作者、出版社、年份、语言或格式？切换到「高级搜索」。</span>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>18</em>搜索 · 输入态（建议）</figcaption>
+      </figure>
+
+      <!-- 19 搜索 · 高级搜索 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">搜索书源</div>
+                <h1 class="ptitle">搜索</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="searchbar">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <input value="三体" readonly>
+                <span class="clearbtn"><svg class="ic" style="width:12px;height:12px"><use href="#i-close"/></svg></span>
+                <div class="sendbtn"><svg class="ic"><use href="#i-arrow"/></svg></div>
+              </div>
+
+              <div class="seg" style="margin-top:12px">
+                <div class="opt"><svg class="ic sm"><use href="#i-search"/></svg>搜索建议</div>
+                <div class="opt on"><svg class="ic sm"><use href="#i-tune"/></svg>高级搜索<em class="count">2</em></div>
+              </div>
+
+              <div class="group-card" style="margin-top:12px;padding:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                  <div class="section-label" style="margin:0">搜索来源</div>
+                  <span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--primary)">管理</span>
+                </div>
+                <div class="chips scrollx">
+                  <span class="chip on"><span class="mark">全</span>全部</span>
+                  <span class="chip"><span class="mark">LG</span>LibGen</span>
+                  <span class="chip"><span class="mark">ZL</span>Z-Library</span>
+                  <span class="chip"><span class="mark">WL</span>WeLib</span>
+                  <span class="chip"><span class="mark">AA</span>Anna's</span>
+                </div>
+
+                <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px">
+                  <div class="adv-grid">
+                    <div class="adv-field"><small>作者</small><b>刘慈欣</b></div>
+                    <div class="adv-field"><small>出版社</small><b>不限</b></div>
+                    <div class="adv-field"><small>出版年份</small><b>2008–2024</b></div>
+                    <div class="adv-field"><small>语言</small><b>中文</b></div>
+                  </div>
+                </div>
+
+                <div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <div class="section-label" style="margin:0">文件类型</div>
+                    <span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--primary)">类型：全部</span>
+                  </div>
+                  <div class="chips">
+                    <span class="chip on">全部</span>
+                    <span class="chip">PDF</span>
+                    <span class="chip">EPUB</span>
+                    <span class="chip">CBR</span>
+                    <span class="chip">CBZ</span>
+                  </div>
+                </div>
+
+                <div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
+                  <div class="section-label" style="margin:0 0 8px">排序方式</div>
+                  <div class="chips">
+                    <span class="chip on">最相关</span>
+                    <span class="chip">最新</span>
+                    <span class="chip">最旧</span>
+                    <span class="chip">最大</span>
+                    <span class="chip">最小</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:8px;margin-top:12px">
+                <div class="btn outline" style="flex:0 0 auto;height:48px;padding:0 18px">重置</div>
+                <div class="btn primary" style="flex:1;height:48px"><svg class="ic sm"><use href="#i-search"/></svg>应用并搜索</div>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>19</em>搜索 · 高级搜索</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════
+       B · 结果与详情
+       ══════════════════════════════════════════════════════ -->
+  <section class="group">
+    <div class="group-head">
+      <h2>结果与详情</h2>
+      <span>搜索主链路 · 流式回填</span>
+      <div class="rule"></div>
+    </div>
+    <div class="grid">
+
+      <!-- 04 搜索结果 · 全部来源 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <div class="querypill">
+                <svg class="ic sm"><use href="#i-search"/></svg>
+                <b>三体</b>
+                <span class="edit"><svg class="ic sm"><use href="#i-close"/></svg></span>
+              </div>
+            </div>
+
+            <div class="pad">
+              <div class="section-row" style="padding:0;margin-bottom:12px">
+                <h3 style="font-size:16px;letter-spacing:-.3px">134 个结果</h3>
+                <span>4 个来源</span>
+              </div>
+
+              <!-- 来源切换：全部 / 单源 -->
+              <div class="src-row">
+                <span class="src-pill on"><span class="dot"></span>全部<em>134</em></span>
+                <span class="src-pill"><span class="dot"></span>LibGen<em>112</em></span>
+                <span class="src-pill"><span class="dot"></span>Anna's<em>14</em></span>
+                <span class="src-pill"><span class="dot"></span>Z-Lib<em>8</em></span>
+                <span class="src-pill"><span class="dot pending"></span>WeLib<em>…</em></span>
+              </div>
+
+              <!-- 流式提示 -->
+              <div class="inline-hint" style="margin-top:12px">
+                <svg class="ic sm"><use href="#i-refresh"/></svg>
+                <span class="grow">WeLib 仍在检索，结果将自动补充。</span>
+              </div>
+
+              <!-- 筛选 -->
+              <div class="chips" style="margin-top:12px">
+                <span class="chip on"><svg class="ic sm"><use href="#i-tune"/></svg>相关度</span>
+                <span class="chip">EPUB</span>
+                <span class="chip">中文</span>
+              </div>
+
+              <!-- 结果列表 -->
+              <div class="resgroup" style="margin-top:12px">
+                <div class="res">
+                  <div class="thumb c6"><b>三体</b></div>
+                  <div class="info">
+                    <b>三体</b>
+                    <div class="by">刘慈欣</div>
+                    <div class="meta">
+                      <span class="fmt epub">EPUB</span><span>中文</span>
+                      <span class="sep"></span><span>2.4 MB</span>
+                      <span class="sep"></span><span>LibGen</span>
+                    </div>
+                  </div>
+                  <svg class="ic sm go"><use href="#i-chev"/></svg>
+                </div>
+                <div class="res">
+                  <div class="thumb c3"><b>三体</b></div>
+                  <div class="info">
+                    <b>The Three-Body Problem</b>
+                    <div class="by">Cixin Liu · Ken Liu (译)</div>
+                    <div class="meta">
+                      <span class="fmt epub">EPUB</span><span>English</span>
+                      <span class="sep"></span><span>3.1 MB</span>
+                      <span class="sep"></span><span>Anna's</span>
+                    </div>
+                  </div>
+                  <svg class="ic sm go"><use href="#i-chev"/></svg>
+                </div>
+                <div class="res">
+                  <div class="thumb c5"><b>三体Ⅱ</b></div>
+                  <div class="info">
+                    <b>三体Ⅱ·黑暗森林</b>
+                    <div class="by">刘慈欣</div>
+                    <div class="meta">
+                      <span class="fmt pdf">PDF</span><span>中文</span>
+                      <span class="sep"></span><span>6.8 MB</span>
+                      <span class="sep"></span><span>Z-Lib</span>
+                    </div>
+                  </div>
+                  <svg class="ic sm go"><use href="#i-chev"/></svg>
+                </div>
+                <div class="res">
+                  <div class="thumb c2"><b>三体Ⅲ</b></div>
+                  <div class="info">
+                    <b>三体Ⅲ·死神永生</b>
+                    <div class="by">刘慈欣</div>
+                    <div class="meta">
+                      <span class="fmt epub">EPUB</span><span>中文</span>
+                      <span class="sep"></span><span>2.9 MB</span>
+                      <span class="sep"></span><span>LibGen</span>
+                    </div>
+                  </div>
+                  <svg class="ic sm go"><use href="#i-chev"/></svg>
+                </div>
+              </div>
+
+              <div class="center-state" style="padding:20px 0 8px">
+                <span style="font-size:11px;color:var(--faint)">已显示 4 / 134 · 上滑加载更多</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>04</em>搜索结果 · 全部来源</figcaption>
+      </figure>
+
+      <!-- 05 搜索结果 · 单源 + 加载态 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <div class="querypill">
+                <svg class="ic sm"><use href="#i-search"/></svg>
+                <b>Normal People</b>
+                <span class="edit"><svg class="ic sm"><use href="#i-close"/></svg></span>
+              </div>
+            </div>
+
+            <div class="pad">
+              <div class="section-row" style="padding:0;margin-bottom:12px">
+                <h3 style="font-size:16px;letter-spacing:-.3px">12 个结果</h3>
+                <span>Anna's Archive</span>
+              </div>
+
+              <div class="src-row">
+                <span class="src-pill"><span class="dot off"></span>全部<em>12</em></span>
+                <span class="src-pill"><span class="dot off"></span>LibGen<em>0</em></span>
+                <span class="src-pill on"><span class="dot"></span>Anna's<em>12</em></span>
+                <span class="src-pill"><span class="dot off"></span>Z-Lib<em>0</em></span>
+                <span class="src-pill"><span class="dot off"></span>WeLib<em>0</em></span>
+              </div>
+
+              <div class="chips" style="margin-top:12px">
+                <span class="chip">相关度</span>
+                <span class="chip on">EPUB</span>
+                <span class="chip">English</span>
+              </div>
+
+              <div class="resgroup" style="margin-top:12px">
+                <div class="res">
+                  <div class="thumb c1"><b>Normal<br>People</b></div>
+                  <div class="info">
+                    <b>Normal People</b>
+                    <div class="by">Sally Rooney</div>
+                    <div class="meta">
+                      <span class="fmt epub">EPUB</span><span>English</span>
+                      <span class="sep"></span><span>1.8 MB</span>
+                    </div>
+                  </div>
+                  <svg class="ic sm go"><use href="#i-chev"/></svg>
+                </div>
+                <div class="res">
+                  <div class="thumb c4"><b>Normal<br>People</b></div>
+                  <div class="info">
+                    <b>Normal People (TV tie-in)</b>
+                    <div class="by">Sally Rooney</div>
+                    <div class="meta">
+                      <span class="fmt epub">EPUB</span><span>English</span>
+                      <span class="sep"></span><span>2.0 MB</span>
+                    </div>
+                  </div>
+                  <svg class="ic sm go"><use href="#i-chev"/></svg>
+                </div>
+              </div>
+
+              <!-- 骨架屏 -->
+              <div class="resgroup" style="margin-top:12px;padding:12px 16px">
+                <div style="display:flex;gap:12px;align-items:center">
+                  <div class="skeleton" style="width:56px;height:80px;border-radius:12px"></div>
+                  <div style="flex:1">
+                    <div class="skeleton" style="height:11px;width:74%"></div>
+                    <div class="skeleton" style="height:9px;width:44%;margin-top:8px"></div>
+                    <div class="skeleton" style="height:9px;width:58%;margin-top:8px"></div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;margin-top:16px">
+                  <div class="skeleton" style="width:56px;height:80px;border-radius:12px"></div>
+                  <div style="flex:1">
+                    <div class="skeleton" style="height:11px;width:62%"></div>
+                    <div class="skeleton" style="height:9px;width:38%;margin-top:8px"></div>
+                    <div class="skeleton" style="height:9px;width:50%;margin-top:8px"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="center-state" style="padding:16px 0 2px">
+                <span style="font-size:11px;color:var(--faint)">正在加载第 2 页…</span>
+              </div>
+
+              <div class="inline-hint" style="margin-top:8px;background:var(--container);color:var(--muted)">
+                <svg class="ic sm"><use href="#i-globe"/></svg>
+                <span class="grow">其他来源：LibGen 0 · Z-Library 0 · WeLib 超时</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>05</em>单源视图 · 分页加载</figcaption>
+      </figure>
+
+      <!-- 06 书籍详情 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <h2>书籍详情</h2>
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-share"/></svg></div>
+            </div>
+
+            <div class="hero">
+              <div class="big c6"><b>三体</b></div>
+              <div class="side">
+                <h2>三体</h2>
+                <div class="author">刘慈欣 · 重庆出版社</div>
+                <div class="stamp">
+                  <span class="accent">EPUB</span><span>中文</span><span>2.4 MB</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pad" style="margin-top:16px">
+              <div class="card">
+                <div class="card-head">
+                  <div class="tile-icon"><svg class="ic"><use href="#i-doc"/></svg></div>
+                  <div class="grow"><b>文件信息</b></div>
+                </div>
+                <dl style="margin:0">
+                  <div class="kv"><dt>ISBN</dt><dd>9787536692930</dd></div>
+                  <div class="kv"><dt>语言</dt><dd>中文</dd></div>
+                  <div class="kv"><dt>出版年</dt><dd>2008</dd></div>
+                  <div class="kv"><dt>大小</dt><dd>2.4 MB</dd></div>
+                  <div class="kv"><dt>来源</dt><dd>LibGen</dd></div>
+                </dl>
+              </div>
+
+              <div class="card" style="margin-top:8px">
+                <div class="card-head">
+                  <div class="tile-icon"><svg class="ic"><use href="#i-text"/></svg></div>
+                  <div class="grow"><b>简介</b></div>
+                </div>
+                <p class="desc">
+                  文化大革命期间，一次绝密军事计划把人类的信息发向宇宙。四光年外，三体文明被迫迁徙，
+                  并向地球派出了舰队。多年后，纳米科学家汪淼在一款虚拟游戏里，触到了这场跨越星海的阴谋。
+                </p>
+              </div>
+
+              <div class="card tight" style="margin-top:8px;display:flex;align-items:center;gap:8px">
+                <svg class="ic" style="color:var(--primary)"><use href="#i-info"/></svg>
+                <span style="font-size:11px;color:var(--muted);flex:1;line-height:16px">来自 LibGen 镜像，下载后自动校验 MD5。</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottombar">
+            <div class="inline">
+              <div class="btn primary"><svg class="ic"><use href="#i-down"/></svg>下载本书</div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>06</em>书籍详情</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════
+       C · 下载与异常
+       ══════════════════════════════════════════════════════ -->
+  <section class="group">
+    <div class="group-head">
+      <h2>下载与异常</h2>
+      <span>进度、失败与空态都有话可说</span>
+      <div class="rule"></div>
+    </div>
+    <div class="grid">
+
+      <!-- 07 下载中心 · 进行中 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked" style="bottom:78px">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">本地存储</div>
+                <h1 class="ptitle">下载中心</h1>
+              </div>
+              <div class="iconbtn"><svg class="ic"><use href="#i-folder"/></svg></div>
+            </div>
+
+            <div class="pad">
+              <!-- 当前任务 -->
+              <div class="dl-hero">
+                <div class="ring" style="--p:62%"><i>62%</i></div>
+                <div class="body">
+                  <b>The Seven Husbands of Evelyn Hugo</b>
+                  <div class="stat"><b>3.8 MB/s</b><span>·</span><span>剩余 00:48</span></div>
+                  <div class="progress"><i></i></div>
+                  <div class="stat" style="margin-top:8px"><span>2.21 / 3.58 MB · Range 续传</span></div>
+                </div>
+              </div>
+
+              <div class="stat-grid" style="margin-top:12px">
+                <div class="stat-box"><b>2</b><small>进行中</small></div>
+                <div class="stat-box"><b>1</b><small>已完成</small></div>
+                <div class="stat-box"><b>1</b><small>失败</small></div>
+              </div>
+
+              <div class="seg" style="margin-top:16px">
+                <div class="opt on">全部<em class="count">4</em></div>
+                <div class="opt">进行中</div>
+                <div class="opt">已完成</div>
+              </div>
+
+              <div class="section-row" style="margin-top:16px;padding:0 2px">
+                <h3>进行中</h3>
+                <span>队列为内存态</span>
+              </div>
+
+              <div class="task">
+                <div class="top">
+                  <div class="mini c1"><b>Evelyn<br>Hugo</b></div>
+                  <div class="grow">
+                    <b>The Seven Husbands of Evelyn Hugo</b>
+                    <small>Taylor Jenkins Reid · EPUB · 3.58 MB</small>
+                    <span class="badge run" style="margin-top:8px"><span class="dot"></span>62%</span>
+                  </div>
+                </div>
+                <div style="margin-top:16px">
+                  <div style="display:flex;gap:8px;margin-bottom:8px;font-size:11px;color:var(--muted)">
+                    <span>2.21 / 3.58 MB</span>
+                    <span class="spacer"></span>
+                    <span style="color:var(--primary)">3.8 MB/s · 剩余 00:48</span>
+                  </div>
+                  <div class="progress"><i></i></div>
+                </div>
+                <div class="actions">
+                  <span style="font-size:11px;color:var(--faint)">Anna's Archive</span>
+                  <span class="spacer"></span>
+                  <div class="btn sm outline"><svg class="ic sm"><use href="#i-pause"/></svg>暂停</div>
+                  <div class="btn sm ghost"><svg class="ic sm"><use href="#i-close"/></svg>取消</div>
+                </div>
+              </div>
+
+              <div class="task">
+                <div class="top">
+                  <div class="mini c6"><b>三体</b></div>
+                  <div class="grow">
+                    <b>三体</b>
+                    <small>刘慈欣 · EPUB · 2.4 MB</small>
+                    <span class="badge wait" style="margin-top:8px"><span class="dot"></span>排队中</span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <span style="font-size:11px;color:var(--faint)">LibGen · 等待空闲槽位</span>
+                  <span class="spacer"></span>
+                  <div class="btn sm ghost"><svg class="ic sm"><use href="#i-close"/></svg>取消</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>07</em>下载中心 · 进行中</figcaption>
+      </figure>
+
+      <!-- 08 下载中心 · 已完成 + 失败 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked" style="bottom:78px">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">本地存储</div>
+                <h1 class="ptitle">下载中心</h1>
+              </div>
+              <div class="iconbtn"><svg class="ic"><use href="#i-folder"/></svg></div>
+            </div>
+
+            <div class="pad">
+              <div class="seg">
+                <div class="opt">全部</div>
+                <div class="opt">进行中</div>
+                <div class="opt on">已完成</div>
+              </div>
+
+              <div class="section-row" style="margin-top:16px;padding:0 2px">
+                <h3>已完成</h3>
+                <span>点书名看详情 · 点打开用外部阅读器</span>
+              </div>
+
+              <div class="task">
+                <div class="top">
+                  <div class="mini c2"><b>Normal<br>People</b></div>
+                  <div class="grow">
+                    <b>Normal People</b>
+                    <small>Sally Rooney · EPUB · 1.8 MB · 已校验</small>
+                    <span class="badge done" style="margin-top:8px"><svg class="ic" style="width:10px;height:10px"><use href="#i-check"/></svg>完成</span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <span style="font-size:11px;color:var(--faint)">昨天 21:04 · Anna's Archive</span>
+                  <span class="spacer"></span>
+                  <div class="btn sm tonal"><svg class="ic sm"><use href="#i-book"/></svg>打开</div>
+                </div>
+              </div>
+
+              <div class="section-row" style="margin-top:16px;padding:0 2px">
+                <h3>失败</h3>
+                <span>1 项</span>
+              </div>
+
+              <div class="task" style="border-color:rgba(179,38,30,.24)">
+                <div class="top">
+                  <div class="mini c5"><b>Educated</b></div>
+                  <div class="grow">
+                    <b>Educated</b>
+                    <small>Tara Westover · PDF · 8.1 MB</small>
+                    <span class="badge fail" style="margin-top:8px"><svg class="ic" style="width:10px;height:10px"><use href="#i-alert"/></svg>失败</span>
+                  </div>
+                </div>
+                <div class="inline-hint warn" style="margin-top:8px;background:var(--error-c);color:var(--error)">
+                  <svg class="ic sm"><use href="#i-alert"/></svg>
+                  <span class="grow">签名链接已过期，可刷新链接后重试。</span>
+                </div>
+                <div class="actions">
+                  <span style="font-size:11px;color:var(--faint)">Z-Library</span>
+                  <span class="spacer"></span>
+                  <div class="btn sm outline"><svg class="ic sm"><use href="#i-refresh"/></svg>重试</div>
+                  <div class="btn sm ghost">移除</div>
+                </div>
+              </div>
+
+              <div class="card tight" style="margin-top:16px;display:flex;gap:8px;align-items:flex-start">
+                <svg class="ic sm" style="color:var(--tertiary);margin-top:1px"><use href="#i-info"/></svg>
+                <span style="font-size:11px;color:var(--muted);line-height:16px">移除记录时可勾选同时移除本地文件；队列仅存在内存中，进程退出后不续传。</span>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>08</em>下载中心 · 完成与失败</figcaption>
+      </figure>
+
+      <!-- 09 空态 / 无结果 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <div class="querypill">
+                <svg class="ic sm"><use href="#i-search"/></svg>
+                <b>暗室手册</b>
+                <span class="edit"><svg class="ic sm"><use href="#i-close"/></svg></span>
+              </div>
+            </div>
+
+            <div class="pad">
+              <div class="section-row" style="padding:0">
+                <h3 style="font-size:16px;letter-spacing:-.3px">0 个结果</h3>
+                <span>4 个来源已响应</span>
+              </div>
+
+              <div class="src-row" style="margin-top:12px">
+                <span class="src-pill on"><span class="dot warn"></span>全部<em>0</em></span>
+                <span class="src-pill"><span class="dot off"></span>LibGen<em>0</em></span>
+                <span class="src-pill"><span class="dot off"></span>Anna's<em>0</em></span>
+                <span class="src-pill"><span class="dot off"></span>Z-Lib<em>0</em></span>
+                <span class="src-pill"><span class="dot warn"></span>WeLib<em>失败</em></span>
+              </div>
+
+              <div class="center-state" style="padding:44px 8px 0">
+                <div class="halo"><svg class="ic" style="width:38px;height:38px"><use href="#i-search"/></svg></div>
+                <h3>没有找到「暗室手册」</h3>
+                <p>试试更短的关键词、作者名，或用 ISBN 精确检索。WeLib 本次未返回结果。</p>
+                <div class="chips" style="justify-content:center;margin-top:16px">
+                  <span class="chip">暗室</span>
+                  <span class="chip">手册</span>
+                  <span class="chip">9787536692930</span>
+                </div>
+                <div class="btn tonal sm" style="margin-top:16px"><svg class="ic sm"><use href="#i-refresh"/></svg>重新搜索</div>
+              </div>
+
+              <div class="card" style="margin-top:28px">
+                <div class="card-head no-gap">
+                  <div class="tile-icon accent"><svg class="ic"><use href="#i-info"/></svg></div>
+                  <div class="grow">
+                    <b>来源状态</b>
+                    <div class="sub">三个来源正常，WeLib 超时</div>
+                  </div>
+                </div>
+                <dl style="margin:8px 0 0">
+                  <div class="kv"><dt>LibGen</dt><dd style="color:var(--secondary)">已响应 · 0</dd></div>
+                  <div class="kv"><dt>Anna's</dt><dd style="color:var(--secondary)">已响应 · 0</dd></div>
+                  <div class="kv"><dt>Z-Library</dt><dd style="color:var(--secondary)">已响应 · 0</dd></div>
+                  <div class="kv"><dt>WeLib</dt><dd style="color:var(--error)">超时</dd></div>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>09</em>无结果 · 来源诊断</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════
+       D · 设置
+       ══════════════════════════════════════════════════════ -->
+  <section class="group">
+    <div class="group-head">
+      <h2>设置</h2>
+      <span>搜索来源 / 外观 / 高级 / 关于</span>
+      <div class="rule"></div>
+    </div>
+    <div class="grid">
+
+      <!-- 10 设置 · 搜索来源 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">偏好</div>
+                <h1 class="ptitle">设置</h1>
+              </div>
+            </div>
+
+            <div class="pad">
+              <div class="seg">
+                <div class="opt on">搜索来源</div>
+                <div class="opt">外观</div>
+                <div class="opt">高级</div>
+                <div class="opt">关于</div>
+              </div>
+
+              <p style="font-size:11px;line-height:16px;color:var(--muted);margin:12px 4px 0">
+                四个书源并行检索。关闭的来源不会发起请求，镜像地址由 SLUM 目录下发。
+              </p>
+              <div style="margin-top:16px">
+                <div class="mirror">
+                  <div class="top">
+                    <div class="logo">LG</div>
+                    <div class="grow"><b>LibGen</b><small>快速直链下载——优先搜索</small></div>
+                    <div class="toggle on"></div>
+                  </div>
+                  <div class="foot">
+                    <span class="lat"><span class="dot"></span>已启用</span>
+                    <span class="spacer"></span>
+                    <span class="link">镜像</span>
+                  </div>
+                </div>
+
+                <div class="mirror">
+                  <div class="top">
+                    <div class="logo aa">AA</div>
+                    <div class="grow"><b>Anna's Archive</b><small>最后搜索——受 DDoS-Guard 保护</small></div>
+                    <div class="toggle on"></div>
+                  </div>
+                  <div class="foot">
+                    <span class="lat"><span class="dot"></span>已启用</span>
+                    <span class="spacer"></span>
+                    <span class="link">镜像</span>
+                  </div>
+                </div>
+
+                <div class="mirror">
+                  <div class="top">
+                    <div class="logo zl">ZL</div>
+                    <div class="grow"><b>Z-Library</b><small>镜像轮换，可能需要登录</small></div>
+                    <div class="toggle on"></div>
+                  </div>
+                  <div class="foot">
+                    <span class="lat"><span class="dot"></span>已启用</span>
+                    <span class="spacer"></span>
+                    <span class="link">镜像</span>
+                  </div>
+                </div>
+
+                <div class="mirror">
+                  <div class="top">
+                    <div class="logo">WL</div>
+                    <div class="grow"><b>WeLib</b><small>Cloudflare 防护的搜索，书籍页面可直接访问</small></div>
+                    <div class="toggle"></div>
+                  </div>
+                  <div class="foot">
+                    <span class="lat"><span class="dot"></span>已关闭</span>
+                    <span class="spacer"></span>
+                    <span class="link">镜像</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="group-card" style="margin-top:12px">
+                <div class="gh">来源行为</div>
+                <div class="setrow">
+                  <div class="ic"><svg class="ic"><use href="#i-globe"/></svg></div>
+                  <div class="grow"><b>镜像与来源</b><small>查看 SLUM 下发的全部节点</small></div>
+                  <svg class="ic sm chev"><use href="#i-chev"/></svg>
+                </div>
+                <div class="setrow">
+                  <div class="ic"><svg class="ic"><use href="#i-shield"/></svg></div>
+                  <div class="grow"><b>Anna's Archive 捐赠密钥</b><small>输入密钥以获得更快下载</small></div>
+                  <svg class="ic sm chev"><use href="#i-chev"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>10</em>设置 · 搜索来源</figcaption>
+      </figure>
+
+      <!-- 11 设置 · 外观（浅色） -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">偏好</div>
+                <h1 class="ptitle">设置</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="seg">
+                <div class="opt">搜索来源</div>
+                <div class="opt on">外观</div>
+                <div class="opt">高级</div>
+                <div class="opt">关于</div>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:16px 16px 0">
+              <div class="setrow" style="min-height:52px">
+                <div class="ic"><svg class="ic"><use href="#i-lang"/></svg></div>
+                <div class="grow"><b>语言</b><small>界面文字，立即生效</small></div>
+                <span class="val">中文</span>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">主题</div>
+              <div class="theme-grid">
+                <div class="theme-opt on">
+                  <div class="swatch" style="background:#f4efe6">
+                    <span style="background:#0f6b5c;width:60%"></span>
+                    <span style="background:#e3d6c2;width:84%"></span>
+                    <span style="background:#d9efe9;width:44%"></span>
+                  </div>
+                  <p>浅色</p>
+                </div>
+                <div class="theme-opt">
+                  <div class="swatch" style="background:#151310">
+                    <span style="background:#5fd0b8;width:60%"></span>
+                    <span style="background:#3e372e;width:84%"></span>
+                    <span style="background:#123f37;width:44%"></span>
+                  </div>
+                  <p>深色</p>
+                </div>
+                <div class="theme-opt">
+                  <div class="swatch" style="background:linear-gradient(135deg,#f4efe6 50%,#151310 50%)">
+                    <span style="background:#0f6b5c;width:60%"></span>
+                    <span style="background:#e3d6c2;width:84%"></span>
+                  </div>
+                  <p>跟随系统</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">显示</div>
+              <div class="setrow" style="flex-direction:column;align-items:stretch;gap:12px;padding-bottom:16px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="ic"><svg class="ic"><use href="#i-text"/></svg></div>
+                  <div class="grow"><b style="font-size:13px;font-weight:700">字体大小</b></div>
+                  <span class="val">100%</span>
+                </div>
+                <div class="slider">
+                  <span style="font-size:11px;color:var(--faint)">Aa</span>
+                  <div class="track"><i style="width:50%"></i><span class="knob" style="left:50%"></span></div>
+                  <span style="font-size:16px;color:var(--muted)">Aa</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>11</em>设置 · 外观（浅色）</figcaption>
+      </figure>
+
+      <!-- 12 设置 · 外观（深色屏）+ 语言展开 -->
+      <figure class="frame">
+        <div class="phone dark"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">偏好</div>
+                <h1 class="ptitle">设置</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="seg">
+                <div class="opt">搜索来源</div>
+                <div class="opt on">外观</div>
+                <div class="opt">高级</div>
+                <div class="opt">关于</div>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:16px 16px 0">
+              <div class="setrow" style="min-height:52px">
+                <div class="ic"><svg class="ic"><use href="#i-lang"/></svg></div>
+                <div class="grow"><b>语言</b><small>界面文字，立即生效</small></div>
+                <span class="val">中文</span>
+                <svg class="ic sm chev" style="transform:rotate(90deg)"><use href="#i-chev"/></svg>
+              </div>
+              <div style="border-top:1px solid var(--line);padding:8px 0 8px">
+                <div class="langrow">
+                  <span class="code">AUTO</span>
+                  <div class="grow"><b>跟随系统</b><small>自动匹配浏览器语言</small></div>
+                  <div class="radio"></div>
+                </div>
+                <div class="langrow">
+                  <span class="code">EN</span>
+                  <div class="grow"><b>English</b><small>English (United States)</small></div>
+                  <div class="radio"></div>
+                </div>
+                <div class="langrow">
+                  <span class="code">DE</span>
+                  <div class="grow"><b>Deutsch</b><small>Deutsch</small></div>
+                  <div class="radio"></div>
+                </div>
+                <div class="langrow">
+                  <span class="code">FR</span>
+                  <div class="grow"><b>Français</b><small>Français</small></div>
+                  <div class="radio"></div>
+                </div>
+                <div class="langrow on">
+                  <span class="code">中</span>
+                  <div class="grow"><b>简体中文</b><small>当前语言</small></div>
+                  <div class="radio on"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">主题</div>
+              <div class="theme-grid">
+                <div class="theme-opt">
+                  <div class="swatch" style="background:#f4efe6">
+                    <span style="background:#0f6b5c;width:60%"></span>
+                    <span style="background:#e3d6c2;width:84%"></span>
+                    <span style="background:#d9efe9;width:44%"></span>
+                  </div>
+                  <p>浅色</p>
+                </div>
+                <div class="theme-opt on">
+                  <div class="swatch" style="background:#151310">
+                    <span style="background:#5fd0b8;width:60%"></span>
+                    <span style="background:#3e372e;width:84%"></span>
+                    <span style="background:#123f37;width:44%"></span>
+                  </div>
+                  <p>深色</p>
+                </div>
+                <div class="theme-opt">
+                  <div class="swatch" style="background:linear-gradient(135deg,#f4efe6 50%,#151310 50%)">
+                    <span style="background:#0f6b5c;width:60%"></span>
+                    <span style="background:#e3d6c2;width:84%"></span>
+                  </div>
+                  <p>跟随系统</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>12</em>外观 · 深色屏与语言展开</figcaption>
+      </figure>
+
+      <!-- 13 设置 · 高级 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">偏好</div>
+                <h1 class="ptitle">设置</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="seg">
+                <div class="opt">搜索来源</div>
+                <div class="opt">外观</div>
+                <div class="opt on">高级</div>
+                <div class="opt">关于</div>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:16px 16px 0">
+              <div class="gh">通用</div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-folder"/></svg></div>
+                <div class="grow"><b>存储位置</b><small>下载文件的保存目录</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">行为</div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-down"/></svg></div>
+                <div class="grow"><b>手动下载按钮</b><small>显示手动触发下载的按钮</small></div>
+                <div class="toggle"></div>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-shield"/></svg></div>
+                <div class="grow"><b>后台完成验证</b><small>无感完成 DDoS 验证；可关闭后在可见窗口验证</small></div>
+                <div class="toggle on"></div>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">更新</div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-refresh"/></svg></div>
+                <div class="grow"><b>包含测试版更新</b><small>获取预发布版本</small></div>
+                <div class="toggle"></div>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-refresh"/></svg></div>
+                <div class="grow"><b>检查更新</b></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">备份</div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-doc"/></svg></div>
+                <div class="grow"><b>导出备份</b><small>将设置、书籍与镜像实例保存为 JSON 文件</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-doc"/></svg></div>
+                <div class="grow"><b>导入备份</b><small>从 JSON 文件恢复数据</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">维护</div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-doc"/></svg></div>
+                <div class="grow"><b>导出日志</b><small>分享诊断日志</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-refresh"/></svg></div>
+                <div class="grow"><b>重新引导</b><small>重置应用设置流程</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+            </div>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>13</em>设置 · 高级</figcaption>
+      </figure>
+
+      <!-- 14 设置 · 关于 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">偏好</div>
+                <h1 class="ptitle">设置</h1>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="seg">
+                <div class="opt">搜索来源</div>
+                <div class="opt">外观</div>
+                <div class="opt">高级</div>
+                <div class="opt on">关于</div>
+              </div>
+            </div>
+
+            <div class="pad" style="margin-top:16px">
+              <div class="card" style="display:flex;align-items:center;gap:12px">
+                <div style="width:52px;height:52px;border-radius:16px;overflow:hidden;flex:none;box-shadow:var(--sh-primary)">
+                  <svg width="52" height="52" viewBox="0 0 1024 1024" style="display:block">
+                    <rect width="1024" height="1024" fill="#0F6B5C"/>
+                    <circle cx="512" cy="512" r="352" fill="#0C5A4E"/>
+                    <rect x="286" y="286" width="452" height="120" rx="34" fill="#F7F1E8"/>
+                    <path d="M286 320c0-19 15-34 34-34h30v120h-30c-19 0-34-15-34-34z" fill="#E2D5C3"/>
+                    <path d="M654 310v72M672 310v72M690 310v72" stroke="#D6C7B4" stroke-width="6" stroke-linecap="round"/>
+                    <rect x="286" y="446" width="320" height="120" rx="34" fill="#E9DFD0"/>
+                    <path d="M286 480c0-19 15-34 34-34h30v120h-30c-19 0-34-15-34-34z" fill="#D5C5B0"/>
+                    <path d="M522 470v72M540 470v72M558 470v72" stroke="#C6B49D" stroke-width="6" stroke-linecap="round"/>
+                    <rect x="286" y="606" width="452" height="120" rx="34" fill="#D96C4F"/>
+                    <path d="M286 640c0-19 15-34 34-34h30v120h-30c-19 0-34-15-34-34z" fill="#B9543B"/>
+                    <path d="M654 630v72M672 630v72M690 630v72" stroke="#F0B7A6" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M622 286h58v222l-29-26-29 26z" fill="#D96C4F"/>
+                  </svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <b style="display:block;font-size:14px;font-weight:800;letter-spacing:-.2px">OpenlibExtended</b>
+                  <small style="display:block;font-size:11px;color:var(--muted);margin-top:3px">v1.0.11 · AGPL-3.0</small>
+                </div>
+                <span class="badge done">AGPL-3.0</span>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">信息</div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-star"/></svg></div>
+                <div class="grow"><b>更新日志</b><small>查看 1.0.11 的变更</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-doc"/></svg></div>
+                <div class="grow"><b>开源许可</b><small>依赖与许可证清单</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-globe"/></svg></div>
+                <div class="grow"><b>项目主页</b><small>GitHub · 提交反馈</small></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-info"/></svg></div>
+                <div class="grow"><b>关于 OpenlibExtended</b></div>
+                <svg class="ic sm chev"><use href="#i-chev"/></svg>
+              </div>
+            </div>
+
+            <div class="group-card" style="margin:12px 16px 0">
+              <div class="gh">致谢</div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-book"/></svg></div>
+                <div class="grow"><b>SLUM 镜像目录</b><small>open-slum.org</small></div>
+              </div>
+              <div class="setrow">
+                <div class="ic"><svg class="ic"><use href="#i-shield"/></svg></div>
+                <div class="grow"><b>过盾求解器</b><small>WebView 手动验证兜底</small></div>
+              </div>
+            </div>
+
+            <p style="font-size:11px;color:var(--faint);text-align:center;margin:16px 0 0;line-height:16px">
+              不提供书籍内容，仅做镜像检索与下载。<br>请支持正版。
+            </p>
+          </div>
+          <nav class="navbar">
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-home"/></svg></span>发现</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-search"/></svg></span>搜索</div>
+            <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-down"/></svg></span>下载中心</div>
+            <div class="tab on"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
+          </nav>
+        </div>
+        <figcaption><em>14</em>设置 · 关于</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════
+       E · 二级页与浮层
+       ══════════════════════════════════════════════════════ -->
+  <section class="group">
+    <div class="group-head">
+      <h2>二级页与浮层</h2>
+      <span>返回 + 标题 + 单个操作</span>
+      <div class="rule"></div>
+    </div>
+    <div class="grid">
+
+      <!-- 15 镜像与来源 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <h2>镜像与来源</h2>
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-speed"/></svg></div>
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-refresh"/></svg></div>
+            </div>
+
+            <div class="pad">
+              <div class="inline-hint">
+                <svg class="ic sm"><use href="#i-shield"/></svg>
+                <span class="grow">地址由 SLUM 下发；DOWN 镜像永不请求。右上角可测本机到已启用节点的延迟。</span>
+              </div>
+
+              <div class="section-label" style="margin-left:0">LibGen · 1 个节点</div>
+              <div class="mirror">
+                <div class="top">
+                  <div class="logo">LG</div>
+                  <div class="grow"><b>libgen.is</b><small>主节点 · 支持 Range 续传</small></div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="foot" style="display:block">
+                  <div class="latrow"><span class="lat"><span class="dot"></span>可达 · SLUM 320 ms</span></div>
+                  <div class="latrow"><span class="lat stale"><span class="dot"></span>本机未测速</span></div>
+                </div>
+              </div>
+
+              <div class="section-label" style="margin-left:0">Anna's Archive · 1 个节点</div>
+              <div class="mirror">
+                <div class="top">
+                  <div class="logo aa">AA</div>
+                  <div class="grow"><b>annas-archive.org</b><small>需过盾 · 命中缓存时跳过</small></div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="foot" style="display:block">
+                  <div class="latrow"><span class="lat"><span class="dot"></span>可达 · SLUM 480 ms</span></div>
+                  <div class="latrow"><span class="lat stale"><span class="dot"></span>本机未测速</span></div>
+                </div>
+              </div>
+
+              <div class="section-label" style="margin-left:0">Z-Library · 1 个节点</div>
+              <div class="mirror">
+                <div class="top">
+                  <div class="logo zl">ZL</div>
+                  <div class="grow"><b>z-lib.gs</b><small>签名链接会过期，需 linkRefresher</small></div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="foot" style="display:block">
+                  <div class="latrow"><span class="lat slow"><span class="dot"></span>可达 · SLUM 1.1 s</span></div>
+                  <div class="latrow"><span class="lat stale"><span class="dot"></span>本机未测速</span></div>
+                </div>
+              </div>
+
+              <div class="card tight" style="margin-top:16px;display:flex;align-items:center;gap:12px">
+                <div class="tile-icon"><svg class="ic"><use href="#i-tune"/></svg></div>
+                <div class="grow"><b style="display:block;font-size:13px;font-weight:700">自动镜像排序</b><small style="display:block;font-size:11px;color:var(--muted);margin-top:2px">按保护等级、状态与本机延迟自动排序</small></div>
+                <div class="toggle on"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>15</em>镜像与来源</figcaption>
+      </figure>
+
+      <!-- 16 底部弹层 · 下载选项 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen" style="filter:blur(1.2px) brightness(.97)">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <div class="querypill">
+                <svg class="ic sm"><use href="#i-search"/></svg>
+                <b>Normal People</b>
+                <span class="edit"><svg class="ic sm"><use href="#i-close"/></svg></span>
+              </div>
+            </div>
+            <div class="pad">
+              <div class="section-row" style="padding:0;margin-bottom:12px">
+                <h3 style="font-size:16px;letter-spacing:-.3px">51 个结果</h3>
+                <span>4 个来源</span>
+              </div>
+              <div class="src-row">
+                <span class="src-pill on"><span class="dot"></span>全部<em>51</em></span>
+                <span class="src-pill"><span class="dot"></span>LibGen<em>0</em></span>
+                <span class="src-pill"><span class="dot"></span>Anna's<em>失败</em></span>
+                <span class="src-pill"><span class="dot warn"></span>Z-Lib<em>51</em></span>
+                <span class="src-pill"><span class="dot pending"></span>WeLib<em>…</em></span>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;inset:0;background:rgba(33,28,23,.34);z-index:28"></div>
+          <div class="sheet">
+            <div class="handle"></div>
+            <h4>选择来源</h4>
+            <p>切换结果视图；自动模式会合并全部书源。</p>
+            <div class="sheet-opt">
+              <div class="tile-icon accent" style="width:32px;height:32px;border-radius:12px"><svg class="ic sm"><use href="#i-tune"/></svg></div>
+              <div class="grow"><b style="font-size:12px;display:block">自动来源</b><small style="font-size:11px;color:var(--muted)">合并全部来源 · 推荐</small></div>
+              <div class="radio on"></div>
+            </div>
+            <div class="sheet-opt">
+              <div class="tile-icon" style="width:32px;height:32px;border-radius:12px"><svg class="ic sm"><use href="#i-book"/></svg></div>
+              <div class="grow"><b style="font-size:12px;display:block">LibGen</b><small style="font-size:11px;color:var(--muted)">0 个结果</small></div>
+              <div class="radio"></div>
+            </div>
+            <div class="sheet-opt">
+              <div class="tile-icon" style="width:32px;height:32px;border-radius:12px"><svg class="ic sm"><use href="#i-book"/></svg></div>
+              <div class="grow"><b style="font-size:12px;display:block">Z-Library</b><small style="font-size:11px;color:var(--muted)">51 个结果</small></div>
+              <div class="radio"></div>
+            </div>
+            <div class="sheet-opt">
+              <div class="tile-icon" style="width:32px;height:32px;border-radius:12px"><svg class="ic sm"><use href="#i-book"/></svg></div>
+              <div class="grow"><b style="font-size:12px;display:block">WeLib</b><small style="font-size:11px;color:var(--muted)">仍在检索</small></div>
+              <div class="radio"></div>
+            </div>
+            <div class="sheet-opt">
+              <div class="tile-icon" style="width:32px;height:32px;border-radius:12px"><svg class="ic sm"><use href="#i-book"/></svg></div>
+              <div class="grow"><b style="font-size:12px;display:block">Anna's</b><small style="font-size:11px;color:var(--tertiary)">请求失败</small></div>
+              <div class="radio"></div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>16</em>底部弹层 · 选择来源</figcaption>
+      </figure>
+
+      <!-- 17 对话框 · 确认移除 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen docked" style="filter:blur(1.2px) brightness(.97)">
+            <div class="pagehead">
+              <div class="grow">
+                <div class="eyebrow">本地存储</div>
+                <h1 class="ptitle">下载中心</h1>
+              </div>
+              <div class="iconbtn"><svg class="ic"><use href="#i-folder"/></svg></div>
+            </div>
+            <div class="pad">
+              <div class="seg primary">
+                <div class="opt">全部</div>
+                <div class="opt">进行中</div>
+                <div class="opt on">已完成</div>
+              </div>
+              <div class="task" style="margin-top:16px">
+                <div class="top">
+                  <div class="mini c2"><b>Normal<br>People</b></div>
+                  <div class="grow">
+                    <b>Normal People</b>
+                    <small>Sally Rooney · EPUB · 1.8 MB</small>
+                  </div>
+                  <span class="badge done">完成</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;inset:0;background:rgba(33,28,23,.38);z-index:28"></div>
+          <div style="position:absolute;inset:0;z-index:32;display:grid;place-items:center;padding:24px">
+            <div style="width:100%;border-radius:28px;background:var(--surface);padding:24px;box-shadow:var(--sh-3)">
+              <div style="width:48px;height:48px;border-radius:16px;background:var(--error-c);color:var(--error);display:grid;place-items:center;margin-bottom:16px">
+                <svg class="ic" style="width:24px;height:24px"><use href="#i-trash"/></svg>
+              </div>
+              <b style="display:block;font-size:16px;font-weight:800;letter-spacing:-.3px;line-height:24px">删除记录</b>
+              <p style="margin:8px 0 0;font-size:12px;line-height:20px;color:var(--muted)">
+                默认只移除记录；本地文件会保留在下载目录。
+              </p>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding:12px;border-radius:12px;border:1px solid var(--outline-v);background:var(--low)">
+                <span style="width:20px;height:20px;border-radius:8px;border:1.5px solid var(--outline);background:var(--surface);flex:none"></span>
+                <span style="font-size:12px;font-weight:600;color:var(--ink)">同时移除文件</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:20px">
+                <div class="btn outline" style="flex:1">取消</div>
+                <div class="btn" style="flex:1;background:var(--error);color:#fff">删除</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>17</em>对话框 · 确认移除</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <section class="group">
+    <div class="group-head">
+      <h2>分类详情</h2>
+      <span>点击分类后的书籍网格</span>
+      <div class="rule"></div>
+    </div>
+    <div class="grid">
+
+      <!-- 20 分类 · 经典 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <h2>经典</h2>
+            </div>
+            <div class="pad" style="margin-top:8px">
+              <div class="catbook-grid">
+                <div class="catbook"><div class="cover c6"><b>三体</b></div><b>三体</b><span class="by">刘慈欣</span><span class="meta">★ 4.12 · 2008</span></div>
+                <div class="catbook"><div class="cover c2"><b>活着</b></div><b>活着</b><span class="by">余华</span><span class="meta">★ 4.35 · 1993</span></div>
+                <div class="catbook"><div class="cover c5"><b>百年孤独</b></div><b>百年孤独</b><span class="by">加西亚·马尔克斯</span><span class="meta">★ 4.07 · 1967</span></div>
+                <div class="catbook"><div class="cover c3"><b>围城</b></div><b>围城</b><span class="by">钱钟书</span><span class="meta">★ 4.28 · 1947</span></div>
+                <div class="catbook"><div class="cover c1"><b>平凡的世界</b></div><b>平凡的世界</b><span class="by">路遥</span><span class="meta">★ 4.33 · 1986</span></div>
+                <div class="catbook"><div class="cover c4"><b>红楼梦</b></div><b>红楼梦</b><span class="by">曹雪芹</span><span class="meta">★ 4.31 · 1791</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>20</em>分类 · 经典</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <section class="group">
+    <div class="group-head">
+      <h2>镜像测速</h2>
+      <span>手动测当前设备到已启用节点的延迟</span>
+      <div class="rule"></div>
+    </div>
+    <div class="grid">
+
+      <!-- 21 镜像 · 本机测速 -->
+      <figure class="frame">
+        <div class="phone"><i class="gg" aria-hidden="true"></i>
+          <div class="statusbar"><span>9:41</span><span class="sb-right"><span>5G</span><span class="bat"></span></span></div>
+          <div class="screen">
+            <div class="appbar">
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-back"/></svg></div>
+              <h2>镜像与来源</h2>
+              <div class="iconbtn sm"><span class="spinner"></span></div>
+              <div class="iconbtn sm"><svg class="ic"><use href="#i-refresh"/></svg></div>
+            </div>
+
+            <div class="pad">
+              <div class="inline-hint">
+                <span class="spinner"></span>
+                <span class="grow">正在测速 · 3/4 已完成。只测已启用节点，超时 6 秒。</span>
+              </div>
+
+              <div class="section-label" style="margin-left:0">LibGen · 1 个节点</div>
+              <div class="mirror">
+                <div class="top">
+                  <div class="logo">LG</div>
+                  <div class="grow"><b>libgen.is</b><small>主节点 · 支持 Range 续传</small></div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="foot" style="display:block">
+                  <div class="latrow"><span class="lat"><span class="dot"></span>可达 · SLUM 320 ms</span></div>
+                  <div class="latrow"><span class="spinner"></span><span class="lat stale">本机测速中…</span></div>
+                </div>
+              </div>
+
+              <div class="section-label" style="margin-left:0">Anna's Archive · 1 个节点</div>
+              <div class="mirror">
+                <div class="top">
+                  <div class="logo aa">AA</div>
+                  <div class="grow"><b>annas-archive.org</b><small>需过盾 · 命中缓存时跳过</small></div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="foot" style="display:block">
+                  <div class="latrow"><span class="lat"><span class="dot"></span>可达 · SLUM 480 ms</span></div>
+                  <div class="latrow"><span class="lat local"><span class="dot"></span>本机 68 ms · 刚刚</span></div>
+                </div>
+              </div>
+
+              <div class="section-label" style="margin-left:0">Z-Library · 1 个节点</div>
+              <div class="mirror">
+                <div class="top">
+                  <div class="logo zl">ZL</div>
+                  <div class="grow"><b>z-lib.gs</b><small>签名链接会过期，需 linkRefresher</small></div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="foot" style="display:block">
+                  <div class="latrow"><span class="lat slow"><span class="dot"></span>可达 · SLUM 1.1 s</span></div>
+                  <div class="latrow"><span class="lat slow"><span class="dot"></span>本机 1.2 s · 偏慢</span></div>
+                </div>
+              </div>
+
+              <div class="section-label" style="margin-left:0">WeLib · 1 个节点</div>
+              <div class="mirror">
+                <div class="top">
+                  <div class="logo">WL</div>
+                  <div class="grow"><b>welib.org</b><small>需过盾 · 命中缓存时跳过</small></div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="foot" style="display:block">
+                  <div class="latrow"><span class="lat"><span class="dot"></span>可达 · SLUM 540 ms</span></div>
+                  <div class="latrow"><span class="lat bad"><span class="dot"></span>本机超时 · 6 s 未响应</span></div>
+                </div>
+              </div>
+
+              <div class="card tight" style="margin-top:16px;display:flex;align-items:center;gap:12px">
+                <div class="tile-icon"><svg class="ic"><use href="#i-tune"/></svg></div>
+                <div class="grow"><b style="display:block;font-size:13px;font-weight:700">自动镜像排序</b><small style="display:block;font-size:11px;color:var(--muted);margin-top:2px">同层按本机延迟；未测速或过期时用 SLUM 延迟</small></div>
+                <div class="toggle on"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><em>21</em>镜像 · 本机测速</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <footer class="deck-foot">
+    <span><b>21 个界面</b> · 全部可交互原型 · 底部页与分段标签可左右滑动</span>
+    <span>字阶 10 – 34 · 圆角 8 / 12 / 16 / 20 / 28 · 4 列 × 76 + 3 × 8</span>
+    <span>主题源 lib/ui/themes.dart</span>
+    <span class="spacer"></span>
+    <span>OpenlibExtended · design/ui_prototype.html</span>
+  </footer>
+
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M4.9 7.5l1.7 1M17.4 15.5l1.7 1M4.9 16.5l1.7-1M17.4 8.5l1.7-1"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15"/><path d="m13.5 6.5 6 5.5-6 5.5"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m10.5 6.5-6 5.5 6 5.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-tune" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v18H6.5A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 17.5h15"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 4 2.4 5.2 5.6.7-4.1 3.9 1.1 5.6L12 16.7 6.9 19.4 8 13.8 3.9 9.9l5.6-.7z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-9.2A4 4 0 0 1 12 8a4 4 0 0 1 7 2.8C19 15.7 12 20 12 20z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.4 2.3 3.6 5 3.6 8s-1.2 5.7-3.6 8c-2.4-2.3-3.6-5-3.6-8S9.6 6.3 12 4z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 19 6v6c0 4-3 7.2-7 8.5-4-1.3-7-4.5-7-8.5V6z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 11v5"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14"/><path d="M9 7V4.8h6V7"/><path d="M6.5 7l.8 12h9.4l.8-12"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 13v6.5h14V13"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.5 20 19H4z"/><path d="M12 10v4"/><path d="M12 16.5h.01"/></symbol>
+    <symbol id="i-speed" viewBox="0 0 24 24"><path d="M4.5 17a8 8 0 1 1 15 0"/><path d="m12 14 4.5-4.5"/><circle cx="12" cy="14" r="1.2"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.2-5.1"/><path d="M19 4.5V9h-4.5"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 0 0 16c1.4 0 2-1 2-2s-.7-1.6-.7-2.4c0-.9.8-1.6 1.7-1.6h1.5A4 4 0 0 0 20.5 10C20.5 6.6 16.8 4 12 4z"/><circle cx="8.5" cy="9.5" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="15.5" cy="9.5" r="1"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h9M9.5 6v13"/><path d="M15 11h5M17.5 11v8"/></symbol>
+    <symbol id="i-lang" viewBox="0 0 24 24"><path d="M4 6h9M8.5 6v1.5c0 3.6-2 6.5-4.5 8"/><path d="M6 11c1.5 2.5 3.5 4 5.5 4.5"/><path d="m13 19 3.5-9 3.5 9"/><path d="M14.2 16.2h4.6"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h3.7l1.8 2h7.5A1.5 1.5 0 0 1 20 9.5v8A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5V8h4"/><path d="M9.5 13h6M9.5 16.5h4"/></symbol>
+  </defs>
+</svg>
+
+  <script>
+    (function(){
+      var on = location.hash === '#grid';
+      document.body.classList.toggle('show-grid', on);
+      addEventListener('keydown', function(e){
+        if (e.key === 'g' || e.key === 'G'){ document.body.classList.toggle('show-grid'); }
+      });
+    })();
+  </script>
+</body>
+</html>

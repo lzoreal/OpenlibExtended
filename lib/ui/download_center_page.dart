@@ -30,6 +30,7 @@ import 'package:openlib/ui/components/inline_hint.dart';
 import 'package:openlib/ui/components/file_buttons_widget.dart'
     show openBookExternally;
 import 'package:openlib/ui/components/page_header.dart';
+import 'package:openlib/ui/components/pill_tabs.dart';
 import 'package:openlib/ui/components/section_header.dart';
 import 'package:openlib/ui/mybook_page.dart';
 import 'package:openlib/ui/swiss_grid.dart';
@@ -83,7 +84,7 @@ final completedDownloadsProvider =
   return entries;
 });
 
-enum _DownloadFilter { all, active, completed, failed }
+enum _DownloadFilter { all, active, completed }
 
 enum _CompletedAction { details, share, folder, remove }
 
@@ -94,7 +95,8 @@ class DownloadCenterPage extends ConsumerStatefulWidget {
   ConsumerState<DownloadCenterPage> createState() => _DownloadCenterPageState();
 }
 
-class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage> {
+class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
+    with SingleTickerProviderStateMixin {
   Timer? _speedTimer;
   final Map<String, int> _lastBytes = {};
   final Map<String, double> _speeds = {};
@@ -102,18 +104,33 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage> {
   bool _hasSample = false;
   String? _verifyingTaskId;
   _DownloadFilter _filter = _DownloadFilter.all;
+  late final TabController _filterController;
 
   @override
   void initState() {
     super.initState();
+    _filterController = TabController(
+      length: _DownloadFilter.values.length,
+      vsync: this,
+      initialIndex: _filter.index,
+    );
+    _filterController.addListener(_syncFilter);
     _speedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _sampleSpeeds();
     });
   }
 
+  void _syncFilter() {
+    final next = _DownloadFilter.values[_filterController.index];
+    if (next != _filter) {
+      setState(() => _filter = next);
+    }
+  }
+
   @override
   void dispose() {
     _speedTimer?.cancel();
+    _filterController.dispose();
     super.dispose();
   }
 
@@ -209,36 +226,97 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage> {
     final deleteLocalFile = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(l10n.downloadCenterRemoveRecord),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.downloadCenterRemoveRecordBody),
-              const SizedBox(height: 4),
-              CheckboxListTile(
-                value: removeFile,
-                onChanged: (value) =>
-                    setDialogState(() => removeFile = value ?? false),
-                title: Text(l10n.downloadCenterRemoveFile),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                dense: true,
+        builder: (context, setDialogState) {
+          final scheme = Theme.of(context).colorScheme;
+          return Dialog(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: scheme.errorContainer,
+                        borderRadius: BorderRadius.circular(SwissRadius.field),
+                      ),
+                      child: Icon(
+                        Icons.delete_outline,
+                        color: scheme.error,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.downloadCenterRemoveRecord,
+                    style: SwissText.subtitle.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.downloadCenterRemoveRecordBody,
+                    style: SwissText.caption.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(SwissRadius.field),
+                      border: Border.all(color: scheme.outlineVariant),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: CheckboxListTile(
+                        value: removeFile,
+                        onChanged: (value) =>
+                            setDialogState(() => removeFile = value ?? false),
+                        title: Text(
+                          l10n.downloadCenterRemoveFile,
+                          style: SwissText.label.copyWith(
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(l10n.cancel),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context, removeFile),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: scheme.error,
+                            foregroundColor: scheme.onError,
+                          ),
+                          child: Text(l10n.delete),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(l10n.cancel),
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, removeFile),
-              child: Text(l10n.delete),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
     if (deleteLocalFile == null) return;
@@ -346,33 +424,158 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage> {
         task.status == DownloadStatus.queued);
     final canResume = pausedCount > 0;
 
-    final showActive =
-        _filter == _DownloadFilter.all || _filter == _DownloadFilter.active;
-    final showFailed =
-        _filter == _DownloadFilter.all || _filter == _DownloadFilter.failed;
-    final showCompleted =
-        _filter == _DownloadFilter.all || _filter == _DownloadFilter.completed;
+    Widget buildList(_DownloadFilter filter) {
+      final includeActive = filter != _DownloadFilter.completed;
+      final includeCompleted = filter != _DownloadFilter.active;
+      final hasContent = (includeActive && activeOnly.isNotEmpty) ||
+          (includeCompleted && (failed.isNotEmpty || completed.isNotEmpty));
 
-    final visibleCount = (_filter == _DownloadFilter.active
-        ? activeOnly.length
-        : _filter == _DownloadFilter.failed
-            ? failed.length
-            : _filter == _DownloadFilter.completed
-                ? completed.length
-                : allCount);
+      return ListView(
+        key: PageStorageKey<_DownloadFilter>(filter),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        children: [
+          if (currentTask != null && filter != _DownloadFilter.completed)
+            _ProgressHero(
+              task: currentTask,
+              speed: _speeds[currentTask.id],
+            ),
+          if (allCount > 0) ...[
+            const SizedBox(height: 12),
+            _StatsGrid(
+              active: activeOnly.length,
+              completed: completed.length,
+              failed: failed.length,
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (!hasContent)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: Text(
+                  l10n.downloadCenterNoTasks,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            if (includeActive && activeOnly.isNotEmpty) ...[
+              SectionHeader(
+                title: l10n.downloadCenterInProgress,
+                hint: l10n.downloadCenterQueueMemory,
+                action: canPause || canResume
+                    ? TextButton.icon(
+                        onPressed: () => _toggleAll(activeOnly),
+                        icon: Icon(
+                          canResume && !canPause
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
+                          size: 16,
+                        ),
+                        label: Text(
+                          canResume && !canPause
+                              ? l10n.downloadCenterAllResume
+                              : l10n.downloadCenterAllPause,
+                        ),
+                        style: TextButton.styleFrom(
+                          minimumSize: Size.zero,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          textStyle: SwissText.micro,
+                        ),
+                      )
+                    : null,
+              ),
+              for (final task in activeOnly)
+                _TaskCard(
+                  task: task,
+                  speed: _speeds[task.id],
+                  verifying: _verifyingTaskId == task.id,
+                  onPause: () =>
+                      ref.read(downloadManagerProvider).pauseDownload(task.id),
+                  onResume: () =>
+                      ref.read(downloadManagerProvider).resumeDownload(task.id),
+                  onCancel: () =>
+                      ref.read(downloadManagerProvider).cancelDownload(task.id),
+                  onRetry: () => ref
+                      .read(downloadManagerProvider)
+                      .retryDownloadKeepingPartial(task.id),
+                  onVerify: () => _verifyTask(task),
+                ),
+            ],
+            if (includeCompleted && failed.isNotEmpty) ...[
+              SectionHeader(
+                title: l10n.downloadCenterFailed,
+                hint: '${failed.length}',
+              ),
+              for (final task in failed)
+                _TaskCard(
+                  task: task,
+                  speed: null,
+                  verifying: _verifyingTaskId == task.id,
+                  onPause: null,
+                  onResume: null,
+                  onCancel: () =>
+                      ref.read(downloadManagerProvider).cancelDownload(task.id),
+                  onRetry: () => ref
+                      .read(downloadManagerProvider)
+                      .retryDownloadKeepingPartial(task.id),
+                  onVerify: () => _verifyTask(task),
+                ),
+            ],
+            if (includeCompleted && completed.isNotEmpty) ...[
+              SectionHeader(
+                title: l10n.downloadCenterCompleted,
+                hint: l10n.downloadCenterCompletedHint,
+              ),
+              _CompletedList(
+                items: completed,
+                onOpen: _openCompleted,
+                onDetails: (item) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BookPage(id: item.book.id),
+                    ),
+                  );
+                },
+                onShare: (item) async {
+                  await shareBook(
+                    item.book.title,
+                    item.book.link,
+                    item.book.thumbnail ?? '',
+                    fileName: item.fileName,
+                    format: item.book.format,
+                  );
+                },
+                onShowInFolder: PlatformUtils.isDesktop
+                    ? (item) => _showInFolder(item)
+                    : null,
+                onRemove: _removeRecord,
+              ),
+              const SizedBox(height: 12),
+              InlineHint(message: l10n.downloadCenterRemoveNote),
+              const SizedBox(height: 12),
+              _StorageSummary(completed: completed),
+            ],
+          ],
+        ],
+      );
+    }
 
     return ContentWidth(
       maxWidth: 900,
-      child: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(myLibraryProvider);
-          ref.invalidate(completedDownloadsProvider);
-        },
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-          children: [
-            PageHeader(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: PageHeader(
               eyebrow: l10n.downloadEyebrow,
               title: l10n.downloadCenterTitle,
               padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
@@ -390,161 +593,45 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage> {
                 ),
               ),
             ),
-            if (currentTask != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: _ProgressHero(
-                  task: currentTask,
-                  speed: _speeds[currentTask.id],
-                ),
-              ),
-            if (allCount > 0) ...[
-              const SizedBox(height: 12),
-              _StatsGrid(
-                active: activeOnly.length,
-                completed: completed.length,
-                failed: failed.length,
-              ),
-            ],
-            if (allCount > 0) ...[
-              const SizedBox(height: 16),
-              _FilterRow(
-                selected: _filter,
-                all: allCount,
-                active: activeOnly.length,
-                completed: completed.length,
-                failed: failed.length,
-                onSelected: (value) => setState(() => _filter = value),
-              ),
-            ],
-            if (allCount == 0)
-              _EmptyState(
-                onSearch: () {
-                  ref.read(selectedIndexProvider.notifier).state = 1;
-                },
-              )
-            else if (visibleCount == 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                child: Center(
-                  child: Text(
-                    l10n.downloadCenterNoTasks,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
+          ),
+          if (allCount > 0)
+            PillTabs(
+              controller: _filterController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              tabs: [
+                Tab(text: '${l10n.downloadCenterAll} $allCount'),
+                Tab(text: l10n.downloadCenterActive),
+                Tab(text: l10n.downloadCenterCompleted),
+              ],
+            ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(myLibraryProvider);
+                ref.invalidate(completedDownloadsProvider);
+              },
+              child: allCount == 0
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                      children: [
+                        _EmptyState(
+                          onSearch: () {
+                            ref.read(selectedIndexProvider.notifier).state = 1;
+                          },
+                        ),
+                      ],
+                    )
+                  : TabBarView(
+                      controller: _filterController,
+                      children: [
+                        for (final filter in _DownloadFilter.values)
+                          buildList(filter),
+                      ],
                     ),
-                  ),
-                ),
-              )
-            else ...[
-              if (showActive && activeOnly.isNotEmpty) ...[
-                SectionHeader(
-                  title: l10n.downloadCenterInProgress,
-                  hint: l10n.downloadCenterQueueMemory,
-                  action: canPause || canResume
-                      ? TextButton.icon(
-                          onPressed: () => _toggleAll(activeOnly),
-                          icon: Icon(
-                            canResume && !canPause
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                            size: 16,
-                          ),
-                          label: Text(
-                            canResume && !canPause
-                                ? l10n.downloadCenterAllResume
-                                : l10n.downloadCenterAllPause,
-                          ),
-                          style: TextButton.styleFrom(
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: SwissText.micro,
-                          ),
-                        )
-                      : null,
-                ),
-                for (final task in activeOnly)
-                  _TaskCard(
-                    task: task,
-                    speed: _speeds[task.id],
-                    verifying: _verifyingTaskId == task.id,
-                    onPause: () => ref
-                        .read(downloadManagerProvider)
-                        .pauseDownload(task.id),
-                    onResume: () => ref
-                        .read(downloadManagerProvider)
-                        .resumeDownload(task.id),
-                    onCancel: () => ref
-                        .read(downloadManagerProvider)
-                        .cancelDownload(task.id),
-                    onRetry: () => ref
-                        .read(downloadManagerProvider)
-                        .retryDownloadKeepingPartial(task.id),
-                    onVerify: () => _verifyTask(task),
-                  ),
-              ],
-              if (showFailed && failed.isNotEmpty) ...[
-                SectionHeader(
-                  title: l10n.downloadCenterFailed,
-                  hint: '${failed.length}',
-                ),
-                for (final task in failed)
-                  _TaskCard(
-                    task: task,
-                    speed: null,
-                    verifying: _verifyingTaskId == task.id,
-                    onPause: null,
-                    onResume: null,
-                    onCancel: () => ref
-                        .read(downloadManagerProvider)
-                        .cancelDownload(task.id),
-                    onRetry: () => ref
-                        .read(downloadManagerProvider)
-                        .retryDownloadKeepingPartial(task.id),
-                    onVerify: () => _verifyTask(task),
-                  ),
-              ],
-              if (showCompleted && completed.isNotEmpty) ...[
-                SectionHeader(
-                  title: l10n.downloadCenterCompleted,
-                  hint: l10n.downloadCenterCompletedHint,
-                ),
-                _CompletedList(
-                  items: completed,
-                  onOpen: _openCompleted,
-                  onDetails: (item) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BookPage(id: item.book.id),
-                      ),
-                    );
-                  },
-                  onShare: (item) async {
-                    await shareBook(
-                      item.book.title,
-                      item.book.link,
-                      item.book.thumbnail ?? '',
-                      fileName: item.fileName,
-                      format: item.book.format,
-                    );
-                  },
-                  onShowInFolder: PlatformUtils.isDesktop
-                      ? (item) => _showInFolder(item)
-                      : null,
-                  onRemove: _removeRecord,
-                ),
-                const SizedBox(height: 12),
-                InlineHint(message: l10n.downloadCenterRemoveNote),
-                const SizedBox(height: 12),
-                _StorageSummary(completed: completed),
-              ],
-            ],
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -713,7 +800,7 @@ class _StatBox extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Container(
-      height: SwissGrid.row,
+      constraints: const BoxConstraints(minHeight: SwissGrid.row),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
@@ -825,88 +912,6 @@ class _StorageSummary extends StatelessWidget {
   }
 }
 
-class _FilterRow extends StatelessWidget {
-  const _FilterRow({
-    required this.selected,
-    required this.all,
-    required this.active,
-    required this.completed,
-    required this.failed,
-    required this.onSelected,
-  });
-
-  final _DownloadFilter selected;
-  final int all;
-  final int active;
-  final int completed;
-  final int failed;
-  final ValueChanged<_DownloadFilter> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(SwissRadius.pill),
-      ),
-      child: SegmentedButton<_DownloadFilter>(
-        showSelectedIcon: false,
-        expandedInsets: EdgeInsets.zero,
-        segments: [
-          ButtonSegment(
-            value: _DownloadFilter.all,
-            label: Text('${l10n.downloadCenterAll} $all'),
-          ),
-          ButtonSegment(
-            value: _DownloadFilter.active,
-            label: Text('${l10n.downloadCenterActive} $active'),
-          ),
-          ButtonSegment(
-            value: _DownloadFilter.completed,
-            label: Text('${l10n.downloadCenterCompleted} $completed'),
-          ),
-          ButtonSegment(
-            value: _DownloadFilter.failed,
-            label: Text(
-              failed > 0
-                  ? '${l10n.downloadCenterFailed} $failed'
-                  : l10n.downloadCenterFailed,
-            ),
-          ),
-        ],
-        selected: {selected},
-        style: ButtonStyle(
-          visualDensity: VisualDensity.compact,
-          padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 4),
-          ),
-          minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
-          textStyle: WidgetStatePropertyAll(
-            SwissText.caption.copyWith(fontWeight: FontWeight.w600),
-          ),
-          side: const WidgetStatePropertyAll(BorderSide.none),
-          shape: const WidgetStatePropertyAll(StadiumBorder()),
-          backgroundColor: WidgetStateProperty.resolveWith((states) {
-            return states.contains(WidgetState.selected)
-                ? scheme.primary
-                : Colors.transparent;
-          }),
-          foregroundColor: WidgetStateProperty.resolveWith((states) {
-            return states.contains(WidgetState.selected)
-                ? scheme.onPrimary
-                : scheme.onSurfaceVariant;
-          }),
-        ),
-        onSelectionChanged: (values) => onSelected(values.first),
-      ),
-    );
-  }
-}
-
 class _TaskCard extends StatelessWidget {
   const _TaskCard({
     required this.task,
@@ -940,8 +945,8 @@ class _TaskCard extends StatelessWidget {
       if ((task.author ?? '').isNotEmpty) task.author!,
       if (task.format.isNotEmpty) task.format.toUpperCase(),
       if (size.isNotEmpty) size,
-      if (source != null) source,
     ].join(' · ');
+    final percent = (task.progress.clamp(0.0, 1.0) * 100).round();
     final isPaused = task.status == DownloadStatus.paused;
     final isDownloading = task.status == DownloadStatus.downloading;
     final isFailed = task.status == DownloadStatus.failed;
@@ -961,7 +966,7 @@ class _TaskCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: _SurfaceCard(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -972,39 +977,34 @@ class _TaskCard extends StatelessWidget {
                     title: task.title,
                     thumbnail: task.thumbnail,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                task.title,
-                                style: SwissText.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _StatusPill(
-                              label: _statusLabel(l10n, task.status),
-                              color: statusColor,
-                              dot: isDownloading || isQueued,
-                              icon:
-                                  isFailed ? Icons.error_outline_rounded : null,
-                            ),
-                          ],
+                        Text(
+                          task.title,
+                          style: SwissText.label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Text(
                           meta,
                           style: SwissText.micro.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        _StatusPill(
+                          label: isDownloading || isPaused
+                              ? '$percent%'
+                              : _statusLabel(l10n, task.status),
+                          color: statusColor,
+                          dot: isDownloading || isQueued,
+                          icon: isFailed ? Icons.error_outline_rounded : null,
                         ),
                       ],
                     ),
@@ -1012,15 +1012,7 @@ class _TaskCard extends StatelessWidget {
                 ],
               ),
               if (isDownloading || isPaused) ...[
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
-                  child: LinearProgressIndicator(
-                    value: task.progress,
-                    minHeight: 4,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Text(
@@ -1037,7 +1029,7 @@ class _TaskCard extends StatelessWidget {
                           if (eta != null) eta,
                         ].join(' · '),
                         style: SwissText.micro.copyWith(
-                          color: scheme.onSurfaceVariant,
+                          color: scheme.primary,
                         ),
                       )
                     else if (isPaused)
@@ -1049,8 +1041,16 @@ class _TaskCard extends StatelessWidget {
                       ),
                   ],
                 ),
-              ] else if (isVerifying) ...[
                 const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: task.progress,
+                    minHeight: 4,
+                  ),
+                ),
+              ] else if (isVerifying) ...[
+                const SizedBox(height: 16),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(2),
                   child: const LinearProgressIndicator(minHeight: 4),
@@ -1061,7 +1061,7 @@ class _TaskCard extends StatelessWidget {
                   style: SwissText.micro.copyWith(color: scheme.secondary),
                 ),
               ] else if (isQueued) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(2),
                   child: const LinearProgressIndicator(minHeight: 4),
@@ -1074,7 +1074,7 @@ class _TaskCard extends StatelessWidget {
                   ),
                 ),
               ] else if (isFailed) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
                 _ErrorBox(
                   text: _errorText(l10n, task.errorMessage),
                   manual: task.errorMessage
@@ -1084,9 +1084,15 @@ class _TaskCard extends StatelessWidget {
                   onVerify: onVerify,
                 ),
               ],
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(
                 children: [
+                  Icon(
+                    Icons.public,
+                    size: 16,
+                    color: scheme.outline,
+                  ),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       source ?? '',
@@ -1102,23 +1108,23 @@ class _TaskCard extends StatelessWidget {
                         isPaused
                             ? Icons.play_arrow_rounded
                             : Icons.pause_rounded,
-                        size: 15,
+                        size: 16,
                       ),
                       label: Text(
                         isPaused ? l10n.resumeDownload : l10n.pauseDownload,
                       ),
                       style: _smallOutlinedActionStyle(context),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                   ],
                   if (isFailed) ...[
                     OutlinedButton.icon(
                       onPressed: onRetry,
-                      icon: const Icon(Icons.refresh_rounded, size: 15),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
                       label: Text(l10n.retry),
                       style: _smallOutlinedActionStyle(context),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                   ],
                   if (!isVerifying)
                     TextButton.icon(
@@ -1161,8 +1167,9 @@ class _DownloadCover extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(SwissRadius.sm),
       child: SizedBox(
-        width: 40,
-        height: 60,
+        key: const ValueKey('download-cover'),
+        width: 64,
+        height: 96,
         child: hasThumbnail
             ? CachedNetworkImage(
                 imageUrl: thumbnail!,
@@ -1222,8 +1229,8 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      constraints: const BoxConstraints(minHeight: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(SwissRadius.pill),
@@ -1421,7 +1428,7 @@ class _CompletedRow extends StatelessWidget {
       // is the only path that hands the file to an external reader.
       onTap: onDetails,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1432,44 +1439,38 @@ class _CompletedRow extends StatelessWidget {
                   title: book.title,
                   thumbnail: book.thumbnail,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              book.title,
-                              style: SwissText.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _StatusPill(
-                            label: l10n.statusCompleted,
-                            color: scheme.secondary,
-                            icon: Icons.check_rounded,
-                          ),
-                        ],
+                      Text(
+                        book.title,
+                        style: SwissText.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
                         meta,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: SwissText.micro.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      _StatusPill(
+                        label: l10n.statusCompleted,
+                        color: scheme.secondary,
+                        icon: Icons.check_rounded,
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(

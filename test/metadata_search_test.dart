@@ -1,51 +1,16 @@
 // Real tests for metadata-aware search: how the provider mappers turn
-// advanced-search fields into backend-native parameters, and how the
-// local library filter matches across metadata. URL building is pure
-// string logic - tested directly, no network.
-
-// Dart imports:
-import 'dart:io';
+// advanced-search fields into backend-native parameters. URL building is
+// pure string logic - tested directly, no network.
 
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
 
 // Package imports:
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
 import 'package:openlib/services/annas_archieve.dart';
 import 'package:openlib/services/search_manager.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/library_organization.dart';
-import 'package:openlib/state/state.dart'
-    show
-        libraryBooksProvider,
-        librarySearchQueryProvider,
-        libraryTagFilterProvider,
-        organizedLibraryProvider;
-
-class _FakePathProvider extends PathProviderPlatform {
-  Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_meta_test/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -186,83 +151,6 @@ void main() {
       expect(requested, isNotEmpty);
       expect(requested.single.queryParameters['req'], 'foundation');
       expect(requested.single.queryParameters.containsKey('columns'), isFalse);
-    });
-  });
-
-  group('library metadata filter', () {
-    test('query matches title, author, publisher and info', () {
-      final books = [
-        LibraryBook(
-            book: MyBook(
-                id: 'a',
-                title: 'Foundation',
-                author: 'Isaac Asimov',
-                thumbnail: null,
-                link: 'l',
-                publisher: 'Doubleday',
-                info: '[en], pdf, 5.2MB, 1951',
-                format: 'pdf',
-                description: null)),
-        LibraryBook(
-            book: MyBook(
-                id: 'b',
-                title: 'Dune',
-                author: 'Frank Herbert',
-                thumbnail: null,
-                link: 'l',
-                publisher: 'Chilton',
-                info: '[en], epub, 1965',
-                format: 'epub',
-                description: null)),
-      ];
-
-      expect(filterLibrary(books, query: 'asimov').map((b) => b.id), ['a']);
-      expect(filterLibrary(books, query: 'DUNE').map((b) => b.id), ['b']);
-      expect(filterLibrary(books, query: 'chilton').map((b) => b.id), ['b']);
-      expect(filterLibrary(books, query: '1951').map((b) => b.id), ['a']);
-      expect(filterLibrary(books, query: 'zzz'), isEmpty);
-      // Empty and whitespace queries keep everything.
-      expect(filterLibrary(books, query: '').length, 2);
-      expect(filterLibrary(books, query: '   ').length, 2);
-    });
-
-    test('combined with status and tag filters', () async {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-      PathProviderPlatform.instance = _FakePathProvider();
-
-      final db = MyLibraryDb.instance;
-      final database = await db.database;
-      await database.delete('mybooks');
-      await database.delete('bookposition');
-      await database.delete('booktags');
-
-      await db.insert(MyBook(
-          id: 'm1',
-          title: 'I, Robot',
-          author: 'Asimov',
-          thumbnail: null,
-          link: 'l',
-          publisher: null,
-          info: null,
-          format: 'pdf',
-          description: null));
-      await db.addTag('m1', 'Sci-Fi');
-
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-
-      // Wait for the enrichment provider to load the seeded rows.
-      await container.read(libraryBooksProvider.future);
-
-      container.read(libraryTagFilterProvider.notifier).state = {'Sci-Fi'};
-      container.read(librarySearchQueryProvider.notifier).state = 'asimov';
-      final organized = container.read(organizedLibraryProvider);
-      expect(organized.map((b) => b.id), ['m1']);
-
-      // Query that contradicts the tag filter clears the list.
-      container.read(librarySearchQueryProvider.notifier).state = 'tolkien';
-      expect(container.read(organizedLibraryProvider), isEmpty);
     });
   });
 }

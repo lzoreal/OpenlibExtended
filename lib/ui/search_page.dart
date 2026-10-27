@@ -38,6 +38,7 @@ import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/edge_fade.dart';
 import 'package:openlib/ui/components/inline_hint.dart';
 import 'package:openlib/ui/components/page_header.dart';
+import 'package:openlib/ui/components/pill_tabs.dart';
 import 'package:openlib/ui/components/search_source_meta.dart';
 import 'package:openlib/ui/components/section_header.dart';
 import 'package:openlib/ui/results_page.dart';
@@ -58,16 +59,24 @@ class SearchPage extends ConsumerStatefulWidget {
   ConsumerState<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends ConsumerState<SearchPage> {
+class _SearchPageState extends ConsumerState<SearchPage>
+    with SingleTickerProviderStateMixin {
   Timer? _debounce;
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
+  late final TabController _modeController;
   int _suggestionRequest = 0;
   _SearchMode _mode = _SearchMode.suggestions;
 
   @override
   void initState() {
     super.initState();
+    _modeController = TabController(
+      length: _SearchMode.values.length,
+      vsync: this,
+      initialIndex: _mode.index,
+    );
+    _modeController.addListener(_syncMode);
     _searchController =
         TextEditingController(text: ref.read(searchQueryProvider));
     _searchFocusNode = FocusNode();
@@ -80,10 +89,18 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     });
   }
 
+  void _syncMode() {
+    final mode = _SearchMode.values[_modeController.index];
+    if (_mode != mode) {
+      setState(() => _mode = mode);
+    }
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
     _suggestionRequest++;
+    _modeController.dispose();
     _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
@@ -94,9 +111,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     if (clean.isEmpty) return;
     final request = ++_suggestionRequest;
     ref.read(suggestionsLoadingProvider.notifier).state = true;
-    final real = await ref
-        .read(googleSuggestApiProvider)
-        .fetchSuggestions(clean);
+    final real =
+        await ref.read(googleSuggestApiProvider).fetchSuggestions(clean);
     if (!mounted || request != _suggestionRequest) return;
     final cleaned = real
         .where((suggestion) =>
@@ -147,6 +163,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   void _setMode(_SearchMode mode) {
     if (_mode == mode) return;
     setState(() => _mode = mode);
+    if (_modeController.index != mode.index) {
+      _modeController.animateTo(mode.index);
+    }
     if (mode == _SearchMode.advanced) {
       _searchFocusNode.unfocus();
     }
@@ -159,7 +178,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           context: context,
           message: AppLocalizations.of(context).searchEmptyQuery);
       if (_mode != _SearchMode.suggestions) {
-        setState(() => _mode = _SearchMode.suggestions);
+        _setMode(_SearchMode.suggestions);
       }
       _searchFocusNode.requestFocus();
       return;
@@ -176,10 +195,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     final selected = ref.read(selectedSourceState);
     final enabled = ref.read(searchProviderToggles).valueOrNull;
-    final source = selected != null &&
-            (enabled == null || enabled.contains(selected))
-        ? selected
-        : null;
+    final source =
+        selected != null && (enabled == null || enabled.contains(selected))
+            ? selected
+            : null;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -237,121 +256,149 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     return ContentWidth(
       maxWidth: 840,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PageHeader(
-            eyebrow: l10n.searchEyebrow,
-            title: l10n.navSearch,
-            padding: const EdgeInsets.fromLTRB(0, 6, 0, 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PageHeader(
+                  eyebrow: l10n.searchEyebrow,
+                  title: l10n.navSearch,
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+                ),
+                const ActiveDownloadsWidget(),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            theme.colorScheme.primary.withValues(alpha: 0.08),
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: SearchBar(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    hintText: l10n.homeSearchHint,
+                    backgroundColor:
+                        WidgetStatePropertyAll(theme.colorScheme.surface),
+                    shape: WidgetStatePropertyAll(
+                      StadiumBorder(
+                        side: BorderSide(
+                          color: theme.colorScheme.primary,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                    constraints: const BoxConstraints(
+                      minHeight: 52,
+                      maxHeight: 52,
+                    ),
+                    padding: const WidgetStatePropertyAll(
+                      EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    textStyle: WidgetStatePropertyAll(SwissText.body),
+                    hintStyle: WidgetStatePropertyAll(
+                      SwissText.caption.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    leading: const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.search_rounded),
+                    ),
+                    trailing: [
+                      if (query.isNotEmpty)
+                        IconButton(
+                          tooltip: l10n.clearSearch,
+                          onPressed: _clearQuery,
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHigh,
+                            fixedSize: const Size(32, 32),
+                            minimumSize: Size.zero,
+                            padding: EdgeInsets.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 3, right: 2),
+                        child: IconButton(
+                          tooltip: l10n.navSearch,
+                          onPressed: _submit,
+                          icon:
+                              const Icon(Icons.arrow_forward_rounded, size: 18),
+                          style: IconButton.styleFrom(
+                            backgroundColor: theme.colorScheme.primary,
+                            foregroundColor: theme.colorScheme.onPrimary,
+                            fixedSize: const Size(32, 32),
+                            minimumSize: Size.zero,
+                            padding: EdgeInsets.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: _onSearchQueryChanged,
+                    onSubmitted: (_) => _submit(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
-          const ActiveDownloadsWidget(),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                  spreadRadius: 3,
+          PillTabs(
+            controller: _modeController,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            tabs: [
+              Tab(text: l10n.searchSuggestionsTitle),
+              Tab(
+                text: advancedCount > 0
+                    ? '${l10n.advancedSearch} ($advancedCount)'
+                    : l10n.advancedSearch,
+              ),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _modeController,
+              children: [
+                ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                  children: [
+                    _SuggestionsTab(
+                      query: query,
+                      onSearch: (value) => _submit(value),
+                    ),
+                  ],
+                ),
+                ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                  children: [
+                    _AdvancedSearchTab(
+                      onApply: () => _submit(),
+                      onReset: _resetFilters,
+                    ),
+                  ],
                 ),
               ],
             ),
-            child: SearchBar(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              hintText: l10n.homeSearchHint,
-              backgroundColor:
-                  WidgetStatePropertyAll(theme.colorScheme.surface),
-              shape: WidgetStatePropertyAll(
-                StadiumBorder(
-                  side: BorderSide(
-                    color: theme.colorScheme.primary,
-                    width: 1.5,
-                  ),
-                ),
-              ),
-              constraints: const BoxConstraints(
-                minHeight: 48,
-                maxHeight: 48,
-              ),
-              padding: const WidgetStatePropertyAll(
-                EdgeInsets.symmetric(horizontal: 16),
-              ),
-              textStyle: WidgetStatePropertyAll(SwissText.body),
-              hintStyle: WidgetStatePropertyAll(
-                SwissText.caption.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              leading: const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Icon(Icons.search_rounded),
-              ),
-              trailing: [
-                if (query.isNotEmpty)
-                  IconButton(
-                    tooltip: l10n.clearSearch,
-                    onPressed: _clearQuery,
-                    icon: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHigh,
-                      fixedSize: const Size(32, 32),
-                      minimumSize: Size.zero,
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 3, right: 2),
-                  child: IconButton(
-                    tooltip: l10n.navSearch,
-                    onPressed: _submit,
-                    icon: const Icon(
-                        Icons.arrow_forward_rounded, size: 18),
-                    style: IconButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: theme.colorScheme.onPrimary,
-                      fixedSize: const Size(32, 32),
-                      minimumSize: Size.zero,
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ),
-              ],
-              onChanged: _onSearchQueryChanged,
-              onSubmitted: (_) => _submit(),
-            ),
           ),
-          const SizedBox(height: 12),
-          _SearchModeSwitch(
-            mode: _mode,
-            advancedCount: advancedCount,
-            onChanged: _setMode,
-          ),
-          const SizedBox(height: 12),
-          if (_mode == _SearchMode.suggestions)
-            _SuggestionsTab(
-              query: query,
-              onSearch: (value) => _submit(value),
-            )
-          else
-            _AdvancedSearchTab(
-              onApply: () => _submit(),
-              onReset: _resetFilters,
-            ),
         ],
       ),
     );
   }
 }
-
 
 String _typeFilterLabel(AppLocalizations l10n, String value) {
   return switch (value) {
@@ -508,6 +555,7 @@ class _AdvancedValueField extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 label,
@@ -568,33 +616,32 @@ class _AdvancedTextField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: SwissText.badge.copyWith(color: scheme.outline),
           ),
           const SizedBox(height: 2),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              textInputAction: TextInputAction.next,
-              style: SwissText.caption.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                hintText: hint,
-                hintStyle: SwissText.caption.copyWith(color: scheme.outline),
-                contentPadding: EdgeInsets.zero,
-              ),
+          TextField(
+            controller: controller,
+            onChanged: onChanged,
+            textInputAction: TextInputAction.next,
+            style: SwissText.caption.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              hintText: hint,
+              hintStyle: SwissText.caption.copyWith(color: scheme.outline),
+              contentPadding: EdgeInsets.zero,
             ),
           ),
         ],
@@ -637,8 +684,7 @@ class _SelectableFilterChip extends StatelessWidget {
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         labelStyle: SwissText.micro.copyWith(
           fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-          color:
-              selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+          color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
         ),
       ),
     );
@@ -674,8 +720,7 @@ class _AdvancedSearchTab extends ConsumerStatefulWidget {
   final VoidCallback onReset;
 
   @override
-  ConsumerState<_AdvancedSearchTab> createState() =>
-      _AdvancedSearchTabState();
+  ConsumerState<_AdvancedSearchTab> createState() => _AdvancedSearchTabState();
 }
 
 class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
@@ -760,18 +805,21 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SearchSourceSelector(horizontal: true),
-        const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(14),
+          key: const ValueKey('advanced-search-card'),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: scheme.surface,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(SwissRadius.card),
             border: Border.all(color: scheme.outlineVariant),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const _SearchSourceSelector(horizontal: true),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final width = (constraints.maxWidth - 8) / 2;
@@ -781,44 +829,52 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                     children: [
                       SizedBox(
                         width: width,
-                        height: 48,
-                        child: _AdvancedTextField(
-                          controller: _authorController,
-                          label: l10n.author,
-                          hint: l10n.anyValue,
-                          onChanged: (value) => ref
-                              .read(searchAuthorProvider.notifier)
-                              .state = value.trim(),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: _AdvancedTextField(
+                            controller: _authorController,
+                            label: l10n.author,
+                            hint: l10n.anyValue,
+                            onChanged: (value) => ref
+                                .read(searchAuthorProvider.notifier)
+                                .state = value.trim(),
+                          ),
                         ),
                       ),
                       SizedBox(
                         width: width,
-                        height: 48,
-                        child: _AdvancedTextField(
-                          controller: _publisherController,
-                          label: l10n.publisher,
-                          hint: l10n.anyValue,
-                          onChanged: (value) => ref
-                              .read(searchPublisherProvider.notifier)
-                              .state = value.trim(),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: _AdvancedTextField(
+                            controller: _publisherController,
+                            label: l10n.publisher,
+                            hint: l10n.anyValue,
+                            onChanged: (value) => ref
+                                .read(searchPublisherProvider.notifier)
+                                .state = value.trim(),
+                          ),
                         ),
                       ),
                       SizedBox(
                         width: width,
-                        height: 48,
-                        child: _AdvancedValueField(
-                          label: l10n.publishedYearLabel,
-                          value: _yearFilterLabel(l10n, yearValue),
-                          onTap: _pickYear,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: _AdvancedValueField(
+                            label: l10n.publishedYearLabel,
+                            value: _yearFilterLabel(l10n, yearValue),
+                            onTap: _pickYear,
+                          ),
                         ),
                       ),
                       SizedBox(
                         width: width,
-                        height: 48,
-                        child: _AdvancedValueField(
-                          label: l10n.languageSetting,
-                          value: _languageFilterLabel(l10n, languageValue),
-                          onTap: _pickLanguage,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: _AdvancedValueField(
+                            label: l10n.languageSetting,
+                            value: _languageFilterLabel(l10n, languageValue),
+                            onTap: _pickLanguage,
+                          ),
                         ),
                       ),
                     ],
@@ -830,21 +886,26 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                 children: [
                   _FilterSectionLabel(title: l10n.filterFileTypeLabel),
                   const Spacer(),
-                  TextButton(
-                    onPressed: _pickType,
-                    style: TextButton.styleFrom(
-                      minimumSize: Size.zero,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
+                  Flexible(
+                    child: TextButton(
+                      onPressed: _pickType,
+                      style: TextButton.styleFrom(
+                        minimumSize: Size.zero,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      '${l10n.filterTypeLabel}: ${_typeFilterLabel(l10n, typeValue)}',
-                      style: SwissText.micro.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w700,
+                      child: Text(
+                        '${l10n.filterTypeLabel}: ${_typeFilterLabel(l10n, typeValue)}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: SwissText.micro.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -880,7 +941,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                       selected: sortValue == value,
                       onTap: () {
                         ref.read(selectedSortState.notifier).state = value;
-                        MyLibraryDb.instance.savePreference('filterSort', value);
+                        MyLibraryDb.instance
+                            .savePreference('filterSort', value);
                       },
                     ),
                 ],
@@ -915,158 +977,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        InlineHint(message: l10n.advancedFilterNote),
       ],
-    );
-  }
-}
-
-class _SearchModeSwitch extends StatelessWidget {
-  const _SearchModeSwitch({
-    required this.mode,
-    required this.advancedCount,
-    required this.onChanged,
-  });
-
-  final _SearchMode mode;
-  final int advancedCount;
-  final ValueChanged<_SearchMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context);
-    return Container(
-      key: const ValueKey('search-mode-switch'),
-      height: 44,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(SwissRadius.pill),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final half = constraints.maxWidth / 2;
-            return Stack(
-              children: [
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  left: mode == _SearchMode.suggestions ? 0 : half,
-                  top: 0,
-                  width: half,
-                  height: constraints.maxHeight,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: scheme.surface,
-                      borderRadius: BorderRadius.circular(SwissRadius.pill),
-                      boxShadow: [
-                        BoxShadow(
-                          color: scheme.shadow.withValues(alpha: 0.07),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ModeTab(
-                        icon: Icons.search_rounded,
-                        label: l10n.searchSuggestionsTitle,
-                        selected: mode == _SearchMode.suggestions,
-                        onTap: () => onChanged(_SearchMode.suggestions),
-                      ),
-                    ),
-                    Expanded(
-                      child: _ModeTab(
-                        icon: Icons.tune_rounded,
-                        label: l10n.advancedSearch,
-                        selected: mode == _SearchMode.advanced,
-                        badge: advancedCount,
-                        onTap: () => onChanged(_SearchMode.advanced),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeTab extends StatelessWidget {
-  const _ModeTab({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.badge = 0,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final int badge;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final color = selected ? scheme.onSurface : scheme.onSurfaceVariant;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(SwissRadius.pill),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: SwissText.caption.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ),
-            if (badge > 0) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? scheme.surfaceContainerHigh
-                      : scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(SwissRadius.pill),
-                ),
-                child: Text(
-                  '$badge',
-                  style: SwissText.badge.copyWith(
-                    color: selected
-                        ? scheme.onSurfaceVariant
-                        : scheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1468,8 +1379,9 @@ class _RecentSearchesSection extends ConsumerWidget {
             subtitle: l10n.searchAllSourcesLabel,
             removeTooltip: l10n.removeRecentSearch(recents[index]),
             onTap: () => onSearch(recents[index]),
-            onRemove: () =>
-                ref.read(recentSearchesProvider.notifier).remove(recents[index]),
+            onRemove: () => ref
+                .read(recentSearchesProvider.notifier)
+                .remove(recents[index]),
           ),
           if (index < recents.length - 1)
             Divider(
@@ -1562,9 +1474,7 @@ class _TryTheseSection extends ConsumerWidget {
     final suggestions = <String>[];
     for (final book in trending) {
       final title = book.title?.trim();
-      if (title != null &&
-          title.isNotEmpty &&
-          !suggestions.contains(title)) {
+      if (title != null && title.isNotEmpty && !suggestions.contains(title)) {
         suggestions.add(title);
       }
       if (suggestions.length == 4) break;
@@ -1717,29 +1627,29 @@ class _SearchSourceSelector extends ConsumerWidget {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                  children: [
-                    _SourceChoiceChip(
-                      mark: l10n.sourceMarkAll,
-                      label: l10n.searchSourceAuto,
-                      selected: effective == null,
-                      onTap: () =>
-                          ref.read(selectedSourceState.notifier).state = null,
-                    ),
-                    for (final source in sources) ...[
-                      const SizedBox(width: 8),
+                    children: [
                       _SourceChoiceChip(
-                        mark: sourceMark(source),
-                        label: sourceShortLabel(l10n, source),
-                        selected: effective == source,
-                        onTap: () => ref
-                            .read(selectedSourceState.notifier)
-                            .state = source,
+                        mark: l10n.sourceMarkAll,
+                        label: l10n.searchSourceAuto,
+                        selected: effective == null,
+                        onTap: () =>
+                            ref.read(selectedSourceState.notifier).state = null,
                       ),
+                      for (final source in sources) ...[
+                        const SizedBox(width: 8),
+                        _SourceChoiceChip(
+                          mark: sourceMark(source),
+                          label: sourceShortLabel(l10n, source),
+                          selected: effective == source,
+                          onTap: () => ref
+                              .read(selectedSourceState.notifier)
+                              .state = source,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            )
+              )
             else
               Wrap(
                 spacing: 8,
@@ -1757,9 +1667,8 @@ class _SearchSourceSelector extends ConsumerWidget {
                       mark: sourceMark(source),
                       label: sourceShortLabel(l10n, source),
                       selected: effective == source,
-                      onTap: () => ref
-                          .read(selectedSourceState.notifier)
-                          .state = source,
+                      onTap: () =>
+                          ref.read(selectedSourceState.notifier).state = source,
                     ),
                 ],
               ),
@@ -1819,9 +1728,8 @@ class _SourceChoiceChip extends StatelessWidget {
                   child: Text(
                     mark,
                     style: SwissText.badge.copyWith(
-                      color: selected
-                          ? scheme.onPrimary
-                          : scheme.onSurfaceVariant,
+                      color:
+                          selected ? scheme.onPrimary : scheme.onSurfaceVariant,
                       letterSpacing: 0.4,
                     ),
                   ),
@@ -1830,9 +1738,8 @@ class _SourceChoiceChip extends StatelessWidget {
                 Text(
                   label,
                   style: SwissText.micro.copyWith(
-                    color: selected
-                        ? scheme.onPrimary
-                        : scheme.onSurfaceVariant,
+                    color:
+                        selected ? scheme.onPrimary : scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

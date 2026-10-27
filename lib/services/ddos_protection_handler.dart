@@ -35,7 +35,8 @@ class DDoSProtectionHandler {
   /// Store cookies for a domain to avoid repeated captchas
   Future<void> storeCookies(String domain, List<Cookie> cookies) async {
     try {
-      final cookieString = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+      final cookieString =
+          cookies.map((c) => '${c.name}=${c.value}').join('; ');
       await _database.setBrowserOptions('cookies_$domain', cookieString);
 
       // Also cache in memory
@@ -46,9 +47,7 @@ class DDoSProtectionHandler {
           metadata: {'domain': domain, 'count': cookies.length});
     } catch (e, stackTrace) {
       _logger.error('Failed to store cookies',
-          tag: 'DDoSHandler',
-          error: e,
-          stackTrace: stackTrace);
+          tag: 'DDoSHandler', error: e, stackTrace: stackTrace);
     }
   }
 
@@ -81,8 +80,7 @@ class DDoSProtectionHandler {
       }
     } catch (e) {
       _logger.debug('No stored cookies for domain',
-          tag: 'DDoSHandler',
-          metadata: {'domain': domain});
+          tag: 'DDoSHandler', metadata: {'domain': domain});
     }
     return null;
   }
@@ -92,8 +90,7 @@ class DDoSProtectionHandler {
     await _database.setBrowserOptions('cookies_$domain', '');
     _cachedCookies.remove(domain);
     _logger.debug('Cookies cleared for domain',
-        tag: 'DDoSHandler',
-        metadata: {'domain': domain});
+        tag: 'DDoSHandler', metadata: {'domain': domain});
   }
 
   /// Extract cookies from a response for storage
@@ -108,8 +105,7 @@ class DDoSProtectionHandler {
           cookies.add(Cookie.fromSetCookieValue(header));
         } catch (e) {
           _logger.debug('Failed to parse Set-Cookie header',
-              tag: 'DDoSHandler',
-              metadata: {'header': header});
+              tag: 'DDoSHandler', metadata: {'header': header});
         }
       }
     }

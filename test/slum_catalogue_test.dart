@@ -33,8 +33,7 @@ void main() {
       expect(sites.length, greaterThanOrEqualTo(4));
     });
 
-    test('reads DDoS-Guard as the gate, not "protected" as a status only',
-        () {
+    test('reads DDoS-Guard as the gate, not "protected" as a status only', () {
       final gl = sites.firstWhere((s) => s.host == 'annas-archive.gl');
       expect(gl.protection, Protection.ddosGuard);
       expect(gl.status, SlumStatus.protected);
@@ -70,13 +69,16 @@ void main() {
 
     test('marks the down mirrors down and the degraded one degraded', () {
       final down = sites.where((s) => s.isDown).map((s) => s.host).toSet();
-      expect(down, containsAll(['libgen.bz', 'libgen.gl', 'libgen.vg', 'libgen.li']));
+      expect(down,
+          containsAll(['libgen.bz', 'libgen.gl', 'libgen.vg', 'libgen.li']));
 
       final la = sites.firstWhere((s) => s.host == 'libgen.la');
       expect(la.status, SlumStatus.degraded);
       // Down mirrors are never attempted; degraded ones still are.
-      expect(down.every((host) =>
-          !sites.firstWhere((s) => s.host == host).isAttemptable), isTrue);
+      expect(
+          down.every(
+              (host) => !sites.firstWhere((s) => s.host == host).isAttemptable),
+          isTrue);
       expect(la.isAttemptable, isTrue);
     });
   });
@@ -109,8 +111,8 @@ void main() {
 
   group('other page (welib)', () {
     test('keeps only WeLib hosts', () {
-      final sites = catalogue.parsePage(
-          _fixture('slum_other.html'), MirrorService.welib);
+      final sites =
+          catalogue.parsePage(_fixture('slum_other.html'), MirrorService.welib);
 
       expect(sites, hasLength(1));
       expect(sites.single.host, 'welib.org');
@@ -161,6 +163,66 @@ void main() {
       ]);
       expect(ordered.map((s) => s.host).toList(), ['fast', 'slow']);
     });
+
+    test('fresh local latency overrides SLUM latency inside a tier', () {
+      final ordered = SlumCatalogue.sortAuto(
+        [
+          site('slower-local', Protection.cloudflare, SlumStatus.protected,
+              latency: 100),
+          site('faster-local', Protection.cloudflare, SlumStatus.protected,
+              latency: 900),
+        ],
+        localLatencyMs: {'slower-local': 850, 'faster-local': 45},
+      );
+
+      expect(
+        ordered.map((s) => s.host).toList(),
+        ['faster-local', 'slower-local'],
+      );
+    });
+
+    test('a host with a local reading ranks above one without', () {
+      final ordered = SlumCatalogue.sortAuto(
+        [
+          site('no-local', Protection.cloudflare, SlumStatus.protected,
+              latency: 50),
+          site('has-local', Protection.cloudflare, SlumStatus.protected,
+              latency: 500),
+        ],
+        localLatencyMs: {'has-local': 200},
+      );
+
+      expect(ordered.map((s) => s.host).toList(), ['has-local', 'no-local']);
+    });
+
+    test('fresh local latency ranks above protection difficulty', () {
+      final ordered = SlumCatalogue.sortAuto(
+        [
+          site('plain-slow', Protection.none, SlumStatus.up, latency: 100),
+          site('gated-fast', Protection.cloudflare, SlumStatus.protected,
+              latency: 900),
+        ],
+        localLatencyMs: {'plain-slow': 800, 'gated-fast': 100},
+      );
+
+      expect(
+        ordered.map((s) => s.host).toList(),
+        ['gated-fast', 'plain-slow'],
+      );
+    });
+
+    test('local latency never lifts a DOWN mirror', () {
+      final ordered = SlumCatalogue.sortAuto(
+        [
+          site('down', Protection.none, SlumStatus.down, latency: 100),
+          site('up', Protection.cloudflare, SlumStatus.protected, latency: 900),
+        ],
+        localLatencyMs: {'down': 1, 'up': 900},
+      );
+
+      expect(ordered.first.host, 'up');
+      expect(ordered.last.isDown, isTrue);
+    });
   });
 
   // The live catalogue: proves the parser still matches the real pages.
@@ -181,8 +243,8 @@ void main() {
     }, skip: 'live network - run with --run-skipped');
 
     test('every mirror it reports resolves to a usable URL', () async {
-      final sites = await SlumCatalogue()
-          .sites(MirrorService.zlibrary, force: true);
+      final sites =
+          await SlumCatalogue().sites(MirrorService.zlibrary, force: true);
       for (final site in sites) {
         expect(Uri.tryParse(site.url)?.hasAuthority, isTrue,
             reason: '${site.url} must be an absolute URL');

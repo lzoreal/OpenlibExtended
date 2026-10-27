@@ -12,10 +12,6 @@
   "@navSearch": {
     "description": "Bottom navigation label"
   },
-  "navMyLibrary": "My Library",
-  "@navMyLibrary": {
-    "description": "Bottom navigation label"
-  },
   "navSettings": "Settings",
   "@navSettings": {
     "description": "Bottom navigation label"
@@ -51,14 +47,6 @@
   "publisher": "Publisher",
   "@publisher": {
     "description": "Text field label for the publisher metadata filter"
-  },
-  "searchLibraryHint": "Search library (title, author, publisher, year)",
-  "@searchLibraryHint": {
-    "description": "Hint text of the library metadata search box"
-  },
-  "newCollection": "New collection",
-  "@newCollection": {
-    "description": "Button that opens the tag creation dialog"
   },
   "noResultsFound": "No results found",
   "@noResultsFound": {
@@ -109,25 +97,9 @@
   "@enable": {
     "description": "Confirm button granting a permission"
   },
-  "statusUnread": "Unread",
-  "@statusUnread": {
-    "description": "Reading status filter chip"
-  },
-  "statusInProgress": "In Progress",
-  "@statusInProgress": {
-    "description": "Reading status filter chip"
-  },
   "statusCompleted": "Completed",
   "@statusCompleted": {
     "description": "Reading status filter chip"
-  },
-  "collectionNameHint": "e.g. Favorites, Sci-Fi",
-  "@collectionNameHint": {
-    "description": "Hint for the new-collection name field"
-  },
-  "manageCollectionsHint": "Long-press any book to manage its collections",
-  "@manageCollectionsHint": {
-    "description": "Helper text in the collection editor sheet"
   },
   "results": "Results",
   "@results": {
@@ -145,17 +117,17 @@
   "@about": {
     "description": "About page title"
   },
-  "aboutDescription": "An Open source app to download and read books from shadow library (Anna's Archive).",
+  "aboutDescription": "An open source app that downloads books from shadow libraries (Anna's Archive, LibGen, Z-Library) and opens them in your preferred reader.",
   "@aboutDescription": {
     "description": "Short app description on the About page"
   },
-  "aboutForkNote": "This is a forked version maintained by warreth for personal use and community updates.",
+  "aboutForkNote": "This fork is maintained by lzoreal for personal use and community updates.",
   "@aboutForkNote": {
-    "description": "Fork attribution line"
+    "description": "Explains who maintains this fork"
   },
-  "aboutOriginalNote": "Original app by dstark5 (https://github.com/dstark5/Openlib).",
+  "aboutOriginalNote": "Original app by dstark5; extended fork by warreth (https://github.com/warreth/OpenlibExtended).",
   "@aboutOriginalNote": {
-    "description": "Upstream attribution line"
+    "description": "Credits the original app and the upstream fork"
   },
   "version": "Version",
   "@version": {
@@ -165,9 +137,9 @@
   "@github": {
     "description": "Github section header"
   },
-  "thisForkByWarreth": "This Fork (by warreth)",
-  "@thisForkByWarreth": {
-    "description": "Link label to this fork"
+  "thisForkByMaintainer": "This Fork (by lzoreal)",
+  "@thisForkByMaintainer": {
+    "description": "Link label to this fork's repository"
   },
   "reportAnIssue": "Report An Issue",
   "@reportAnIssue": {
@@ -202,7 +174,15 @@
   "@searchProvidersSection": {
     "description": "Settings section header"
   },
-  "libraryInstancesSection": "Library & Instances",
+  "searchOrderHint": "All four sources are searched at once. This order controls how results are merged and which source opens first. Press and hold a card, then drag to reorder.",
+  "@searchOrderHint": {
+    "description": "Settings hint explaining the drag-to-reorder search source list"
+  },
+  "searchOrderReset": "Reset order",
+  "@searchOrderReset": {
+    "description": "Settings button that restores the default search source order"
+  },
+  "libraryInstancesSection": "Mirrors",
   "@libraryInstancesSection": {
     "description": "Settings section header"
   },
@@ -212,10 +192,6 @@
   },
   "generalSection": "General",
   "@generalSection": {
-    "description": "Settings section header"
-  },
-  "readerSection": "Reader",
-  "@readerSection": {
     "description": "Settings section header"
   },
   "advancedSection": "Advanced",
@@ -262,22 +238,6 @@
   "storageLocation": "Storage Location",
   "@storageLocation": {
     "description": "Settings tile title"
-  },
-  "openPdfExternally": "Open PDF externally",
-  "@openPdfExternally": {
-    "description": "Settings switch tile title"
-  },
-  "useDefaultPdfViewer": "Use your default PDF viewer",
-  "@useDefaultPdfViewer": {
-    "description": "Settings switch tile subtitle"
-  },
-  "openEpubExternally": "Open EPUB externally",
-  "@openEpubExternally": {
-    "description": "Settings switch tile title"
-  },
-  "useDefaultEpubReader": "Use your default EPUB reader",
-  "@useDefaultEpubReader": {
-    "description": "Settings switch tile subtitle"
   },
   "manualDownloadButton": "Manual Download Button",
   "@manualDownloadButton": {
@@ -636,10 +596,6 @@
   "@copiedToClipboard": {
     "description": "Snackbar after copying text"
   },
-  "gotIt": "Got it!",
-  "@gotIt": {
-    "description": "Reader help overlay dismiss button"
-  },
   "copy": "Copy",
   "@copy": {
     "description": "Copy-to-clipboard button"
@@ -679,10 +635,6 @@
   "noMirrors": "No mirrors available!",
   "@noMirrors": {
     "description": "Snackbar when no mirror can serve the book"
-  },
-  "addToMyLibrary": "Add To My Library",
-  "@addToMyLibrary": {
-    "description": "Button saving the book to the library"
   },
   "downloadStartedBackground": "Download started in background",
   "@downloadStartedBackground": {
@@ -800,45 +752,13 @@
   "@done": {
     "description": "Webview verification finish button"
   },
-  "nothingToRead": "Nothing to read on this page",
-  "@nothingToRead": {
-    "description": "Snackbar when TTS has no text"
-  },
   "noVoiceAvailable": "No voice available for reading aloud",
   "@noVoiceAvailable": {
     "description": "Snackbar when TTS finds no voice"
   },
-  "pauseReadingAloud": "Pause reading aloud",
-  "@pauseReadingAloud": {
-    "description": "TTS pause tooltip"
-  },
-  "resumeReadingAloud": "Read aloud",
-  "@resumeReadingAloud": {
-    "description": "TTS start/resume tooltip"
-  },
-  "stopReadingAloud": "Stop reading aloud",
-  "@stopReadingAloud": {
-    "description": "TTS stop tooltip"
-  },
-  "speechSpeed": "Speech speed",
-  "@speechSpeed": {
-    "description": "TTS speed control tooltip"
-  },
-  "decreaseFontSize": "Decrease font size",
-  "@decreaseFontSize": {
-    "description": "Reader font control tooltip"
-  },
-  "increaseFontSize": "Increase font size",
-  "@increaseFontSize": {
-    "description": "Reader font control tooltip"
-  },
   "close": "Close",
   "@close": {
     "description": "Dialog dismiss button"
-  },
-  "sortLibrary": "Sort library",
-  "@sortLibrary": {
-    "description": "Library sort menu tooltip"
   },
   "reloadHealthData": "Reload health data",
   "@reloadHealthData": {
@@ -856,18 +776,6 @@
   "deleteMirrorTooltip": "Delete mirror",
   "@deleteMirrorTooltip": {
     "description": "Mirror delete button tooltip"
-  },
-  "ttsEngineMissing": "No speech engine found. Install one (e.g. Speech Services) in system settings.",
-  "@ttsEngineMissing": {
-    "description": "Snackbar when the device has no TTS engine installed"
-  },
-  "previousPage": "Previous page",
-  "@previousPage": {
-    "description": "PDF reader previous page button tooltip"
-  },
-  "nextPage": "Next page",
-  "@nextPage": {
-    "description": "PDF reader next page button tooltip"
   },
   "searchingOn": "Results from {source}",
   "@searchingOn": {
@@ -955,5 +863,1887 @@
   "whatsNewFeatureCovers": "Missing LibGen covers are fetched from the book's detail page.",
   "@whatsNewFeatureCovers": {
     "description": "Release note about the lazy cover fix"
+  },
+  "categoryClassicsTitle": "Classics",
+  "@categoryClassicsTitle": {
+    "description": "Category title shown on the Genres page (Classics)"
+  },
+  "categoryClassicsInfo": "Timeless literary works often revered for their artistic merit and cultural significance.",
+  "@categoryClassicsInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryRomanceTitle": "Romance",
+  "@categoryRomanceTitle": {
+    "description": "Category title shown on the Genres page (Romance)"
+  },
+  "categoryRomanceInfo": "Stories focused on romantic relationships, exploring love, passion, and emotional connections.",
+  "@categoryRomanceInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryFictionTitle": "Fiction",
+  "@categoryFictionTitle": {
+    "description": "Category title shown on the Genres page (Fiction)"
+  },
+  "categoryFictionInfo": "Narrative literature created from the imagination, not based on real events.",
+  "@categoryFictionInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryYoungAdultTitle": "Young Adult",
+  "@categoryYoungAdultTitle": {
+    "description": "Category title shown on the Genres page (Young Adult)"
+  },
+  "categoryYoungAdultInfo": "Books targeted at teenage readers, addressing themes relevant to adolescence.",
+  "@categoryYoungAdultInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryFantasyTitle": "Fantasy",
+  "@categoryFantasyTitle": {
+    "description": "Category title shown on the Genres page (Fantasy)"
+  },
+  "categoryFantasyInfo": "A genre featuring magical elements, mythical creatures, and fantastical worlds.",
+  "@categoryFantasyInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryScienceFictionTitle": "Science Fiction",
+  "@categoryScienceFictionTitle": {
+    "description": "Category title shown on the Genres page (Science Fiction)"
+  },
+  "categoryScienceFictionInfo": "Literature that explores futuristic concepts, advanced technology, and space exploration.",
+  "@categoryScienceFictionInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryNonfictionTitle": "Nonfiction",
+  "@categoryNonfictionTitle": {
+    "description": "Category title shown on the Genres page (Nonfiction)"
+  },
+  "categoryNonfictionInfo": "Works based on factual information, including essays, biographies, and documentaries.",
+  "@categoryNonfictionInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryChildrenTitle": "Children",
+  "@categoryChildrenTitle": {
+    "description": "Category title shown on the Genres page (Children)"
+  },
+  "categoryChildrenInfo": "Books aimed at young readers, often with illustrations and simple narratives.",
+  "@categoryChildrenInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryHistoryTitle": "History",
+  "@categoryHistoryTitle": {
+    "description": "Category title shown on the Genres page (History)"
+  },
+  "categoryHistoryInfo": "Literature that examines past events, cultures, and significant historical figures.",
+  "@categoryHistoryInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryMysteryTitle": "Mystery",
+  "@categoryMysteryTitle": {
+    "description": "Category title shown on the Genres page (Mystery)"
+  },
+  "categoryMysteryInfo": "Stories centered around suspenseful plots, often involving crime or puzzles to solve.",
+  "@categoryMysteryInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryCoversTitle": "Covers",
+  "@categoryCoversTitle": {
+    "description": "Category title shown on the Genres page (Covers)"
+  },
+  "categoryCoversInfo": "Refers to the artwork and design that visually represents a book, influencing reader interest.",
+  "@categoryCoversInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryHorrorTitle": "Horror",
+  "@categoryHorrorTitle": {
+    "description": "Category title shown on the Genres page (Horror)"
+  },
+  "categoryHorrorInfo": "A genre designed to evoke fear, dread, or terror in the reader through suspenseful storytelling.",
+  "@categoryHorrorInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryHistoricalFictionTitle": "Historical Fiction",
+  "@categoryHistoricalFictionTitle": {
+    "description": "Category title shown on the Genres page (Historical Fiction)"
+  },
+  "categoryHistoricalFictionInfo": "Novels set in a specific historical period, blending factual events with fictional characters.",
+  "@categoryHistoricalFictionInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryBestTitle": "Best",
+  "@categoryBestTitle": {
+    "description": "Category title shown on the Genres page (Best)"
+  },
+  "categoryBestInfo": "Often refers to critically acclaimed or popular books, usually categorized by rankings or awards.",
+  "@categoryBestInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryTitlesTitle": "Titles",
+  "@categoryTitlesTitle": {
+    "description": "Category title shown on the Genres page (Titles)"
+  },
+  "categoryTitlesInfo": "Refers to the names of books, which often reflect their themes or subject matter.",
+  "@categoryTitlesInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryMiddleGradeTitle": "Middle Grade",
+  "@categoryMiddleGradeTitle": {
+    "description": "Category title shown on the Genres page (Middle Grade)"
+  },
+  "categoryMiddleGradeInfo": "Books intended for readers aged 8-12, featuring age-appropriate themes and characters.",
+  "@categoryMiddleGradeInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryParanormalTitle": "Paranormal",
+  "@categoryParanormalTitle": {
+    "description": "Category title shown on the Genres page (Paranormal)"
+  },
+  "categoryParanormalInfo": "Stories that incorporate supernatural elements, including ghosts, vampires, and otherworldly beings.",
+  "@categoryParanormalInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryLoveTitle": "Love",
+  "@categoryLoveTitle": {
+    "description": "Category title shown on the Genres page (Love)"
+  },
+  "categoryLoveInfo": "A theme exploring the complexities and nuances of love in various forms and relationships.",
+  "@categoryLoveInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryQueerTitle": "Queer",
+  "@categoryQueerTitle": {
+    "description": "Category title shown on the Genres page (Queer)"
+  },
+  "categoryQueerInfo": "Literature that represents diverse sexual orientations and gender identities within the LGBTQ+ spectrum.",
+  "@categoryQueerInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryHistoricalRomanceTitle": "Historical Romance",
+  "@categoryHistoricalRomanceTitle": {
+    "description": "Category title shown on the Genres page (Historical Romance)"
+  },
+  "categoryHistoricalRomanceInfo": "Novels combining romantic plots set against a historical backdrop.",
+  "@categoryHistoricalRomanceInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryContemporaryTitle": "Contemporary",
+  "@categoryContemporaryTitle": {
+    "description": "Category title shown on the Genres page (Contemporary)"
+  },
+  "categoryContemporaryInfo": "Works set in modern times, often addressing current social issues and relatable characters.",
+  "@categoryContemporaryInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryThrillerTitle": "Thriller",
+  "@categoryThrillerTitle": {
+    "description": "Category title shown on the Genres page (Thriller)"
+  },
+  "categoryThrillerInfo": "A suspenseful genre focused on excitement, tension, and unexpected twists.",
+  "@categoryThrillerInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryWomenTitle": "Women",
+  "@categoryWomenTitle": {
+    "description": "Category title shown on the Genres page (Women)"
+  },
+  "categoryWomenInfo": "Literature that explores women’s experiences, perspectives, and empowerment.",
+  "@categoryWomenInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryBiographyTitle": "Biography",
+  "@categoryBiographyTitle": {
+    "description": "Category title shown on the Genres page (Biography)"
+  },
+  "categoryBiographyInfo": "Nonfiction works detailing the life story of an individual, highlighting their achievements and challenges.",
+  "@categoryBiographyInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryLgbtqTitle": "LGBTQ",
+  "@categoryLgbtqTitle": {
+    "description": "Category title shown on the Genres page (LGBTQ)"
+  },
+  "categoryLgbtqInfo": "Inclusive literature representing the experiences of the lesbian, gay, bisexual, transgender, and queer community.",
+  "@categoryLgbtqInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categorySeriesTitle": "Series",
+  "@categorySeriesTitle": {
+    "description": "Category title shown on the Genres page (Series)"
+  },
+  "categorySeriesInfo": "A collection of related books that follow a common storyline or set of characters.",
+  "@categorySeriesInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "categoryTitleChallengeTitle": "Title Challenge",
+  "@categoryTitleChallengeTitle": {
+    "description": "Category title shown on the Genres page (Title Challenge)"
+  },
+  "categoryTitleChallengeInfo": "Refers to prompts or contests encouraging creative thinking about book titles.",
+  "@categoryTitleChallengeInfo": {
+    "description": "Category description shown on the Genres page"
+  },
+  "mirrorsTitle": "Mirrors",
+  "@mirrorsTitle": {
+    "description": "Mirrors settings page text: Mirrors"
+  },
+  "automaticMirrorOrder": "Automatic mirror order",
+  "@automaticMirrorOrder": {
+    "description": "Mirrors settings page text: Automatic mirror order"
+  },
+  "mirrorOrderAutoHint": "Easiest protection first, then fastest. Recommended.",
+  "@mirrorOrderAutoHint": {
+    "description": "Mirrors settings page text: Easiest protection first, then fastest. Recommended."
+  },
+  "mirrorOrderManualHint": "Manual: use the arrows to set your own order.",
+  "@mirrorOrderManualHint": {
+    "description": "Mirrors settings page text: Manual: use the arrows to set your own order."
+  },
+  "mirrorListUpToDate": "Mirror list is up to date",
+  "@mirrorListUpToDate": {
+    "description": "Mirrors settings page text: Mirror list is up to date"
+  },
+  "mirrorListUpdated": "Mirror list updated: {count} change(s)",
+  "@mirrorListUpdated": {
+    "description": "Mirrors settings page text: Mirror list updated: {count} change(s)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mirrorRefreshFailed": "Refresh failed: {error}",
+  "@mirrorRefreshFailed": {
+    "description": "Mirrors settings page text: Refresh failed: {error}",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "mirrorCatalogueUnreachable": "Could not reach open-slum.org - no mirror list available",
+  "@mirrorCatalogueUnreachable": {
+    "description": "Mirrors settings page text: Could not reach open-slum.org - no mirror list available"
+  },
+  "mirrorFooterNote": "Mirror addresses and their status come from open-slum.org and refresh automatically. A mirror reported DOWN is never contacted. Local latency is measured by this device when you tap the speed button.",
+  "@mirrorFooterNote": {
+    "description": "Mirrors settings page text: Mirror addresses and their status come from open-slum.org and refresh automatically. A mirror reported DOWN is never contacted. Local latency is measured by this device when you tap the speed button."
+  },
+  "mirrorLatencyTestTooltip": "Test local latency",
+  "@mirrorLatencyTestTooltip": {
+    "description": "Mirrors settings page: AppBar button that measures this device's latency to enabled mirrors."
+  },
+  "mirrorLatencyNotTested": "Local latency not tested",
+  "@mirrorLatencyNotTested": {
+    "description": "Mirrors settings page: this device has no reading for the mirror yet."
+  },
+  "mirrorLatencyTesting": "Testing local latency…",
+  "@mirrorLatencyTesting": {
+    "description": "Mirrors settings page: a local latency test is running for this mirror."
+  },
+  "mirrorLatencyTimeout": "Local timeout",
+  "@mirrorLatencyTimeout": {
+    "description": "Mirrors settings page: the mirror did not return response headers before the local test timed out."
+  },
+  "mirrorLatencyLocal": "Local {latency}",
+  "@mirrorLatencyLocal": {
+    "description": "Mirrors settings page: local latency value, e.g. Local 85 ms.",
+    "placeholders": {
+      "latency": {
+        "type": "String"
+      }
+    }
+  },
+  "mirrorLatencyJustNow": "just now",
+  "@mirrorLatencyJustNow": {
+    "description": "Mirrors settings page: the local latency was measured less than a minute ago."
+  },
+  "mirrorLatencyExpired": "expired",
+  "@mirrorLatencyExpired": {
+    "description": "Mirrors settings page: the local reading is older than 24 hours and no longer affects ordering."
+  },
+  "mirrorLatencyDone": "Local test: {reachable}/{total} reachable, fastest {fastest}",
+  "@mirrorLatencyDone": {
+    "description": "Snackbar after a local latency test.",
+    "placeholders": {
+      "reachable": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "fastest": {
+        "type": "String"
+      }
+    }
+  },
+  "mirrorLatencyAllTimedOut": "Local test finished · no mirror responded",
+  "@mirrorLatencyAllTimedOut": {
+    "description": "Snackbar when every mirror in the local latency test timed out."
+  },
+  "mirrorLatencyNoTargets": "No enabled mirrors to test",
+  "@mirrorLatencyNoTargets": {
+    "description": "Snackbar when the local latency test has no enabled, non-DOWN mirrors."
+  },
+  "mirrorLatencyFailed": "Local test failed: {error}",
+  "@mirrorLatencyFailed": {
+    "description": "Snackbar when the local latency test throws.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noMirrorsReported": "No mirrors reported",
+  "@noMirrorsReported": {
+    "description": "Mirrors settings page text: No mirrors reported"
+  },
+  "noMirrorsReportedHint": "open-slum.org has no entry (yet) or could not be reached.",
+  "@noMirrorsReportedHint": {
+    "description": "Mirrors settings page text: open-slum.org has no entry (yet) or could not be reached."
+  },
+  "couldNotLoadMirrors": "Could not load mirrors",
+  "@couldNotLoadMirrors": {
+    "description": "Mirrors settings page text: Could not load mirrors"
+  },
+  "moveUp": "Move up",
+  "@moveUp": {
+    "description": "Mirrors settings page text: Move up"
+  },
+  "moveDown": "Move down",
+  "@moveDown": {
+    "description": "Mirrors settings page text: Move down"
+  },
+  "reportedDownNeverContacted": "reported down - never contacted",
+  "@reportedDownNeverContacted": {
+    "description": "Mirrors settings page text: reported down - never contacted"
+  },
+  "mirrorServiceLibgenHint": "Fast, challenge-free downloads when a mirror is up",
+  "@mirrorServiceLibgenHint": {
+    "description": "Mirrors settings page text: Fast, challenge-free downloads when a mirror is up"
+  },
+  "mirrorServiceZlibHint": "DiamWall mirrors solve headlessly",
+  "@mirrorServiceZlibHint": {
+    "description": "Mirrors settings page text: DiamWall mirrors solve headlessly"
+  },
+  "mirrorServiceWelibHint": "Cloudflare-gated search, open book pages",
+  "@mirrorServiceWelibHint": {
+    "description": "Mirrors settings page text: Cloudflare-gated search, open book pages"
+  },
+  "mirrorServiceAnnasHint": "Reading, details and downloads",
+  "@mirrorServiceAnnasHint": {
+    "description": "Mirrors settings page text: Reading, details and downloads"
+  },
+  "mirrorStatusUp": "Up",
+  "@mirrorStatusUp": {
+    "description": "Mirrors settings page text: Up"
+  },
+  "mirrorStatusDegraded": "Degraded",
+  "@mirrorStatusDegraded": {
+    "description": "Mirrors settings page text: Degraded"
+  },
+  "mirrorStatusProtected": "Protected",
+  "@mirrorStatusProtected": {
+    "description": "Mirrors settings page text: Protected"
+  },
+  "mirrorStatusDown": "Down",
+  "@mirrorStatusDown": {
+    "description": "Mirrors settings page text: Down"
+  },
+  "searchEmptyQuery": "Search field is empty",
+  "@searchEmptyQuery": {
+    "description": "UI text: Search field is empty"
+  },
+  "filterTypeLabel": "Type",
+  "@filterTypeLabel": {
+    "description": "UI text: Type"
+  },
+  "filterSortLabel": "Sort by",
+  "@filterSortLabel": {
+    "description": "UI text: Sort by"
+  },
+  "filterFileTypeLabel": "File type",
+  "@filterFileTypeLabel": {
+    "description": "UI text: File type"
+  },
+  "filterYearLabel": "Year",
+  "@filterYearLabel": {
+    "description": "UI text: Year"
+  },
+  "filterAll": "All",
+  "@filterAll": {
+    "description": "UI text: All"
+  },
+  "typeAnyBooks": "Any Books",
+  "@typeAnyBooks": {
+    "description": "UI text: Any Books"
+  },
+  "typeUnknownBooks": "Unknown Books",
+  "@typeUnknownBooks": {
+    "description": "UI text: Unknown Books"
+  },
+  "typeFictionBooks": "Fiction Books",
+  "@typeFictionBooks": {
+    "description": "UI text: Fiction Books"
+  },
+  "typeNonfictionBooks": "Non-fiction Books",
+  "@typeNonfictionBooks": {
+    "description": "UI text: Non-fiction Books"
+  },
+  "typeComicBooks": "Comic Books",
+  "@typeComicBooks": {
+    "description": "UI text: Comic Books"
+  },
+  "typeMagazine": "Magazine",
+  "@typeMagazine": {
+    "description": "UI text: Magazine"
+  },
+  "typeStandardsDocument": "Standards Document",
+  "@typeStandardsDocument": {
+    "description": "UI text: Standards Document"
+  },
+  "typeJournalArticle": "Journal Article",
+  "@typeJournalArticle": {
+    "description": "UI text: Journal Article"
+  },
+  "sortMostRelevant": "Most Relevant",
+  "@sortMostRelevant": {
+    "description": "UI text: Most Relevant"
+  },
+  "sortNewest": "Newest",
+  "@sortNewest": {
+    "description": "UI text: Newest"
+  },
+  "sortOldest": "Oldest",
+  "@sortOldest": {
+    "description": "UI text: Oldest"
+  },
+  "sortLargest": "Largest",
+  "@sortLargest": {
+    "description": "UI text: Largest"
+  },
+  "sortSmallest": "Smallest",
+  "@sortSmallest": {
+    "description": "UI text: Smallest"
+  },
+  "yearBefore1980": "Before 1980",
+  "@yearBefore1980": {
+    "description": "UI text: Before 1980"
+  },
+  "langEnglish": "English",
+  "@langEnglish": {
+    "description": "Language filter label (English)"
+  },
+  "langSpanish": "Spanish",
+  "@langSpanish": {
+    "description": "Language filter label (Spanish)"
+  },
+  "langFrench": "French",
+  "@langFrench": {
+    "description": "Language filter label (French)"
+  },
+  "langGerman": "German",
+  "@langGerman": {
+    "description": "Language filter label (German)"
+  },
+  "langItalian": "Italian",
+  "@langItalian": {
+    "description": "Language filter label (Italian)"
+  },
+  "langPortuguese": "Portuguese",
+  "@langPortuguese": {
+    "description": "Language filter label (Portuguese)"
+  },
+  "langRussian": "Russian",
+  "@langRussian": {
+    "description": "Language filter label (Russian)"
+  },
+  "langChinese": "Chinese",
+  "@langChinese": {
+    "description": "Language filter label (Chinese)"
+  },
+  "langJapanese": "Japanese",
+  "@langJapanese": {
+    "description": "Language filter label (Japanese)"
+  },
+  "langKorean": "Korean",
+  "@langKorean": {
+    "description": "Language filter label (Korean)"
+  },
+  "langArabic": "Arabic",
+  "@langArabic": {
+    "description": "Language filter label (Arabic)"
+  },
+  "langHindi": "Hindi",
+  "@langHindi": {
+    "description": "Language filter label (Hindi)"
+  },
+  "langMalayalam": "Malayalam",
+  "@langMalayalam": {
+    "description": "Language filter label (Malayalam)"
+  },
+  "langDutch": "Dutch",
+  "@langDutch": {
+    "description": "Language filter label (Dutch)"
+  },
+  "langPolish": "Polish",
+  "@langPolish": {
+    "description": "Language filter label (Polish)"
+  },
+  "langTurkish": "Turkish",
+  "@langTurkish": {
+    "description": "Language filter label (Turkish)"
+  },
+  "langSwedish": "Swedish",
+  "@langSwedish": {
+    "description": "Language filter label (Swedish)"
+  },
+  "langIndonesian": "Indonesian",
+  "@langIndonesian": {
+    "description": "Language filter label (Indonesian)"
+  },
+  "langVietnamese": "Vietnamese",
+  "@langVietnamese": {
+    "description": "Language filter label (Vietnamese)"
+  },
+  "langCzech": "Czech",
+  "@langCzech": {
+    "description": "Language filter label (Czech)"
+  },
+  "langGreek": "Greek",
+  "@langGreek": {
+    "description": "Language filter label (Greek)"
+  },
+  "langRomanian": "Romanian",
+  "@langRomanian": {
+    "description": "Language filter label (Romanian)"
+  },
+  "langHungarian": "Hungarian",
+  "@langHungarian": {
+    "description": "Language filter label (Hungarian)"
+  },
+  "langUkrainian": "Ukrainian",
+  "@langUkrainian": {
+    "description": "Language filter label (Ukrainian)"
+  },
+  "langHebrew": "Hebrew",
+  "@langHebrew": {
+    "description": "Language filter label (Hebrew)"
+  },
+  "langThai": "Thai",
+  "@langThai": {
+    "description": "Language filter label (Thai)"
+  },
+  "langPersian": "Persian",
+  "@langPersian": {
+    "description": "Language filter label (Persian)"
+  },
+  "langBengali": "Bengali",
+  "@langBengali": {
+    "description": "Language filter label (Bengali)"
+  },
+  "langFinnish": "Finnish",
+  "@langFinnish": {
+    "description": "Language filter label (Finnish)"
+  },
+  "langNorwegian": "Norwegian",
+  "@langNorwegian": {
+    "description": "Language filter label (Norwegian)"
+  },
+  "langDanish": "Danish",
+  "@langDanish": {
+    "description": "Language filter label (Danish)"
+  },
+  "downloadsTitle": "Downloads",
+  "@downloadsTitle": {
+    "description": "UI text: Downloads"
+  },
+  "downloadQueued": "Queued",
+  "@downloadQueued": {
+    "description": "UI text: Queued"
+  },
+  "downloadGettingMirrors": "Getting mirrors...",
+  "@downloadGettingMirrors": {
+    "description": "UI text: Getting mirrors..."
+  },
+  "downloadFindingMirror": "Finding mirror...",
+  "@downloadFindingMirror": {
+    "description": "UI text: Finding mirror..."
+  },
+  "downloadDownloading": "Downloading",
+  "@downloadDownloading": {
+    "description": "UI text: Downloading"
+  },
+  "downloadPaused": "Paused",
+  "@downloadPaused": {
+    "description": "UI text: Paused"
+  },
+  "downloadVerifying": "Verifying",
+  "@downloadVerifying": {
+    "description": "UI text: Verifying"
+  },
+  "downloadCancelled": "Cancelled",
+  "@downloadCancelled": {
+    "description": "UI text: Cancelled"
+  },
+  "downloadFailedGeneric": "Download failed",
+  "@downloadFailedGeneric": {
+    "description": "UI text: Download failed"
+  },
+  "verifyAction": "Verify",
+  "@verifyAction": {
+    "description": "UI text: Verify"
+  },
+  "descriptionLabel": "Description",
+  "@descriptionLabel": {
+    "description": "UI text: Description"
+  },
+  "noDescriptionAvailable": "No description available",
+  "@noDescriptionAvailable": {
+    "description": "UI text: No description available"
+  },
+  "couldNotOpenLink": "Could not open the link.",
+  "@couldNotOpenLink": {
+    "description": "UI text: Could not open the link."
+  },
+  "manualDownloadAction": "Manual Download",
+  "@manualDownloadAction": {
+    "description": "UI text: Manual Download"
+  },
+  "fastDownloadStarted": "Fast download started in background 🚀",
+  "@fastDownloadStarted": {
+    "description": "UI text: Fast download started in background 🚀"
+  },
+  "welibNoDownloadLink": "WeLib did not offer a download link for this book.",
+  "@welibNoDownloadLink": {
+    "description": "UI text: WeLib did not offer a download link for this book."
+  },
+  "welibPageUnreadable": "Could not read the WeLib download page.",
+  "@welibPageUnreadable": {
+    "description": "UI text: Could not read the WeLib download page."
+  },
+  "fileNotFoundDownloadFailed": "File not found. The download may have failed.",
+  "@fileNotFoundDownloadFailed": {
+    "description": "UI text: File not found. The download may have failed."
+  },
+  "shareBookMessage": "Discover this amazing book: \"{title}\"\nRead more: {link}",
+  "@shareBookMessage": {
+    "description": "UI text: Discover this amazing book: \"{title}\"\nRead more: {link}",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "link": {
+        "type": "String"
+      }
+    }
+  },
+  "webviewWindowTitle": "Verify Access - OpenLibExtended",
+  "@webviewWindowTitle": {
+    "description": "UI text: Verify Access - OpenLibExtended"
+  },
+  "webviewBrowserOpen": "Browser window is open",
+  "@webviewBrowserOpen": {
+    "description": "UI text: Browser window is open"
+  },
+  "webviewBrowserOpening": "Opening browser window...",
+  "@webviewBrowserOpening": {
+    "description": "UI text: Opening browser window..."
+  },
+  "webviewInstructions": "1. Solve the CAPTCHA in the browser window\n2. Wait for the page to fully load\n3. Click 'Done' button above to continue",
+  "@webviewInstructions": {
+    "description": "UI text: 1. Solve the CAPTCHA in the browser window\n2. Wait for the page to fully load\n3. Click 'Done' button above to continue"
+  },
+  "webviewPreparingDownload": "Preparing download...",
+  "@webviewPreparingDownload": {
+    "description": "UI text: Preparing download..."
+  },
+  "webviewPreparingHint": "Please wait while we verify access and fetch download links",
+  "@webviewPreparingHint": {
+    "description": "UI text: Please wait while we verify access and fetch download links"
+  },
+  "changeStorageHint": "Change where books are saved",
+  "@changeStorageHint": {
+    "description": "UI text: Change where books are saved"
+  },
+  "versionWithBuild": "Version {version}+{build}",
+  "@versionWithBuild": {
+    "description": "UI text: Version {version}+{build}",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "String"
+      }
+    }
+  },
+  "backupShareText": "OpenlibExtended backup",
+  "@backupShareText": {
+    "description": "UI text: OpenlibExtended backup"
+  },
+  "exportBackupTitle": "Export Backup",
+  "@exportBackupTitle": {
+    "description": "UI text: Export Backup"
+  },
+  "exportBackupSubtitle": "Save settings, books and instances to a JSON file",
+  "@exportBackupSubtitle": {
+    "description": "UI text: Save settings, books and instances to a JSON file"
+  },
+  "importBackupTitle": "Import Backup",
+  "@importBackupTitle": {
+    "description": "UI text: Import Backup"
+  },
+  "importBackupSubtitle": "Restore from a backup file (replaces current data)",
+  "@importBackupSubtitle": {
+    "description": "UI text: Restore from a backup file (replaces current data)"
+  },
+  "providerWelibCatalog": "Cloudflare-gated search and open book pages",
+  "@providerWelibCatalog": {
+    "description": "UI text: Cloudflare-gated search and open book pages"
+  },
+  "errorWhatToDo": "What to do",
+  "@errorWhatToDo": {
+    "description": "UI text: What to do"
+  },
+  "errorVpnDescription": "A VPN can help bypass regional blocks and access the content.",
+  "@errorVpnDescription": {
+    "description": "UI text: A VPN can help bypass regional blocks and access the content."
+  },
+  "errorVerificationPrompt": "The site is asking you to verify that you're human. We'll open a browser window where you can complete the verification.",
+  "@errorVerificationPrompt": {
+    "description": "UI text: The site is asking you to verify that you're human. We'll open a browser window where you can complete the verification."
+  },
+  "errorVerificationReturn": "Once you complete the verification, return to the app and tap 'Try Again'.",
+  "@errorVerificationReturn": {
+    "description": "UI text: Once you complete the verification, return to the app and tap 'Try Again'."
+  },
+  "errorNoContent": "No content available",
+  "@errorNoContent": {
+    "description": "UI text: No content available"
+  },
+  "networkErrorNoInternetTitle": "No internet connection",
+  "@networkErrorNoInternetTitle": {
+    "description": "Localized network error title or solution: No internet connection"
+  },
+  "networkErrorNoInternetSolution": "Check your internet connection. Make sure Wi-Fi or mobile data is enabled.",
+  "@networkErrorNoInternetSolution": {
+    "description": "Localized network error title or solution: Check your internet connection. Make sure Wi-Fi or mobile data is enabled."
+  },
+  "networkErrorCloudflareTitle": "Access blocked by DDoS protection",
+  "@networkErrorCloudflareTitle": {
+    "description": "Localized network error title or solution: Access blocked by DDoS protection"
+  },
+  "networkErrorCloudflareSolution": "This site is protected and blocking the app. Try a VPN, change DNS to 1.1.1.1 or 8.8.8.8, or verify in the browser.",
+  "@networkErrorCloudflareSolution": {
+    "description": "Localized network error title or solution: This site is protected and blocking the app. Try a VPN, change DNS to 1.1.1.1 or 8.8.8.8, or verify "
+  },
+  "networkErrorServerUnavailableTitle": "Server temporarily unavailable",
+  "@networkErrorServerUnavailableTitle": {
+    "description": "Localized network error title or solution: Server temporarily unavailable"
+  },
+  "networkErrorServerUnavailableSolution": "The server is having problems. Try again in a few minutes or choose another mirror in Settings.",
+  "@networkErrorServerUnavailableSolution": {
+    "description": "Localized network error title or solution: The server is having problems. Try again in a few minutes or choose another mirror in Settings."
+  },
+  "networkErrorTimeoutTitle": "Request timed out",
+  "@networkErrorTimeoutTitle": {
+    "description": "Localized network error title or solution: Request timed out"
+  },
+  "networkErrorTimeoutSolution": "The server is taking too long to respond. Check your connection and try again.",
+  "@networkErrorTimeoutSolution": {
+    "description": "Localized network error title or solution: The server is taking too long to respond. Check your connection and try again."
+  },
+  "networkErrorForbiddenTitle": "Access denied",
+  "@networkErrorForbiddenTitle": {
+    "description": "Localized network error title or solution: Access denied"
+  },
+  "networkErrorForbiddenSolution": "You don't have permission to access this resource. Try a VPN, change DNS, or use another mirror in Settings.",
+  "@networkErrorForbiddenSolution": {
+    "description": "Localized network error title or solution: You don't have permission to access this resource. Try a VPN, change DNS, or use another mirror in S"
+  },
+  "networkErrorRateLimitedTitle": "Too many requests",
+  "@networkErrorRateLimitedTitle": {
+    "description": "Localized network error title or solution: Too many requests"
+  },
+  "networkErrorRateLimitedSolution": "Too many requests were sent. Wait a few minutes and try again.",
+  "@networkErrorRateLimitedSolution": {
+    "description": "Localized network error title or solution: Too many requests were sent. Wait a few minutes and try again."
+  },
+  "networkErrorSslTitle": "Secure connection failed",
+  "@networkErrorSslTitle": {
+    "description": "Localized network error title or solution: Secure connection failed"
+  },
+  "networkErrorSslSolution": "Your network may be blocking secure connections. Try a VPN or a different network.",
+  "@networkErrorSslSolution": {
+    "description": "Localized network error title or solution: Your network may be blocking secure connections. Try a VPN or a different network."
+  },
+  "networkErrorDnsTitle": "Server not found",
+  "@networkErrorDnsTitle": {
+    "description": "Localized network error title or solution: Server not found"
+  },
+  "networkErrorDnsSolution": "The site could not be reached. Your ISP may be blocking it. Try a VPN or change DNS to 1.1.1.1 / 8.8.8.8.",
+  "@networkErrorDnsSolution": {
+    "description": "Localized network error title or solution: The site could not be reached. Your ISP may be blocking it. Try a VPN or change DNS to 1.1.1.1 / 8.8"
+  },
+  "networkErrorUnknownTitle": "Something went wrong",
+  "@networkErrorUnknownTitle": {
+    "description": "Localized network error title or solution: Something went wrong"
+  },
+  "networkErrorUnknownSolution": "Please try again. If the problem persists, restart the app.",
+  "@networkErrorUnknownSolution": {
+    "description": "Localized network error title or solution: Please try again. If the problem persists, restart the app."
+  },
+  "updatePermissionTitle": "Permission Required",
+  "@updatePermissionTitle": {
+    "description": "Localized update/install dialog text: Permission Required"
+  },
+  "updatePermissionBody": "To install app updates, OpenlibExtended needs permission to install packages.\n\nThis allows the app to automatically install new versions with bug fixes and new features.\n\nYou will be taken to Settings to enable this permission.",
+  "@updatePermissionBody": {
+    "description": "Localized update/install dialog text: To install app updates, OpenlibExtended needs permission to install packages.\n\nThis allows the app t"
+  },
+  "updateOpenSettings": "Open Settings",
+  "@updateOpenSettings": {
+    "description": "Localized update/install dialog text: Open Settings"
+  },
+  "updateDebugBuildWarning": "Debug Build Detected: Update may fail with 'App not installed' due to signature mismatch. Uninstall this app first.",
+  "@updateDebugBuildWarning": {
+    "description": "Localized update/install dialog text: Debug Build Detected: Update may fail with 'App not installed' due to signature mismatch. Uninstall "
+  },
+  "updateOpeningInstaller": "Opening installer... If nothing happens, the install failed.",
+  "@updateOpeningInstaller": {
+    "description": "Localized update/install dialog text: Opening installer... If nothing happens, the install failed."
+  },
+  "updateManualInstall": "Manual Install",
+  "@updateManualInstall": {
+    "description": "Localized update/install dialog text: Manual Install"
+  },
+  "updateInstallationIssueTitle": "Installation Issue",
+  "@updateInstallationIssueTitle": {
+    "description": "Localized update/install dialog text: Installation Issue"
+  },
+  "updateInstallationIssueBody": "The automatic installer couldn't open the APK. This can happen on some Android versions.\n\nYou can install manually using one of these options:",
+  "@updateInstallationIssueBody": {
+    "description": "Localized update/install dialog text: The automatic installer couldn't open the APK. This can happen on some Android versions.\n\nYou can in"
+  },
+  "updateFileLabel": "File: {file}",
+  "@updateFileLabel": {
+    "description": "Localized update/install dialog text: File: {file}",
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "updateInstallationFailed": "Installation Failed",
+  "@updateInstallationFailed": {
+    "description": "Localized update/install dialog text: Installation Failed"
+  },
+  "updateMethodsTried": "Methods tried:",
+  "@updateMethodsTried": {
+    "description": "Localized update/install dialog text: Methods tried:"
+  },
+  "updateErrorsEncountered": "Errors encountered:",
+  "@updateErrorsEncountered": {
+    "description": "Localized update/install dialog text: Errors encountered:"
+  },
+  "updateMethodNumber": "Method {number}",
+  "@updateMethodNumber": {
+    "description": "Localized update/install dialog text: Method {number}",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "updateDownloadViaBrowser": "Download via Browser",
+  "@updateDownloadViaBrowser": {
+    "description": "Localized update/install dialog text: Download via Browser"
+  },
+  "updateInstallationErrorTitle": "Installation Error",
+  "@updateInstallationErrorTitle": {
+    "description": "Localized update/install dialog text: Installation Error"
+  },
+  "updateOk": "OK",
+  "@updateOk": {
+    "description": "Localized update/install dialog text: OK"
+  },
+  "updateTryManualInstall": "Try Manual Install",
+  "@updateTryManualInstall": {
+    "description": "Localized update/install dialog text: Try Manual Install"
+  },
+  "updateInstallFailed": "Failed to install update: {error}",
+  "@updateInstallFailed": {
+    "description": "Localized update/install dialog text: Failed to install update: {error}",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "updateAvailableTitle": "Update Available",
+  "@updateAvailableTitle": {
+    "description": "Localized update/install dialog text: Update Available"
+  },
+  "updateVersionAvailable": "Version {version} is available!",
+  "@updateVersionAvailable": {
+    "description": "Localized update/install dialog text: Version {version} is available!",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updatePreRelease": "Pre-release",
+  "@updatePreRelease": {
+    "description": "Localized update/install dialog text: Pre-release"
+  },
+  "updateWhatsNew": "What's new:",
+  "@updateWhatsNew": {
+    "description": "Localized update/install dialog text: What's new:"
+  },
+  "updateLater": "Later",
+  "@updateLater": {
+    "description": "Localized update/install dialog text: Later"
+  },
+  "updateDownloadAndInstall": "Download & Install",
+  "@updateDownloadAndInstall": {
+    "description": "Localized update/install dialog text: Download & Install"
+  },
+  "updateDownloadFromGithub": "Download from GitHub",
+  "@updateDownloadFromGithub": {
+    "description": "Localized update/install dialog text: Download from GitHub"
+  },
+  "updateViewOnGithub": "View on GitHub",
+  "@updateViewOnGithub": {
+    "description": "Localized update/install dialog text: View on GitHub"
+  },
+  "updateDownloading": "Downloading Update",
+  "@updateDownloading": {
+    "description": "Localized update/install dialog text: Downloading Update"
+  },
+  "updateDownloadComplete": "Download Complete",
+  "@updateDownloadComplete": {
+    "description": "Localized update/install dialog text: Download Complete"
+  },
+  "updateVersionLabel": "Version {version}",
+  "@updateVersionLabel": {
+    "description": "Localized update/install dialog text: Version {version}",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateOpeningInstallerShort": "Opening installer...",
+  "@updateOpeningInstallerShort": {
+    "description": "Localized update/install dialog text: Opening installer..."
+  },
+  "updateConnecting": "Connecting...",
+  "@updateConnecting": {
+    "description": "Localized update/install dialog text: Connecting..."
+  },
+  "updateFileNotFound": "Downloaded file not found",
+  "@updateFileNotFound": {
+    "description": "Localized update/install dialog text: Downloaded file not found"
+  },
+  "updateFileCorrupted": "Downloaded file appears to be corrupted (only {size})",
+  "@updateFileCorrupted": {
+    "description": "Localized update/install dialog text: Downloaded file appears to be corrupted (only {size})",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "updatePermissionDenied": "Permission to install apps was denied. You can still install manually.",
+  "@updatePermissionDenied": {
+    "description": "Localized update/install dialog text: Permission to install apps was denied. You can still install manually."
+  },
+  "updateMayHaveFailedSilently": "May have failed silently",
+  "@updateMayHaveFailedSilently": {
+    "description": "Localized update/install dialog text: May have failed silently"
+  },
+  "updateMethodOpenFile": "Open File",
+  "@updateMethodOpenFile": {
+    "description": "Localized update/install dialog text: Open File"
+  },
+  "updateMethodApkSideload": "APK Sideload",
+  "@updateMethodApkSideload": {
+    "description": "Localized update/install dialog text: APK Sideload"
+  },
+  "updateMethodPackageInstaller": "Package Installer",
+  "@updateMethodPackageInstaller": {
+    "description": "Localized update/install dialog text: Package Installer"
+  },
+  "networkErrorBookNotFoundTitle": "Book not found",
+  "@networkErrorBookNotFoundTitle": {
+    "description": "Localized network error title or solution: Book not found"
+  },
+  "networkErrorBookNotFoundSolution": "The page loaded but no book details were on it. The link may be outdated - try searching for the title instead.",
+  "@networkErrorBookNotFoundSolution": {
+    "description": "Localized network error title or solution: The page loaded but no book details were on it. The link may be outdated - try searching for the tit"
+  },
+  "networkErrorBookDetailsUnavailableTitle": "Unable to load book details",
+  "@networkErrorBookDetailsUnavailableTitle": {
+    "description": "Localized network error title or solution: Unable to load book details"
+  },
+  "networkErrorBookDetailsUnavailableSolution": "The book information could not be retrieved. Try again or use another mirror in Settings.",
+  "@networkErrorBookDetailsUnavailableSolution": {
+    "description": "Localized network error title or solution: The book information could not be retrieved. Try again or use another mirror in Settings."
+  },
+  "downloadNoWorkingMirrors": "No working mirrors available!",
+  "@downloadNoWorkingMirrors": {
+    "description": "Download failure message: No working mirrors available!"
+  },
+  "downloadAllMirrorsFailed": "All mirrors failed!",
+  "@downloadAllMirrorsFailed": {
+    "description": "Download failure message: All mirrors failed!"
+  },
+  "downloadErrorGettingMirrors": "Error getting mirrors",
+  "@downloadErrorGettingMirrors": {
+    "description": "Download failure message: Error getting mirrors"
+  },
+  "downloadCouldNotSave": "Could not save to library: {error}",
+  "@downloadCouldNotSave": {
+    "description": "Download failure message: Could not save to library: {error}",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "appLogsShareSubject": "OpenlibExtended App Logs",
+  "@appLogsShareSubject": {
+    "description": "Log export dialog text: OpenlibExtended App Logs"
+  },
+  "appLogsShareText": "OpenlibExtended app logs for the past {minutes} minutes",
+  "@appLogsShareText": {
+    "description": "Log export dialog text: OpenlibExtended app logs for the past {minutes} minutes",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationAlreadyDownloading": "Already downloading: {title}",
+  "@notificationAlreadyDownloading": {
+    "description": "Android download notification text: Already downloading: {title}",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationQueued": "Queued: {title}",
+  "@notificationQueued": {
+    "description": "Android download notification text: Queued: {title}",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationStartingFastDownload": "Starting fast download...",
+  "@notificationStartingFastDownload": {
+    "description": "Android download notification text: Starting fast download..."
+  },
+  "notificationVerifyingFile": "Verifying file...",
+  "@notificationVerifyingFile": {
+    "description": "Android download notification text: Verifying file..."
+  },
+  "notificationDownloadComplete": "Download completed!",
+  "@notificationDownloadComplete": {
+    "description": "Android download notification text: Download completed!"
+  },
+  "notificationDownloadCompleteChecksumFailed": "Download completed (checksum failed)",
+  "@notificationDownloadCompleteChecksumFailed": {
+    "description": "Android download notification text: Download completed (checksum failed)"
+  },
+  "notificationChannelDescription": "Book download progress notifications",
+  "@notificationChannelDescription": {
+    "description": "Android download notification text: Book download progress notifications"
+  },
+  "notificationDownloadingPercent": "Downloading... {percent}%",
+  "@notificationDownloadingPercent": {
+    "description": "Android download notification text: Downloading... {percent}%",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationFailed": "Failed: {error}",
+  "@notificationFailed": {
+    "description": "Android download notification text: Failed: {error}",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationDownloadTitle": "Download",
+  "@notificationDownloadTitle": {
+    "description": "Android download notification text: Download"
+  },
+  "searchHintTitle": "Find your next read",
+  "@searchHintTitle": {
+    "description": "Search page empty-state hint: Find your next read"
+  },
+  "searchHintBody": "Search by title, author, or ISBN, or use the filters above.",
+  "@searchHintBody": {
+    "description": "Search page empty-state hint: Search by title, author, or ISBN, or use the filters below."
+  },
+  "homeSearchHint": "Search by title, author, or ISBN",
+  "@homeSearchHint": {
+    "description": "UI label: Search by title, author, or ISBN"
+  },
+  "trendingThisWeek": "Trending this week",
+  "@trendingThisWeek": {
+    "description": "UI label: Trending this week"
+  },
+  "keepExploring": "Keep exploring",
+  "@keepExploring": {
+    "description": "UI label: Keep exploring"
+  },
+  "browseGenres": "Browse by genre",
+  "@browseGenres": {
+    "description": "UI label: Browse by genre"
+  },
+  "settingsManage": "Manage",
+  "@settingsManage": {
+    "description": "UI label: Manage"
+  },
+  "searchSourcesTitle": "Search sources",
+  "@searchSourcesTitle": {
+    "description": "Search source selector: Search sources"
+  },
+  "searchSourceAuto": "All",
+  "@searchSourceAuto": {
+    "description": "Search source selector: Auto"
+  },
+  "searchSourceAutoHint": "All four sources are searched at once; results are merged",
+  "@searchSourceAutoHint": {
+    "description": "Search source selector: Tries enabled sources in order"
+  },
+  "searchSourceOnlyHint": "Only this source’s results are shown",
+  "@searchSourceOnlyHint": {
+    "description": "Search source selector hint when a single source is selected"
+  },
+  "bookDetailsTitle": "Book details",
+  "@bookDetailsTitle": {
+    "description": "Book detail page text: Book details"
+  },
+  "fileInfoTitle": "File info",
+  "@fileInfoTitle": {
+    "description": "Book detail page text: File info"
+  },
+  "formatLabel": "Format",
+  "@formatLabel": {
+    "description": "Book detail page text: Format"
+  },
+  "publishedYearLabel": "Published",
+  "@publishedYearLabel": {
+    "description": "Book detail page text: Published"
+  },
+  "fileSizeLabel": "File size",
+  "@fileSizeLabel": {
+    "description": "Book detail page text: File size"
+  },
+  "isbnLabel": "ISBN",
+  "@isbnLabel": {
+    "description": "Book detail file info row label for the ISBN"
+  },
+  "sourceLabel": "Source",
+  "@sourceLabel": {
+    "description": "Book detail page text: Source"
+  },
+  "sourceAndDownload": "Source & download",
+  "@sourceAndDownload": {
+    "description": "Book detail page text: Source & download"
+  },
+  "openAtSource": "Open at source",
+  "@openAtSource": {
+    "description": "Book detail page text: Open at source"
+  },
+  "sourceWelib": "WeLib",
+  "@sourceWelib": {
+    "description": "Short source label for WeLib results"
+  },
+  "resultsCount": "{count, plural, =1{1 result} other{{count} results}}",
+  "@resultsCount": {
+    "description": "Results page heading with the number of loaded results",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sourceStatusUntried": "Untried",
+  "@sourceStatusUntried": {
+    "description": "A source after the winning source that the automatic chain never queried"
+  },
+  "sourceStatusFailed": "Failed",
+  "@sourceStatusFailed": {
+    "description": "A source that could not be reached during the search"
+  },
+  "sourceResultCount": "{count, plural, =1{1 book} other{{count} books}}",
+  "@sourceResultCount": {
+    "description": "Number of books found in one search source",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchingTitle": "Searching",
+  "@searchingTitle": {
+    "description": "Results page heading while the source chain is running"
+  },
+  "searchingSourcesBody": "Queries all four sources at once, then merges and de-duplicates the results.",
+  "@searchingSourcesBody": {
+    "description": "Explanation shown while the automatic source chain is searching"
+  },
+  "loadMoreResults": "Scroll for more results",
+  "@loadMoreResults": {
+    "description": "Footer hint while more result pages can be loaded"
+  },
+  "noResultsFor": "No results for “{query}”",
+  "@noResultsFor": {
+    "description": "Empty results title including the submitted query",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "noResultsSourcesBody": "All sources returned no matches. Try a shorter query, or clear the filters and search again.",
+  "@noResultsSourcesBody": {
+    "description": "Empty results explanation below the no-results title"
+  },
+  "modifySearch": "Edit search",
+  "@modifySearch": {
+    "description": "Empty results action that returns to the search page"
+  },
+  "clearFiltersRetry": "Clear filters & retry",
+  "@clearFiltersRetry": {
+    "description": "Empty results action that resets filters and repeats the search"
+  },
+  "sourceSheetTitle": "Switch search source",
+  "@sourceSheetTitle": {
+    "description": "Title of the bottom sheet that reruns a search in another source"
+  },
+  "sourceSheetSubtitle": "View results for “{query}” from a chosen source.",
+  "@sourceSheetSubtitle": {
+    "description": "Subtitle of the source picker naming the current query",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "sourceAutoRecommended": "All sources (combined)",
+  "@sourceAutoRecommended": {
+    "description": "Automatic option in the search source picker"
+  },
+  "sourceSheetNote": "Applies to this search only. Your default source stays the same.",
+  "@sourceSheetNote": {
+    "description": "Footer note in the search source picker"
+  },
+  "recentSearchesTitle": "Recent searches",
+  "@recentSearchesTitle": {
+    "description": "Search suggestion panel section header for persisted recent searches"
+  },
+  "clearAll": "Clear all",
+  "@clearAll": {
+    "description": "Action that deletes every recent search"
+  },
+  "searchSuggestionsTitle": "Search suggestions",
+  "@searchSuggestionsTitle": {
+    "description": "Search suggestion panel section header for live suggestions"
+  },
+  "searchSuggestionsLive": "Live",
+  "@searchSuggestionsLive": {
+    "description": "Small label marking live network suggestions"
+  },
+  "searchRecentHint": "Continue from a recent search, or start a new one.",
+  "@searchRecentHint": {
+    "description": "Hint shown in the focused search suggestion panel with an empty query"
+  },
+  "searchInAllSources": "Search “{query}” in all sources",
+  "@searchInAllSources": {
+    "description": "Primary action in the suggestion panel when the automatic chain is selected",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "searchInSource": "Search “{query}” in {source}",
+  "@searchInSource": {
+    "description": "Primary action in the suggestion panel when one source is selected",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "searchAutoScope": "Searching {count} sources at once",
+  "@searchAutoScope": {
+    "description": "Scope pill in the suggestion panel when the automatic chain is selected",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchSourceOnlyScope": "{source} only",
+  "@searchSourceOnlyScope": {
+    "description": "Scope pill in the suggestion panel when a single source is selected",
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "removeRecentSearch": "Remove “{query}”",
+  "@removeRecentSearch": {
+    "description": "Tooltip for deleting one recent search",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "clearSearch": "Clear search",
+  "@clearSearch": {
+    "description": "Tooltip for clearing the search field"
+  },
+  "searchSupportHint": "Search by title, author, ISBN or MD5. All four sources are queried in parallel.",
+  "@searchSupportHint": {
+    "description": "Hint at the bottom of the empty search page."
+  },
+  "tryThese": "Try these",
+  "@tryThese": {
+    "description": "Suggested searches section on the empty search page."
+  },
+  "filtersAndAdvanced": "Filters and advanced search",
+  "@filtersAndAdvanced": {
+    "description": "Section label for the search filters and advanced fields."
+  },
+  "resultsAutoMerged": "Results merged automatically",
+  "@resultsAutoMerged": {
+    "description": "Hint beside the search scope pill while typing"
+  },
+  "searchAdvancedHint": "Need to narrow by author, publisher, year, language or format? Switch to Advanced search.",
+  "@searchAdvancedHint": {
+    "description": "Hint under the inline suggestions pointing at the advanced tab"
+  },
+  "searchApply": "Apply and search",
+  "@searchApply": {
+    "description": "Primary action on the advanced search tab"
+  },
+  "resetFilters": "Reset",
+  "@resetFilters": {
+    "description": "Resets every advanced search filter"
+  },
+  "anyValue": "Any",
+  "@anyValue": {
+    "description": "Placeholder for an unset advanced filter value"
+  },
+  "advancedFilterNote": "Advanced filters apply to this search only; your default source stays unchanged.",
+  "@advancedFilterNote": {
+    "description": "Note under the advanced search actions"
+  },
+  "filterRelevance": "Relevance",
+  "@filterRelevance": {
+    "description": "Default sort chip on the results page."
+  },
+  "searchAllSourcesLabel": "All sources",
+  "@searchAllSourcesLabel": {
+    "description": "Subtitle for a recent search that ran across every source."
+  },
+  "sourceMarkAll": "ALL",
+  "@sourceMarkAll": {
+    "description": "Compact mark shown on the all-sources search chip."
+  },
+  "sourceAnnasShort": "Anna's",
+  "@sourceAnnasShort": {
+    "description": "Compact source label for Anna's Archive in the results journey"
+  },
+  "sourceZlibShort": "Z-Lib",
+  "@sourceZlibShort": {
+    "description": "Compact source label for Z-Library in the results source pills"
+  },
+  "sourceCount": "{count} sources",
+  "@sourceCount": {
+    "description": "Number of sources that answered a search",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sourceStillSearching": "{source} is still searching; results will be added automatically.",
+  "@sourceStillSearching": {
+    "description": "Streaming hint when a source has not answered yet",
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "otherSources": "Other sources: {summary}",
+  "@otherSources": {
+    "description": "Summary of the sources other than the selected one",
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
+  },
+  "sourcesResponded": "{count} sources responded",
+  "@sourcesResponded": {
+    "description": "Right label on the empty results heading",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sourceStatusTitle": "Source status",
+  "@sourceStatusTitle": {
+    "description": "Title of the source diagnosis card on the empty results page"
+  },
+  "sourceStatusSummary": "{ok} responded, {failed} failed",
+  "@sourceStatusSummary": {
+    "description": "Subtitle of the source diagnosis card",
+    "placeholders": {
+      "ok": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "sourceResponded": "Responded · {count}",
+  "@sourceResponded": {
+    "description": "Status row for a source that answered",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sourceTimedOut": "Timed out",
+  "@sourceTimedOut": {
+    "description": "Status row for a source that failed or timed out"
+  },
+  "searchAgain": "Search again",
+  "@searchAgain": {
+    "description": "Empty-results action that returns to the search page"
+  },
+  "sourceMirrorHint": "From the {source} mirror; MD5 is verified after download.",
+  "@sourceMirrorHint": {
+    "description": "Hint card at the bottom of the book detail page",
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadThisBook": "Download book",
+  "@downloadThisBook": {
+    "description": "Primary action on the book detail page"
+  },
+  "navDownloads": "Downloads",
+  "@navDownloads": {
+    "description": "Bottom navigation label for the download center."
+  },
+  "downloadCenterTitle": "Download Center",
+  "@downloadCenterTitle": {
+    "description": "Page title for the download center."
+  },
+  "downloadCenterSummary": "{active} active · {paused} paused · {queued} queued",
+  "@downloadCenterSummary": {
+    "description": "Counts of active, paused and queued download tasks.",
+    "placeholders": {
+      "active": {
+        "type": "int"
+      },
+      "paused": {
+        "type": "int"
+      },
+      "queued": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadCenterNoTasks": "No download tasks yet",
+  "@downloadCenterNoTasks": {
+    "description": "Subtitle when the download center has no tasks."
+  },
+  "downloadCenterAllPause": "Pause all",
+  "@downloadCenterAllPause": {
+    "description": "Pause every active download."
+  },
+  "downloadCenterAllResume": "Resume all",
+  "@downloadCenterAllResume": {
+    "description": "Resume every paused download."
+  },
+  "downloadCenterAll": "All",
+  "@downloadCenterAll": {
+    "description": "Filter label for all download tasks."
+  },
+  "downloadCenterActive": "Active",
+  "@downloadCenterActive": {
+    "description": "Filter label for active download tasks."
+  },
+  "downloadCenterCompleted": "Completed",
+  "@downloadCenterCompleted": {
+    "description": "Filter and section label for completed downloads."
+  },
+  "downloadCenterFailed": "Failed",
+  "@downloadCenterFailed": {
+    "description": "Filter label for failed downloads."
+  },
+  "downloadCenterInProgress": "In progress",
+  "@downloadCenterInProgress": {
+    "description": "Section header for active downloads."
+  },
+  "downloadCenterNeedsAttention": "Needs attention",
+  "@downloadCenterNeedsAttention": {
+    "description": "Section header for failed downloads."
+  },
+  "downloadCenterOrderHint": "In queue order",
+  "@downloadCenterOrderHint": {
+    "description": "Hint for the active downloads section."
+  },
+  "downloadCenterQueueMemory": "Queue lives in memory",
+  "@downloadCenterQueueMemory": {
+    "description": "Hint for the active downloads section."
+  },
+  "downloadCenterCompletedHint": "Tap a title for details · Tap Open for an external reader",
+  "@downloadCenterCompletedHint": {
+    "description": "Hint for the completed downloads section."
+  },
+  "downloadCenterRemoveNote": "When removing a record you can also remove the local file; the queue lives in memory only and does not resume after exit.",
+  "@downloadCenterRemoveNote": {
+    "description": "Note under the completed download records."
+  },
+  "rangeResume": "Range resume",
+  "@rangeResume": {
+    "description": "Shown next to the downloaded/total bytes in the download hero."
+  },
+  "storagePathMessage": "Files are saved in {path}",
+  "@storagePathMessage": {
+    "description": "Shown on mobile when the user taps the storage folder action",
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadCenterRetryHint": "Retry keeps the downloaded part",
+  "@downloadCenterRetryHint": {
+    "description": "Micro copy for the failed downloads section."
+  },
+  "downloadCenterOpenHint": "Tap a title to view details",
+  "@downloadCenterOpenHint": {
+    "description": "Download center completed section hint"
+  },
+  "downloadCenterCurrentProgress": "Current progress",
+  "@downloadCenterCurrentProgress": {
+    "description": "Hero label for total download progress."
+  },
+  "downloadCenterSpeed": "Current speed",
+  "@downloadCenterSpeed": {
+    "description": "Hero label for the current download speed."
+  },
+  "downloadCenterRemaining": "Remaining",
+  "@downloadCenterRemaining": {
+    "description": "Hero label for the estimated remaining time."
+  },
+  "downloadCenterTodayCount": "Completed today: {count}",
+  "@downloadCenterTodayCount": {
+    "description": "Hero footer showing how many books finished today.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadCenterEtaSeconds": "{seconds}s left",
+  "@downloadCenterEtaSeconds": {
+    "description": "Estimated remaining time in seconds.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadCenterEtaMinutes": "{minutes} min left",
+  "@downloadCenterEtaMinutes": {
+    "description": "Estimated remaining time in minutes.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadCenterStorageSummary": "This month: {count} books · {size}",
+  "@downloadCenterStorageSummary": {
+    "description": "Monthly download storage summary.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadCenterStorageLegend": "EPUB {epub} · PDF {pdf}",
+  "@downloadCenterStorageLegend": {
+    "description": "Storage split between EPUB and PDF files.",
+    "placeholders": {
+      "epub": {
+        "type": "String"
+      },
+      "pdf": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadCenterRemoveRecord": "Remove record",
+  "@downloadCenterRemoveRecord": {
+    "description": "Menu action to remove a completed download record."
+  },
+  "downloadCenterRemoveRecordBody": "Only the record is removed; the local file stays in your download folder.",
+  "@downloadCenterRemoveRecordBody": {
+    "description": "Confirmation body for removing a download record."
+  },
+  "downloadCenterRemoveFile": "Also remove file",
+  "@downloadCenterRemoveFile": {
+    "description": "Checkbox in the remove-record dialog that also deletes the downloaded file."
+  },
+  "downloadCenterShowInFolder": "Show in folder",
+  "@downloadCenterShowInFolder": {
+    "description": "Menu action to reveal a downloaded file in the file manager."
+  },
+  "downloadCenterBookDetails": "Book details",
+  "@downloadCenterBookDetails": {
+    "description": "Menu action to open the book detail page."
+  },
+  "share": "Share",
+  "@share": {
+    "description": "Generic share action."
+  },
+  "downloadCenterEmptyTitle": "No downloads yet",
+  "@downloadCenterEmptyTitle": {
+    "description": "Empty state title in the download center."
+  },
+  "downloadCenterEmptyBody": "Tap Download on a book page and the task will appear here. Once it finishes, you can open it directly.",
+  "@downloadCenterEmptyBody": {
+    "description": "Empty state body in the download center."
+  },
+  "downloadCenterGoSearch": "Search books",
+  "@downloadCenterGoSearch": {
+    "description": "Empty state action that switches to the search tab."
+  },
+  "downloadCenterTip": "EPUB and PDF are supported. Pausing and resuming continues from the last byte.",
+  "@downloadCenterTip": {
+    "description": "Tip card shown in the download center empty state."
+  },
+  "downloadBook": "Download",
+  "@downloadBook": {
+    "description": "Download the book into the download center."
+  },
+  "homeTitle": "Discover",
+  "@homeTitle": {
+    "description": "Home page title"
+  },
+  "homeEyebrow": "Discover books",
+  "@homeEyebrow": {
+    "description": "Small label above the home page title"
+  },
+  "browseEyebrow": "Browse",
+  "@browseEyebrow": {
+    "description": "Small label above the categories title"
+  },
+  "searchEyebrow": "Search sources",
+  "@searchEyebrow": {
+    "description": "Small label above the search page title"
+  },
+  "downloadEyebrow": "Local storage",
+  "@downloadEyebrow": {
+    "description": "Small label above the download center title"
+  },
+  "settingsEyebrow": "Preferences",
+  "@settingsEyebrow": {
+    "description": "Small label above the settings title"
+  },
+  "trendingSource": "Goodreads list",
+  "@trendingSource": {
+    "description": "Hint on the weekly trending section"
+  },
+  "categoryCount": "{count} categories",
+  "@categoryCount": {
+    "description": "Number of categories in the browse shortcut section",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "categorySearchHint": "Search within categories",
+  "@categorySearchHint": {
+    "description": "Search field hint when the categories tab is selected"
+  },
+  "categoryInfoHint": "Categories come from the SLUM catalog and stay available offline for 24 hours.",
+  "@categoryInfoHint": {
+    "description": "Hint at the bottom of the categories tab"
+  },
+  "searchSourcesIntro": "All four sources are queried in parallel. Disabled sources are skipped; mirror addresses come from the SLUM catalog.",
+  "@searchSourcesIntro": {
+    "description": "Intro paragraph on the search sources settings tab"
+  },
+  "sourceOn": "Enabled",
+  "@sourceOn": {
+    "description": "Footer label for an enabled search source"
+  },
+  "sourceOff": "Disabled",
+  "@sourceOff": {
+    "description": "Footer label for a disabled search source"
+  },
+  "mirrorsShort": "Mirrors",
+  "@mirrorsShort": {
+    "description": "Link on a source card that opens the mirrors page"
+  },
+  "mirrorNodeCount": "{count} nodes",
+  "@mirrorNodeCount": {
+    "description": "Number of mirror nodes for one service",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "refreshMirrors": "Refresh mirrors",
+  "@refreshMirrors": {
+    "description": "Toolbar action that re-syncs the mirror list"
+  },
+  "sourceBehaviorSection": "Source behavior",
+  "@sourceBehaviorSection": {
+    "description": "Settings group for mirror and source behavior"
+  },
+  "displaySection": "Display",
+  "@displaySection": {
+    "description": "Appearance settings group for typography"
+  },
+  "currentLanguage": "Current language",
+  "@currentLanguage": {
+    "description": "Subtitle on the selected language row"
+  },
+  "behaviorSection": "Behavior",
+  "@behaviorSection": {
+    "description": "Advanced settings group for downloads and verification"
+  },
+  "infoSection": "Information",
+  "@infoSection": {
+    "description": "About tab group for changelog, licenses and links"
+  },
+  "thanksSection": "Acknowledgements",
+  "@thanksSection": {
+    "description": "About tab group for third-party credits"
+  },
+  "changelogTitle": "Changelog",
+  "@changelogTitle": {
+    "description": "About tab row that opens the release notes"
+  },
+  "openSourceLicenses": "Open-source licenses",
+  "@openSourceLicenses": {
+    "description": "About tab row that opens the license list"
+  },
+  "projectHome": "Project home",
+  "@projectHome": {
+    "description": "About tab row that opens the GitHub project"
+  },
+  "slumCatalogue": "SLUM mirror catalog",
+  "@slumCatalogue": {
+    "description": "Acknowledgement row for the mirror catalog"
+  },
+  "slumCatalogueSubtitle": "open-slum.org",
+  "@slumCatalogueSubtitle": {
+    "description": "Subtitle for the SLUM acknowledgement row"
+  },
+  "challengeSolverTitle": "Challenge solver",
+  "@challengeSolverTitle": {
+    "description": "Acknowledgement row for the verification solver"
+  },
+  "challengeSolverSubtitle": "WebView manual verification fallback",
+  "@challengeSolverSubtitle": {
+    "description": "Subtitle for the verification solver acknowledgement"
+  },
+  "aboutDisclaimer": "No book content is hosted here; only mirror search and downloads. Please support the authors.",
+  "@aboutDisclaimer": {
+    "description": "Footer disclaimer on the about tab"
+  },
+  "maintenanceSection": "Maintenance",
+  "@maintenanceSection": {
+    "description": "About tab group for onboarding reset and logs"
+  },
+  "languageCardHint": "Interface language, applied immediately",
+  "@languageCardHint": {
+    "description": "Appearance card: language description"
+  },
+  "themeCardHint": "Follow the system, or always light or dark",
+  "@themeCardHint": {
+    "description": "Appearance card: theme description"
+  },
+  "fontSizeCardHint": "Applies to text across the app",
+  "@fontSizeCardHint": {
+    "description": "Appearance card: font size description"
+  },
+  "fontPreviewSample": "A room without books is a body without a soul.",
+  "@fontPreviewSample": {
+    "description": "Sample sentence in the font size preview"
+  },
+  "themeFollowSystemShort": "System",
+  "@themeFollowSystemShort": {
+    "description": "Theme option label: follow the system"
+  },
+  "themeLightShort": "Light",
+  "@themeLightShort": {
+    "description": "Theme option label: light"
+  },
+  "themeDarkShort": "Dark",
+  "@themeDarkShort": {
+    "description": "Theme option label: dark"
+  },
+  "sourceAllSearchedHint": "All four sources are searched at once. Tap a source to switch results.",
+  "@sourceAllSearchedHint": {
+    "description": "Results source card: explains all sources are searched in parallel and tapping switches results"
+  },
+  "tapToExpandLanguage": "Tap to choose a language",
+  "@tapToExpandLanguage": {
+    "description": "Language card row affordance"
+  },
+  "tapToCollapseLanguage": "Tap to collapse",
+  "@tapToCollapseLanguage": {
+    "description": "Language card row affordance"
+  },
+  "sourceStatusSearching": "Searching…",
+  "@sourceStatusSearching": {
+    "description": "Source tile status while a parallel search is still running"
+  },
+  "verificationPageLoading": "Loading the verification page. The app will continue automatically.",
+  "@verificationPageLoading": {
+    "description": "Visible verification page copy"
+  },
+  "verificationPageInstructions": "Complete the check below; the app will continue automatically.",
+  "@verificationPageInstructions": {
+    "description": "Visible verification page copy"
   }
 }

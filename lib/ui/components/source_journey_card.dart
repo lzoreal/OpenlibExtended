@@ -107,7 +107,7 @@ class _SourcePill extends StatelessWidget {
           onTap: onTap,
           customBorder: const StadiumBorder(),
           child: SizedBox(
-            height: 32,
+            height: 34,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
@@ -158,8 +158,8 @@ class _Dot extends StatelessWidget {
       _PillDot.off => scheme.outlineVariant,
     };
     return Container(
-      width: 8,
-      height: 8,
+      width: 7,
+      height: 7,
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,

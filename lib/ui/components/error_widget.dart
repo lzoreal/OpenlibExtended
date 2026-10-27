@@ -16,6 +16,46 @@ import 'package:openlib/services/logger.dart';
 import 'package:openlib/services/platform_utils.dart';
 import 'package:openlib/ui/challenge_solver_page.dart';
 
+String _networkErrorTitle(AppLocalizations l10n, NetworkError error) {
+  return switch (error.kind) {
+    NetworkErrorKind.bookNotFound => l10n.networkErrorBookNotFoundTitle,
+    NetworkErrorKind.bookDetailsUnavailable =>
+      l10n.networkErrorBookDetailsUnavailableTitle,
+    NetworkErrorKind.generic => switch (error.type) {
+        NetworkErrorType.noInternet => l10n.networkErrorNoInternetTitle,
+        NetworkErrorType.cloudflareBlock => l10n.networkErrorCloudflareTitle,
+        NetworkErrorType.serverUnavailable =>
+          l10n.networkErrorServerUnavailableTitle,
+        NetworkErrorType.timeout => l10n.networkErrorTimeoutTitle,
+        NetworkErrorType.forbidden => l10n.networkErrorForbiddenTitle,
+        NetworkErrorType.rateLimited => l10n.networkErrorRateLimitedTitle,
+        NetworkErrorType.sslError => l10n.networkErrorSslTitle,
+        NetworkErrorType.dnsError => l10n.networkErrorDnsTitle,
+        NetworkErrorType.unknown => l10n.networkErrorUnknownTitle,
+      },
+  };
+}
+
+String _networkErrorSolution(AppLocalizations l10n, NetworkError error) {
+  return switch (error.kind) {
+    NetworkErrorKind.bookNotFound => l10n.networkErrorBookNotFoundSolution,
+    NetworkErrorKind.bookDetailsUnavailable =>
+      l10n.networkErrorBookDetailsUnavailableSolution,
+    NetworkErrorKind.generic => switch (error.type) {
+        NetworkErrorType.noInternet => l10n.networkErrorNoInternetSolution,
+        NetworkErrorType.cloudflareBlock => l10n.networkErrorCloudflareSolution,
+        NetworkErrorType.serverUnavailable =>
+          l10n.networkErrorServerUnavailableSolution,
+        NetworkErrorType.timeout => l10n.networkErrorTimeoutSolution,
+        NetworkErrorType.forbidden => l10n.networkErrorForbiddenSolution,
+        NetworkErrorType.rateLimited => l10n.networkErrorRateLimitedSolution,
+        NetworkErrorType.sslError => l10n.networkErrorSslSolution,
+        NetworkErrorType.dnsError => l10n.networkErrorDnsSolution,
+        NetworkErrorType.unknown => l10n.networkErrorUnknownSolution,
+      },
+  };
+}
+
 class CustomErrorWidget extends StatelessWidget {
   final Object error;
   final StackTrace stackTrace;
@@ -102,7 +142,7 @@ class CustomErrorWidget extends StatelessWidget {
       case NetworkErrorType.cloudflareBlock:
       case NetworkErrorType.forbidden:
         assetPath = "assets/error_fixing_bugs.svg";
-        iconColor = Colors.orange;
+        iconColor = Theme.of(context).colorScheme.tertiary;
         break;
       case NetworkErrorType.timeout:
       case NetworkErrorType.serverUnavailable:
@@ -126,45 +166,47 @@ class CustomErrorWidget extends StatelessWidget {
 
   // Build error title with icon indicator
   Widget _buildErrorTitle(BuildContext context, NetworkError networkError) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
     IconData iconData;
     Color iconColor;
 
     switch (networkError.type) {
       case NetworkErrorType.noInternet:
         iconData = Icons.wifi_off_rounded;
-        iconColor = Colors.red;
+        iconColor = scheme.error;
         break;
       case NetworkErrorType.cloudflareBlock:
         iconData = Icons.shield_rounded;
-        iconColor = Colors.orange;
+        iconColor = scheme.tertiary;
         break;
       case NetworkErrorType.forbidden:
         iconData = Icons.block_rounded;
-        iconColor = Colors.red;
+        iconColor = scheme.error;
         break;
       case NetworkErrorType.timeout:
         iconData = Icons.timer_off_rounded;
-        iconColor = Colors.amber;
+        iconColor = scheme.tertiary;
         break;
       case NetworkErrorType.serverUnavailable:
         iconData = Icons.cloud_off_rounded;
-        iconColor = Colors.grey;
+        iconColor = scheme.onSurfaceVariant;
         break;
       case NetworkErrorType.rateLimited:
         iconData = Icons.speed_rounded;
-        iconColor = Colors.orange;
+        iconColor = scheme.tertiary;
         break;
       case NetworkErrorType.dnsError:
         iconData = Icons.dns_rounded;
-        iconColor = Colors.purple;
+        iconColor = scheme.secondary;
         break;
       case NetworkErrorType.sslError:
         iconData = Icons.lock_open_rounded;
-        iconColor = Colors.red;
+        iconColor = scheme.error;
         break;
       default:
         iconData = Icons.error_outline_rounded;
-        iconColor = Colors.red;
+        iconColor = scheme.error;
     }
 
     return Column(
@@ -172,13 +214,9 @@ class CustomErrorWidget extends StatelessWidget {
         Icon(iconData, size: 48, color: iconColor),
         const SizedBox(height: 12),
         Text(
-          networkError.userMessage,
+          _networkErrorTitle(l10n, networkError),
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
+          style: Theme.of(context).textTheme.headlineSmall,
         ),
       ],
     );
@@ -186,87 +224,75 @@ class CustomErrorWidget extends StatelessWidget {
 
   // Build solution card with actionable advice
   Widget _buildSolutionCard(BuildContext context, NetworkError networkError) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.grey[850]
-            : _getBackgroundColorForType(networkError.type),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _getBorderColorForType(networkError.type),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.lightbulb_outline_rounded,
-                color: _getAccentColorForType(networkError.type),
-                size: 24,
-              ),
-              const SizedBox(width: 8),
+    return Card(
+      color: scheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.lightbulb_outline_rounded,
+                  color: scheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.errorWhatToDo,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: scheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _networkErrorSolution(l10n, networkError),
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
+            ),
+            // Challenge solving failed invisibly on this device: point at
+            // the background-verification toggle in settings.
+            if (networkError.type == NetworkErrorType.cloudflareBlock) ...[
+              const SizedBox(height: 12),
               Text(
-                "What to do",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _getAccentColorForType(networkError.type),
+                AppLocalizations.of(context).backgroundVerificationFix,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.tertiary,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            networkError.solution,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: isDark ? Colors.grey[300] : Colors.grey[800],
-            ),
-          ),
-          // Challenge solving failed invisibly on this device: point at
-          // the background-verification toggle in settings.
-          if (networkError.type == NetworkErrorType.cloudflareBlock) ...[
-            const SizedBox(height: 12),
-            Text(
-              AppLocalizations.of(context).backgroundVerificationFix,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.4,
-                color: isDark ? Colors.orange[200] : Colors.orange[800],
-              ),
-            ),
+            // Show VPN recommendation prominently for blocked content
+            if (networkError.type == NetworkErrorType.cloudflareBlock ||
+                networkError.type == NetworkErrorType.dnsError ||
+                networkError.type == NetworkErrorType.forbidden) ...[
+              const SizedBox(height: 16),
+              _buildVpnRecommendation(context),
+            ],
           ],
-          // Show VPN recommendation prominently for blocked content
-          if (networkError.type == NetworkErrorType.cloudflareBlock ||
-              networkError.type == NetworkErrorType.dnsError ||
-              networkError.type == NetworkErrorType.forbidden) ...[
-            const SizedBox(height: 16),
-            _buildVpnRecommendation(context),
-          ],
-        ],
+        ),
       ),
     );
   }
 
   // Build VPN recommendation banner
   Widget _buildVpnRecommendation(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withAlpha(30),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withAlpha(80)),
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          const Icon(Icons.vpn_key_rounded, color: Colors.blue, size: 32),
+          Icon(Icons.vpn_key_rounded, color: scheme.onSecondaryContainer),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -274,18 +300,15 @@ class CustomErrorWidget extends StatelessWidget {
               children: [
                 Text(
                   AppLocalizations.of(context).tryUsingVpn,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.blue,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: scheme.onSecondaryContainer,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "A VPN can help bypass regional blocks and access the content.",
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.blue[800],
+                  AppLocalizations.of(context).errorVpnDescription,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSecondaryContainer,
                   ),
                 ),
               ],
@@ -299,18 +322,10 @@ class CustomErrorWidget extends StatelessWidget {
   // Build refresh button
   Widget _buildRefreshButton(BuildContext context) {
     return Center(
-      child: ElevatedButton.icon(
+      child: FilledButton.icon(
         onPressed: onRefresh,
         icon: const Icon(Icons.refresh_rounded),
         label: Text(AppLocalizations.of(context).tryAgain),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.secondary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-        ),
       ),
     );
   }
@@ -322,11 +337,7 @@ class CustomErrorWidget extends StatelessWidget {
       child: TextButton.icon(
         onPressed: () => _showDetailsDialog(context, networkError),
         icon: const Icon(Icons.info_outline_rounded, size: 18),
-        label: Text(
-            AppLocalizations.of(context).showBlockedContent),
-        style: TextButton.styleFrom(
-          foregroundColor: Colors.grey[600],
-        ),
+        label: Text(AppLocalizations.of(context).showBlockedContent),
       ),
     );
   }
@@ -334,18 +345,10 @@ class CustomErrorWidget extends StatelessWidget {
   // Build open in browser button for DDoS/Captcha challenges
   Widget _buildOpenBrowserButton(BuildContext context) {
     return Center(
-      child: ElevatedButton.icon(
+      child: FilledButton.tonalIcon(
         onPressed: () => _openInBrowser(context),
         icon: const Icon(Icons.open_in_browser_rounded),
         label: Text(AppLocalizations.of(context).verifyInBrowser),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-        ),
       ),
     );
   }
@@ -354,17 +357,22 @@ class CustomErrorWidget extends StatelessWidget {
   void _openInBrowser(BuildContext context) {
     final networkError = _parseError(error);
     final targetUrl = networkError.blockedUrl;
-    
+    final l10n = AppLocalizations.of(context);
+
     // Show dialog with embedded and system browser options
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.security_rounded, color: Colors.orange),
+            Icon(
+              Icons.security_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(width: 12),
-            Text(AppLocalizations.of(context)
-                .manualVerificationRequired),
+            Flexible(
+              child: Text(l10n.manualVerificationRequired),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -373,28 +381,31 @@ class CustomErrorWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "The site is asking you to verify that you're human. We'll open a browser window where you can complete the verification.",
+                l10n.errorVerificationPrompt,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_rounded, color: Colors.blue[700]),
+                    Icon(
+                      Icons.info_rounded,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        "Once you complete the verification, return to the app and tap 'Try Again'.",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue[700],
-                        ),
+                        l10n.errorVerificationReturn,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSecondaryContainer,
+                            ),
                       ),
                     ),
                   ],
@@ -416,21 +427,16 @@ class CustomErrorWidget extends StatelessWidget {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               },
               icon: const Icon(Icons.language),
-              label: Text(
-                  AppLocalizations.of(context).systemBrowser),
+              label: Text(AppLocalizations.of(context).systemBrowser),
             ),
-          ElevatedButton.icon(
+          FilledButton.icon(
             onPressed: () {
               Navigator.pop(context);
               // Trigger webview for verification
               _triggerBrowserVerification(context);
             },
             icon: const Icon(Icons.open_in_browser),
-            label: Text(
-                AppLocalizations.of(context).embeddedBrowser),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-            ),
+            label: Text(AppLocalizations.of(context).embeddedBrowser),
           ),
         ],
       ),
@@ -448,8 +454,7 @@ class CustomErrorWidget extends StatelessWidget {
     if (targetUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)
-              .unableToOpenVerification),
+          content: Text(AppLocalizations.of(context).unableToOpenVerification),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -468,8 +473,7 @@ class CustomErrorWidget extends StatelessWidget {
         }
       });
     } else {
-      launchUrl(Uri.parse(targetUrl),
-          mode: LaunchMode.externalApplication);
+      launchUrl(Uri.parse(targetUrl), mode: LaunchMode.externalApplication);
     }
   }
 
@@ -482,8 +486,7 @@ class CustomErrorWidget extends StatelessWidget {
           children: [
             const Icon(Icons.code_rounded, size: 24),
             const SizedBox(width: 8),
-            Text(AppLocalizations.of(context)
-                .blockedPageContent),
+            Text(AppLocalizations.of(context).blockedPageContent),
           ],
         ),
         content: SizedBox(
@@ -495,10 +498,12 @@ class CustomErrorWidget extends StatelessWidget {
               children: [
                 if (networkError.technicalDetails != null) ...[
                   Text(
-                    "Error: ${networkError.technicalDetails}",
+                    AppLocalizations.of(context)
+                        .errorLabel(networkError.technicalDetails!),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontSize: 14,
+                      height: 1.429,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -506,15 +511,17 @@ class CustomErrorWidget extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: SelectableText(
-                    _formatResponseBody(
-                        networkError.rawResponseBody ?? "No content available"),
+                    _formatResponseBody(networkError.rawResponseBody ??
+                        AppLocalizations.of(context).errorNoContent),
                     style: const TextStyle(
                       fontFamily: "monospace",
                       fontSize: 11,
+                      height: 1.455,
                     ),
                   ),
                 ),
@@ -530,8 +537,8 @@ class CustomErrorWidget extends StatelessWidget {
               ));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                    content: Text(
-                        AppLocalizations.of(context).copiedToClipboard)),
+                    content:
+                        Text(AppLocalizations.of(context).copiedToClipboard)),
               );
             },
             child: Text(AppLocalizations.of(context).copy),
@@ -553,59 +560,6 @@ class CustomErrorWidget extends StatelessWidget {
     }
     return body;
   }
-
-  // Get background color based on error type
-  Color _getBackgroundColorForType(NetworkErrorType type) {
-    switch (type) {
-      case NetworkErrorType.cloudflareBlock:
-      case NetworkErrorType.forbidden:
-        return Colors.orange.withAlpha(25);
-      case NetworkErrorType.noInternet:
-      case NetworkErrorType.dnsError:
-        return Colors.red.withAlpha(20);
-      case NetworkErrorType.timeout:
-      case NetworkErrorType.rateLimited:
-        return Colors.amber.withAlpha(25);
-      case NetworkErrorType.serverUnavailable:
-        return Colors.grey.withAlpha(30);
-      default:
-        return Colors.grey.withAlpha(25);
-    }
-  }
-
-  // Get border color based on error type
-  Color _getBorderColorForType(NetworkErrorType type) {
-    switch (type) {
-      case NetworkErrorType.cloudflareBlock:
-      case NetworkErrorType.forbidden:
-        return Colors.orange.withAlpha(60);
-      case NetworkErrorType.noInternet:
-      case NetworkErrorType.dnsError:
-        return Colors.red.withAlpha(50);
-      case NetworkErrorType.timeout:
-      case NetworkErrorType.rateLimited:
-        return Colors.amber.withAlpha(60);
-      default:
-        return Colors.grey.withAlpha(50);
-    }
-  }
-
-  // Get accent color based on error type
-  Color _getAccentColorForType(NetworkErrorType type) {
-    switch (type) {
-      case NetworkErrorType.cloudflareBlock:
-      case NetworkErrorType.forbidden:
-        return Colors.orange[700]!;
-      case NetworkErrorType.noInternet:
-      case NetworkErrorType.dnsError:
-        return Colors.red[700]!;
-      case NetworkErrorType.timeout:
-      case NetworkErrorType.rateLimited:
-        return Colors.amber[800]!;
-      default:
-        return Colors.grey[700]!;
-    }
-  }
 }
 
 // Simple error snackbar for quick inline errors
@@ -614,6 +568,7 @@ class ErrorSnackbar {
       {VoidCallback? onRetry}) {
     final networkError =
         error is NetworkError ? error : NetworkError.fromException(error);
+    final l10n = AppLocalizations.of(context);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -622,19 +577,19 @@ class ErrorSnackbar {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              networkError.userMessage,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              _networkErrorTitle(l10n, networkError),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 4),
             Text(
-              networkError.solution.split("\n").first,
-              style: const TextStyle(fontSize: 12),
+              _networkErrorSolution(l10n, networkError),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
         action: onRetry != null
             ? SnackBarAction(
-                label: "Retry",
+                label: l10n.retry,
                 onPressed: onRetry,
               )
             : null,

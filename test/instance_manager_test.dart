@@ -71,25 +71,26 @@ void main() {
 
   group('mirror source', () {
     test('every mirror URL is the one open-slum.org publishes', () async {
-      final views = await manager.instances(MirrorService.zlibrary,
-          force: true);
+      final views =
+          await manager.instances(MirrorService.zlibrary, force: true);
 
       // From test/fixtures/slum_zlibrary.html.
-      expect(views.map((v) => v.url), containsAll([
-        'https://z-library.sk',
-        'https://1lib.sk',
-        'https://z-lib.gl',
-        'https://z-lib.gd',
-        'https://go-to-library.sk',
-        'https://library-access.sk',
-      ]));
+      expect(
+          views.map((v) => v.url),
+          containsAll([
+            'https://z-library.sk',
+            'https://1lib.sk',
+            'https://z-lib.gl',
+            'https://z-lib.gd',
+            'https://go-to-library.sk',
+            'https://library-access.sk',
+          ]));
       expect(views.map((v) => v.host), isNot(contains('welib.org')),
           reason: 'welib is its own service');
     });
 
     test('welib mirrors come from the "other" page', () async {
-      final urls = await manager.enabledUrls(MirrorService.welib,
-          force: true);
+      final urls = await manager.enabledUrls(MirrorService.welib, force: true);
       expect(urls, ['https://welib.org']);
     });
   });
@@ -97,16 +98,14 @@ void main() {
   group('down mirrors', () {
     test('are never handed to a provider', () async {
       // The libgen fixture has four mirrors DOWN and one degraded.
-      final urls = await manager.enabledUrls(MirrorService.libgen,
-          force: true);
+      final urls = await manager.enabledUrls(MirrorService.libgen, force: true);
 
       expect(urls, ['https://libgen.la'],
           reason: 'only the degraded mirror may be contacted');
     });
 
     test('are still listed for the UI, with status and protection', () async {
-      final views =
-          await manager.instances(MirrorService.libgen, force: true);
+      final views = await manager.instances(MirrorService.libgen, force: true);
 
       expect(views, hasLength(5));
       final down = views.where((v) => v.isDown).toList();
@@ -115,10 +114,8 @@ void main() {
     });
 
     test('sort last even when their protection is easier', () async {
-      final views =
-          await manager.instances(MirrorService.libgen, force: true);
-      final firstDown =
-          views.indexWhere((v) => v.isDown);
+      final views = await manager.instances(MirrorService.libgen, force: true);
+      final firstDown = views.indexWhere((v) => v.isDown);
       final lastUp = views.lastIndexWhere((v) => !v.isDown);
       expect(lastUp, lessThan(firstDown),
           reason: 'all attemptable mirrors come before any down one');
@@ -131,8 +128,8 @@ void main() {
     });
 
     test('orders DiamWall mirrors before the browser-only gates', () async {
-      final urls = await manager.enabledUrls(MirrorService.zlibrary,
-          force: true);
+      final urls =
+          await manager.enabledUrls(MirrorService.zlibrary, force: true);
 
       // DiamWall gates come first because the app solves their proof of
       // work in-process; Cloudflare needs a browser.
@@ -160,8 +157,8 @@ void main() {
     });
 
     test('headlessOnly drops mirrors a plain client can never pass', () async {
-      final all = await manager.enabledUrls(MirrorService.zlibrary,
-          force: true);
+      final all =
+          await manager.enabledUrls(MirrorService.zlibrary, force: true);
       final headless = await manager.enabledUrls(MirrorService.zlibrary,
           force: true, headlessOnly: true);
 
@@ -180,8 +177,8 @@ void main() {
     test('a switched-off mirror disappears from the provider list', () async {
       await manager.setEnabled(MirrorService.zlibrary, 'z-lib.gd', false);
 
-      final urls = await manager.enabledUrls(MirrorService.zlibrary,
-          force: true);
+      final urls =
+          await manager.enabledUrls(MirrorService.zlibrary, force: true);
       expect(urls, isNot(contains('https://z-lib.gd')));
       expect(urls, contains('https://z-lib.gl'));
     });
@@ -219,8 +216,8 @@ void main() {
 
     test('move() shifts a mirror one slot in the manual order', () async {
       await manager.setAutoMode(false);
-      final before = await manager.instances(MirrorService.zlibrary,
-          force: true);
+      final before =
+          await manager.instances(MirrorService.zlibrary, force: true);
       final moving = before[1].host;
 
       await manager.move(MirrorService.zlibrary, moving, -1);
@@ -228,6 +225,69 @@ void main() {
       final after =
           await manager.instances(MirrorService.zlibrary, force: true);
       expect(after[0].host, moving);
+    });
+  });
+
+  group('local latency', () {
+    test('persists readings across manager instances', () async {
+      final testedAt = DateTime.utc(2026, 10, 27, 12);
+      await manager.saveLocalLatencies(
+        {'z-lib.gd': 85, 'z-lib.gl': null},
+        testedAt: testedAt,
+      );
+
+      final second = InstanceManager.forTest(
+        catalogue: SlumCatalogue(
+          store: store,
+          baseUrl: 'http://127.0.0.1:${server.port}',
+        ),
+        store: store,
+      );
+      final readings = await second.localLatencies();
+
+      expect(readings['z-lib.gd']?.milliseconds, 85);
+      expect(readings['z-lib.gd']?.testedAt, testedAt);
+      expect(readings['z-lib.gl']?.milliseconds, isNull,
+          reason: 'a timeout is a reading, not a missing entry');
+    });
+
+    test('fresh local latency becomes the primary order', () async {
+      final before =
+          await manager.instances(MirrorService.zlibrary, force: true);
+      final moved = before.lastWhere((view) => !view.isDown).host;
+
+      await manager.saveLocalLatencies({moved: 1});
+
+      final after =
+          await manager.instances(MirrorService.zlibrary, force: true);
+
+      expect(after.first.host, moved,
+          reason: 'a measured mirror moves ahead of every unmeasured one');
+      expect(after.first.site.protection, Protection.cloudflare,
+          reason: 'local speed outranks protection difficulty once measured');
+    });
+
+    test('a reading older than 24 hours is shown but does not reorder',
+        () async {
+      final before = await manager
+          .instances(MirrorService.zlibrary, force: true)
+          .then((views) => views.map((view) => view.host).toList());
+      final moved = (await manager.instances(MirrorService.zlibrary)).last.host;
+
+      await manager.saveLocalLatencies(
+        {moved: 1},
+        testedAt: DateTime.now().subtract(const Duration(hours: 25)),
+      );
+
+      final after = await manager
+          .instances(MirrorService.zlibrary, force: true)
+          .then((views) => views.map((view) => view.host).toList());
+      final readings = await manager.localLatencies();
+
+      expect(after, before);
+      expect(readings[moved]?.milliseconds, 1,
+          reason: 'the UI still shows stale readings');
+      expect(readings[moved]?.isFreshAt(DateTime.now()), isFalse);
     });
   });
 }

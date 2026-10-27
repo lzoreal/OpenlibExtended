@@ -32,5 +32,26 @@ void main() {
     expect(label.fontSize, 10);
     expect(label.height, closeTo(16 / 10, 0.0001));
     expect(label.fontWeight, FontWeight.w700);
+    expect(find.byIcon(Icons.home), findsOneWidget);
+  });
+
+  testWidgets('bottom navigation grows with 200% text scale', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: Scaffold(
+          bottomNavigationBar: BottomNavBar(
+            selectedIndex: 0,
+            onSelected: (_) {},
+            downloadCount: 0,
+          ),
+        ),
+      ),
+    ));
+
+    expect(tester.getSize(find.byType(BottomNavBar)).height, 88);
   });
 }

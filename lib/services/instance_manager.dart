@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 // Project imports:
 import 'package:openlib/services/logger.dart';
+import 'package:openlib/services/mirror_latency.dart';
 import 'package:openlib/services/preference_store.dart';
 import 'package:openlib/services/slum_catalogue.dart';
 
@@ -41,7 +42,8 @@ class MirrorRefreshResult {
   final List<String> changes;
   final bool hasMirrorList;
 
-  const MirrorRefreshResult({required this.changes, required this.hasMirrorList});
+  const MirrorRefreshResult(
+      {required this.changes, required this.hasMirrorList});
 }
 
 /// Decides **which mirrors the app may talk to, and in what order**.
@@ -81,6 +83,7 @@ class InstanceManager {
   static const String _autoModeKey = 'instance_auto_mode';
   static const String _orderKey = 'instance_manual_order';
   static const String _disabledKey = 'instance_disabled_hosts';
+  static const String _localLatencyKey = 'instance_local_latency';
 
   /// Auto mode is the default: the user asked for the app to pick the
   /// easiest mirror itself and only reorder by hand if they opt in.
@@ -129,7 +132,8 @@ class InstanceManager {
     return (map[service.name] ?? const []).toSet();
   }
 
-  Future<void> setEnabled(MirrorService service, String host, bool enabled) async {
+  Future<void> setEnabled(
+      MirrorService service, String host, bool enabled) async {
     final map = await _readHostMap(_disabledKey);
     final list = map[service.name] ?? <String>[];
     if (enabled) {
@@ -175,6 +179,50 @@ class InstanceManager {
   // The mirror list itself.
   // ------------------------------------------------------------------
 
+  /// Locally measured latencies, keyed by host. Stale entries are kept:
+  /// the UI shows them with an "expired" label while ordering ignores them.
+  Future<Map<String, MirrorLatencyReading>> localLatencies() async {
+    try {
+      final raw = await _store?.read(_localLatencyKey);
+      if (raw is! String || raw.isEmpty) return {};
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      final readings = <String, MirrorLatencyReading>{};
+      for (final entry in decoded.entries) {
+        final reading = MirrorLatencyReading.fromJson(entry.value);
+        if (reading != null) readings['${entry.key}'] = reading;
+      }
+      return readings;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Merges a test run into the persisted readings. A null value records
+  /// that the host was tested and timed out; it is not the same as a host
+  /// that was never tested.
+  Future<void> saveLocalLatencies(
+    Map<String, int?> results, {
+    DateTime? testedAt,
+  }) async {
+    final store = _store;
+    if (store == null || results.isEmpty) return;
+    final readings = await localLatencies();
+    final stamp = testedAt ?? DateTime.now();
+    for (final entry in results.entries) {
+      readings[entry.key] = MirrorLatencyReading(
+        milliseconds: entry.value,
+        testedAt: stamp,
+      );
+    }
+    await store.write(
+      _localLatencyKey,
+      jsonEncode({
+        for (final entry in readings.entries) entry.key: entry.value.toJson(),
+      }),
+    );
+  }
+
   /// Every mirror of [service] in display order, including down and
   /// disabled ones, each with the user's enabled flag.
   ///
@@ -183,7 +231,18 @@ class InstanceManager {
   Future<List<InstanceView>> instances(MirrorService service,
       {bool force = false}) async {
     final sites = await _catalogue.sites(service, force: force);
-    final ordered = SlumCatalogue.sortAuto(sites);
+    final now = DateTime.now();
+    final freshLocalLatency = <String, int>{};
+    for (final entry in (await localLatencies()).entries) {
+      final milliseconds = entry.value.milliseconds;
+      if (milliseconds != null && entry.value.isFreshAt(now)) {
+        freshLocalLatency[entry.key] = milliseconds;
+      }
+    }
+    final ordered = SlumCatalogue.sortAuto(
+      sites,
+      localLatencyMs: freshLocalLatency,
+    );
 
     final auto = await isAutoMode();
     final List<SlumSite> finalOrder;

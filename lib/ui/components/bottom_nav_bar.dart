@@ -22,10 +22,14 @@ class BottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    final labelHeight = MediaQuery.textScalerOf(context).scale(16);
+    final barHeight = labelHeight + 56 < SwissGrid.navbar
+        ? SwissGrid.navbar
+        : labelHeight + 56;
     final items = [
       (
-        icon: Icons.explore_outlined,
-        selectedIcon: Icons.explore,
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
         label: l10n.homeTitle,
         badge: null,
       ),
@@ -59,7 +63,7 @@ class BottomNavBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: SwissGrid.navbar,
+          height: barHeight,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: Row(

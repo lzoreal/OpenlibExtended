@@ -24,9 +24,14 @@ enum NetworkErrorType {
   unknown,
 }
 
+/// Provider-specific failures that need their own wording rather than the
+/// generic per-type network message.
+enum NetworkErrorKind { generic, bookNotFound, bookDetailsUnavailable }
+
 // Holds parsed error info with user-friendly message and solution
 class NetworkError implements Exception {
   final NetworkErrorType type;
+  final NetworkErrorKind kind;
   final String userMessage;
   final String solution;
   final String? technicalDetails;
@@ -37,6 +42,7 @@ class NetworkError implements Exception {
     required this.type,
     required this.userMessage,
     required this.solution,
+    this.kind = NetworkErrorKind.generic,
     this.technicalDetails,
     this.rawResponseBody,
     this.blockedUrl,

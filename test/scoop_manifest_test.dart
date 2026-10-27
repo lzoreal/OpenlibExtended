@@ -48,7 +48,7 @@ void main() {
 
     final bits = arch['64bit'] as Map<String, dynamic>;
     expect(bits['url'] as String,
-        startsWith('https://github.com/warreth/OpenlibExtended/releases/'));
+        startsWith('https://github.com/lzoreal/OpenlibExtended/releases/'));
 
     final hash = bits['hash'] as String;
     expect(RegExp(r'^[0-9a-f]{64}$').hasMatch(hash), isTrue,
@@ -77,7 +77,7 @@ void main() {
   test('checkver tracks the GitHub releases feed', () {
     final checkver = manifest['checkver'] as Map<String, dynamic>;
     expect(checkver['url'] as String,
-        'https://github.com/warreth/OpenlibExtended/releases.atom');
+        'https://github.com/lzoreal/OpenlibExtended/releases.atom');
     expect((checkver['regex'] as String).isNotEmpty, isTrue);
   });
 

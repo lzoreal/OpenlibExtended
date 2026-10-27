@@ -943,15 +943,15 @@ class _LoadingSourcePill extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        height: 32,
+        height: 34,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 decoration: BoxDecoration(
                   color: selected ? scheme.onPrimary : Colors.transparent,
                   shape: BoxShape.circle,

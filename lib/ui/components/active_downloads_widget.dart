@@ -26,29 +26,6 @@ class ActiveDownloadsWidget extends ConsumerWidget {
     return '${size.toStringAsFixed(decimals)}${suffixes[i]}';
   }
 
-  String _getStatusText(DownloadStatus status) {
-    switch (status) {
-      case DownloadStatus.queued:
-        return 'Queued';
-      case DownloadStatus.fetchingMirrors:
-        return 'Getting mirrors...';
-      case DownloadStatus.downloadingMirrors:
-        return 'Finding mirror...';
-      case DownloadStatus.downloading:
-        return 'Downloading';
-      case DownloadStatus.paused:
-        return 'Paused';
-      case DownloadStatus.verifying:
-        return 'Verifying';
-      case DownloadStatus.completed:
-        return 'Completed';
-      case DownloadStatus.failed:
-        return 'Failed';
-      case DownloadStatus.cancelled:
-        return 'Cancelled';
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final downloadsAsync = ref.watch(activeDownloadsProvider);
@@ -59,78 +36,48 @@ class ActiveDownloadsWidget extends ConsumerWidget {
           return const SizedBox.shrink();
         }
 
-        return Container(
-          margin: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color:
-                  Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context)
-                    .colorScheme
-                    .shadow
-                    .withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
+        final theme = Theme.of(context);
+        final scheme = theme.colorScheme;
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(14.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .secondary
-                      .withValues(alpha: 0.1),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   children: [
                     Icon(
                       Icons.download_rounded,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.secondary,
+                      size: 20,
+                      color: scheme.primary,
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'Downloads',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.secondary,
-                      ),
+                      AppLocalizations.of(context).downloadsTitle,
+                      style: theme.textTheme.titleSmall,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondary,
-                        borderRadius: BorderRadius.circular(12),
+                        color: scheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '${downloads.length}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
+              const Divider(height: 1),
               SizedBox(
                 height: downloads.length > 2 ? 220 : null,
                 child: ListView.separated(
@@ -140,20 +87,13 @@ class ActiveDownloadsWidget extends ConsumerWidget {
                       ? const AlwaysScrollableScrollPhysics()
                       : const NeverScrollableScrollPhysics(),
                   itemCount: downloads.length,
-                  separatorBuilder: (context, index) => Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .outline
-                        .withValues(alpha: 0.2),
-                  ),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1, indent: 16, endIndent: 16),
                   itemBuilder: (context, index) {
                     final task = downloads.values.elementAt(index);
                     return _DownloadItem(
                       task: task,
                       bytesToFileSize: _bytesToFileSize,
-                      getStatusText: _getStatusText,
                     );
                   },
                 ),
@@ -171,12 +111,10 @@ class ActiveDownloadsWidget extends ConsumerWidget {
 class _DownloadItem extends ConsumerStatefulWidget {
   final DownloadTask task;
   final String Function(int) bytesToFileSize;
-  final String Function(DownloadStatus) getStatusText;
 
   const _DownloadItem({
     required this.task,
     required this.bytesToFileSize,
-    required this.getStatusText,
   });
 
   @override
@@ -187,6 +125,40 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
   // Track if auto-verification has been triggered
   bool _autoVerificationTriggered = false;
   bool _isVerifying = false;
+
+  String _displayError(AppLocalizations l10n, String? message) {
+    if (message == null || message.isEmpty) return l10n.downloadFailedGeneric;
+    if (message.contains('Manual verification required')) {
+      return l10n.manualVerificationRequired;
+    }
+    const savePrefix = 'Could not save to library:';
+    if (message.startsWith(savePrefix)) {
+      return l10n
+          .downloadCouldNotSave(message.substring(savePrefix.length).trim());
+    }
+    return switch (message) {
+      'No mirrors available!' ||
+      'No working mirrors available!' =>
+        l10n.noMirrorsAvailable,
+      'Error getting mirrors' => l10n.downloadErrorGettingMirrors,
+      'All mirrors failed!' => l10n.downloadAllMirrorsFailed,
+      _ => message,
+    };
+  }
+
+  String _getStatusText(AppLocalizations l10n, DownloadStatus status) {
+    return switch (status) {
+      DownloadStatus.queued => l10n.downloadQueued,
+      DownloadStatus.fetchingMirrors => l10n.downloadGettingMirrors,
+      DownloadStatus.downloadingMirrors => l10n.downloadFindingMirror,
+      DownloadStatus.downloading => l10n.downloadDownloading,
+      DownloadStatus.paused => l10n.downloadPaused,
+      DownloadStatus.verifying => l10n.downloadVerifying,
+      DownloadStatus.completed => l10n.statusCompleted,
+      DownloadStatus.failed => l10n.downloadFailedGeneric,
+      DownloadStatus.cancelled => l10n.downloadCancelled,
+    };
+  }
 
   /// Short source name for the mirror currently serving this download.
   String? get _activeMirrorLabel {
@@ -267,11 +239,14 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
     final downloadManager = ref.read(downloadManagerProvider);
     final task = widget.task;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -280,12 +255,12 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
             children: [
               // Status icon
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: _getStatusColor(task.status, context)
-                      .withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
+                      .withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
                   child: _buildStatusIcon(task.status, context),
@@ -298,11 +273,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                   children: [
                     Text(
                       task.title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.tertiary,
-                      ),
+                      style: theme.textTheme.titleSmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -310,35 +281,21 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     Row(
                       children: [
                         Text(
-                          widget.getStatusText(task.status),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                          _getStatusText(l10n, task.status),
+                          style: theme.textTheme.labelSmall?.copyWith(
                             color: _getStatusColor(task.status, context),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         if (_activeMirrorLabel != null) ...[
                           Text(
-                            ' • ',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .tertiary
-                                  .withAlpha(120),
-                            ),
+                            '  ·  ',
+                            style: theme.textTheme.labelSmall,
                           ),
                           Flexible(
                             child: Text(
                               _activeMirrorLabel!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .tertiary
-                                    .withAlpha(170),
-                              ),
+                              style: theme.textTheme.labelSmall,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -346,25 +303,13 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                         ],
                         if (task.author != null && task.author!.isNotEmpty) ...[
                           Text(
-                            ' • ',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .tertiary
-                                  .withAlpha(120),
-                            ),
+                            '  ·  ',
+                            style: theme.textTheme.labelSmall,
                           ),
                           Flexible(
                             child: Text(
                               task.author!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .tertiary
-                                    .withAlpha(170),
-                              ),
+                              style: theme.textTheme.labelSmall,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -383,16 +328,14 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                   icon: Icon(
                     Icons.pause_rounded,
                     size: 20,
-                    color:
-                        Theme.of(context).colorScheme.tertiary.withAlpha(170),
+                    color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
                     downloadManager.pauseDownload(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  tooltip:
-                      AppLocalizations.of(context).pauseDownload,
+                  tooltip: AppLocalizations.of(context).pauseDownload,
                 ),
                 const SizedBox(width: 8),
               ],
@@ -401,16 +344,14 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                   icon: Icon(
                     Icons.play_arrow_rounded,
                     size: 20,
-                    color:
-                        Theme.of(context).colorScheme.tertiary.withAlpha(170),
+                    color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
                     downloadManager.resumeDownload(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  tooltip:
-                      AppLocalizations.of(context).resumeDownload,
+                  tooltip: AppLocalizations.of(context).resumeDownload,
                 ),
                 const SizedBox(width: 8),
               ],
@@ -420,16 +361,14 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                   icon: Icon(
                     Icons.close_rounded,
                     size: 20,
-                    color:
-                        Theme.of(context).colorScheme.tertiary.withAlpha(170),
+                    color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
                     downloadManager.cancelDownload(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  tooltip:
-                      AppLocalizations.of(context).cancelDownload,
+                  tooltip: AppLocalizations.of(context).cancelDownload,
                 ),
             ],
           ),
@@ -437,13 +376,10 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
           if (task.status == DownloadStatus.downloading ||
               task.status == DownloadStatus.paused) ...[
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: task.progress,
                 minHeight: 6,
-                backgroundColor:
-                    Theme.of(context).colorScheme.tertiary.withAlpha(30),
-                color: Theme.of(context).colorScheme.secondary,
               ),
             ),
             const SizedBox(height: 6),
@@ -452,20 +388,14 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
               children: [
                 Text(
                   '${(task.progress * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.secondary,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
                   '${widget.bytesToFileSize(task.downloadedBytes)} / ${widget.bytesToFileSize(task.totalBytes)}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color:
-                        Theme.of(context).colorScheme.tertiary.withAlpha(140),
-                  ),
+                  style: theme.textTheme.labelSmall,
                 ),
               ],
             ),
@@ -474,13 +404,8 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
               task.status == DownloadStatus.queued ||
               task.status == DownloadStatus.verifying) ...[
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                minHeight: 6,
-                backgroundColor:
-                    Theme.of(context).colorScheme.tertiary.withAlpha(30),
-                color: Theme.of(context).colorScheme.secondary,
-              ),
+              borderRadius: BorderRadius.circular(4),
+              child: const LinearProgressIndicator(minHeight: 6),
             ),
           ] else if (task.status == DownloadStatus.failed) ...[
             if (task.errorMessage?.contains('Manual verification required') ==
@@ -490,28 +415,22 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
+                  color: scheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.warning_amber_rounded,
-                      size: 14,
-                      color: Colors.orange,
+                      size: 16,
+                      color: scheme.onTertiaryContainer,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        task.errorMessage ?? 'Manual verification required',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.orange,
+                        l10n.manualVerificationRequired,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onTertiaryContainer,
                         ),
                       ),
                     ),
@@ -519,29 +438,22 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     TextButton(
                       onPressed: _isVerifying ? null : _triggerVerification,
                       style: TextButton.styleFrom(
-                        backgroundColor: Colors.orange,
+                        foregroundColor: scheme.onTertiaryContainer,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
+                            horizontal: 10, vertical: 2),
                         minimumSize: const Size(40, 24),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: _isVerifying
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 12,
                               height: 12,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: scheme.onTertiaryContainer,
                               ),
                             )
-                          : const Text(
-                              'Verify',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
+                          : Text(l10n.verifyAction),
                     ),
                   ],
                 ),
@@ -552,28 +464,22 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: Colors.red.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
+                  color: scheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.error_outline,
-                      size: 14,
-                      color: Colors.red,
+                      size: 16,
+                      color: scheme.onErrorContainer,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        task.errorMessage ?? 'Download failed',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.red,
+                        _displayError(l10n, task.errorMessage),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onErrorContainer,
                         ),
                       ),
                     ),
@@ -583,20 +489,13 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                         downloadManager.retryDownload(task.id);
                       },
                       style: TextButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        foregroundColor: scheme.onErrorContainer,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
+                            horizontal: 10, vertical: 2),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text(
-                        'Retry',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: Text(l10n.retry),
                     ),
                   ],
                 ),
@@ -677,23 +576,24 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
   }
 
   Color _getStatusColor(DownloadStatus status, BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     switch (status) {
       case DownloadStatus.queued:
-        return Colors.orange;
+        return scheme.tertiary;
       case DownloadStatus.fetchingMirrors:
       case DownloadStatus.downloadingMirrors:
       case DownloadStatus.downloading:
-        return Theme.of(context).colorScheme.secondary;
+        return scheme.primary;
       case DownloadStatus.paused:
-        return Colors.amber;
+        return scheme.tertiary;
       case DownloadStatus.verifying:
-        return Colors.blue;
+        return scheme.secondary;
       case DownloadStatus.completed:
-        return Colors.green;
+        return scheme.primary;
       case DownloadStatus.failed:
-        return Colors.red;
+        return scheme.error;
       case DownloadStatus.cancelled:
-        return Colors.grey;
+        return scheme.outline;
     }
   }
 }

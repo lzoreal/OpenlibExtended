@@ -31,6 +31,7 @@ class SectionHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
+            flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -57,13 +58,19 @@ class SectionHeader extends StatelessWidget {
           ),
           if (action != null) ...[
             const SizedBox(width: 8),
-            action!,
+            Flexible(child: action!),
           ] else if (hint != null) ...[
             const SizedBox(width: 8),
-            Text(
-              hint!,
-              style: SwissText.micro.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            Expanded(
+              flex: 3,
+              child: Text(
+                hint!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: SwissText.micro.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],

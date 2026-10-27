@@ -293,7 +293,7 @@ jobs:
           [Setup]
           AppName=OpenLibExtended
           AppVersion=${{ needs.prepare.outputs.version }}
-          AppPublisher=warreth
+          AppPublisher=lzoreal
           DefaultDirName={autopf}\OpenLibExtended
           DefaultGroupName=OpenLibExtended
           OutputDir=artifacts
@@ -507,7 +507,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.ref_name || inputs.release_tag }}
         run: |
-          python3 tool/update_scoop_manifest.py "$RELEASE_TAG"
+          python3 tool/update_scoop_manifest.py "$RELEASE_TAG" "${{ github.repository }}"
       - name: Commit and push manifest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

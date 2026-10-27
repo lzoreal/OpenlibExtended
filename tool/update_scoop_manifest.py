@@ -8,7 +8,7 @@ release workflow (and manually when a release is edited outside CI).
 Usage:
     python3 tool/update_scoop_manifest.py TAG [REPO] [--dry-run]
 
-TAG is like 'v1.5.2'; REPO defaults to warreth/OpenlibExtended.
+TAG is like 'v1.5.2'; REPO defaults to lzoreal/OpenlibExtended.
 """
 
 import argparse
@@ -41,7 +41,7 @@ def sha256_of(url: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tag", help="release tag, e.g. v1.5.2")
-    parser.add_argument("repo", nargs="?", default="warreth/OpenlibExtended")
+    parser.add_argument("repo", nargs="?", default="lzoreal/OpenlibExtended")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the new manifest instead of writing it")
     args = parser.parse_args()

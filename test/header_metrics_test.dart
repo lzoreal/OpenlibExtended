@@ -61,6 +61,7 @@ void main() {
     final hint = tester.widget<Text>(find.text('12'));
     expect(hint.style!.fontSize, 11);
     expect(hint.style!.height, closeTo(16 / 11, 0.0001));
+    expect(tester.getTopRight(find.text('12')).dx, closeTo(320, 0.1));
 
     final pad = tester.widget<Padding>(
       find
@@ -71,6 +72,29 @@ void main() {
           .first,
     );
     expect(pad.padding, const EdgeInsets.fromLTRB(0, 16, 0, 8));
+  });
+
+  testWidgets('section header hint fits at 200% text scale', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: const Scaffold(
+          body: SizedBox(
+            width: 390,
+            child: SectionHeader(
+              title: 'Completed',
+              hint:
+                  'Tap a title for details · tap open for the external reader',
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('pill tab track is 44 high', (tester) async {
@@ -96,5 +120,38 @@ void main() {
     final label = tester.widget<TabBar>(find.byType(TabBar)).labelStyle;
     expect(label!.fontSize, 12);
     expect(label.height, closeTo(20 / 12, 0.0001));
+    expect(label.fontWeight, FontWeight.w800);
+  });
+
+  testWidgets('pill tab track grows and scrolls at 200% text scale',
+      (tester) async {
+    final controller = TabController(length: 4, vsync: const TestVSync());
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: Scaffold(
+          body: PillTabs(
+            controller: controller,
+            tabs: const [
+              Tab(text: 'One'),
+              Tab(text: 'Two'),
+              Tab(text: 'Three'),
+              Tab(text: 'Four'),
+            ],
+          ),
+        ),
+      ),
+    ));
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('pill-tabs-track'))).height,
+      48,
+    );
+    expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isTrue);
   });
 }

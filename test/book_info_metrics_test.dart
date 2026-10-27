@@ -8,7 +8,7 @@ import 'package:openlib/ui/components/book_info_widget.dart';
 import 'package:openlib/ui/themes.dart';
 
 void main() {
-  testWidgets('detail hero cover is 112x168 and title is 16/24 w800',
+  testWidgets('detail hero cover is 128x192 and title is 16/24 w800',
       (tester) async {
     await tester.pumpWidget(ProviderScope(
       overrides: [
@@ -25,7 +25,7 @@ void main() {
               author: 'Author',
               thumbnail: '',
               publisher: '',
-              info: '',
+              info: 'ISBN: 9787536692930',
               link: 'https://x',
               md5: 'm',
               format: 'PDF',
@@ -38,9 +38,10 @@ void main() {
       ),
     ));
 
+    expect(find.text('9787536692930'), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('detail-cover'))),
-      const Size(112, 168),
+      const Size(128, 192),
     );
     final title =
         tester.widget<Text>(find.byKey(const ValueKey('detail-title')));

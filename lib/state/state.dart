@@ -20,7 +20,7 @@ import 'package:openlib/services/files.dart';
 import 'package:openlib/services/open_library.dart';
 import 'package:openlib/services/goodreads.dart';
 import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/library_organization.dart';
+import 'package:openlib/services/mirror_latency.dart';
 import 'package:openlib/services/download_manager.dart';
 // Assuming OpenLibrary, Goodreads, PenguinRandomHouse, BookDigits, and SubCategoriesTypeList are defined
 // or are simple placeholder services/models that work as intended.
@@ -184,9 +184,14 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
         isDark = ui.PlatformDispatcher.instance.platformBrightness ==
             Brightness.dark;
       }
+      // Keep the system bar in step with the MD3 surface palette.
       SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-          systemNavigationBarColor:
-              isDark ? Colors.black : Colors.grey.shade200));
+        systemNavigationBarColor:
+            isDark ? const Color(0xFF141218) : const Color(0xFFFEF7FF),
+        systemNavigationBarIconBrightness:
+            isDark ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      ));
     }
   }
 
@@ -233,6 +238,7 @@ final selectedSortState = StateProvider<String>((ref) => "Most Relevant");
 final selectedFileTypeState = StateProvider<String>((ref) => "All");
 final selectedLanguageState = StateProvider<String>((ref) => "All");
 final selectedYearState = StateProvider<String>((ref) => "All");
+final selectedSourceState = StateProvider<SearchProviderId?>((ref) => null);
 final searchQueryProvider = StateProvider<String>((ref) => "");
 
 // Advanced (metadata) search fields from the expandable panel. Empty
@@ -246,12 +252,6 @@ final donationKeyProvider = StateProvider<String>((ref) => "");
 final cookieProvider = StateProvider<String>((ref) => "");
 final userAgentProvider = StateProvider<String>((ref) => "");
 final webViewLoadingState = StateProvider.autoDispose<bool>((ref) => true);
-
-// PDF/Epub Reader States
-final pdfCurrentPage = StateProvider.autoDispose<int>((ref) => 0);
-final totalPdfPage = StateProvider.autoDispose<int>((ref) => 0);
-final openPdfWithExternalAppProvider = StateProvider<bool>((ref) => false);
-final openEpubWithExternalAppProvider = StateProvider<bool>((ref) => false);
 
 // Download Settings
 final showManualDownloadButtonProvider = StateProvider<bool>((ref) => false);
@@ -289,6 +289,122 @@ final activeDownloadsProvider =
 final serviceInstancesProvider =
     FutureProvider.family<List<InstanceView>, MirrorService>((ref, service) {
   return ref.watch(instanceManagerProvider).instances(service);
+});
+
+@immutable
+class MirrorLatencyState {
+  const MirrorLatencyState({
+    this.testing = false,
+    this.testingHosts = const <String>{},
+    this.readings = const <String, MirrorLatencyReading>{},
+  });
+
+  final bool testing;
+  final Set<String> testingHosts;
+  final Map<String, MirrorLatencyReading> readings;
+
+  MirrorLatencyState copyWith({
+    bool? testing,
+    Set<String>? testingHosts,
+    Map<String, MirrorLatencyReading>? readings,
+  }) {
+    return MirrorLatencyState(
+      testing: testing ?? this.testing,
+      testingHosts: testingHosts ?? this.testingHosts,
+      readings: readings ?? this.readings,
+    );
+  }
+}
+
+@immutable
+class MirrorLatencyResult {
+  const MirrorLatencyResult({
+    required this.total,
+    required this.reachable,
+    required this.fastestMs,
+  });
+
+  final int total;
+  final int reachable;
+  final int? fastestMs;
+}
+
+typedef MirrorLatencyMeasure = Future<Map<String, int?>> Function(
+    Iterable<String> urls);
+
+/// Runs one manual latency test over the enabled, non-down mirrors and
+/// persists the readings. The page owns the trigger; this class owns the
+/// filtering, in-flight state and storage merge.
+class MirrorLatencyNotifier extends StateNotifier<MirrorLatencyState> {
+  MirrorLatencyNotifier(
+    this._manager,
+    this._measure, {
+    DateTime Function()? clock,
+  })  : _clock = clock ?? DateTime.now,
+        super(const MirrorLatencyState());
+
+  final InstanceManager _manager;
+  final MirrorLatencyMeasure _measure;
+  final DateTime Function() _clock;
+
+  Future<void> load() async {
+    final readings = await _manager.localLatencies();
+    if (mounted) state = state.copyWith(readings: readings);
+  }
+
+  Future<MirrorLatencyResult> test(Iterable<InstanceView> views) async {
+    final targets = <SlumSite>[];
+    final seen = <String>{};
+    for (final view in views) {
+      if (!view.enabled || view.site.isDown) continue;
+      if (seen.add(view.site.host)) targets.add(view.site);
+    }
+    if (targets.isEmpty) {
+      return const MirrorLatencyResult(
+        total: 0,
+        reachable: 0,
+        fastestMs: null,
+      );
+    }
+
+    final hosts = targets.map((site) => site.host).toSet();
+    state = state.copyWith(testing: true, testingHosts: hosts);
+    try {
+      final results = await _measure(targets.map((site) => site.url));
+      await _manager.saveLocalLatencies(results, testedAt: _clock());
+      final readings = await _manager.localLatencies();
+      if (mounted) state = MirrorLatencyState(readings: readings);
+
+      var reachable = 0;
+      int? fastest;
+      for (final value in results.values) {
+        if (value == null) continue;
+        reachable++;
+        if (fastest == null || value < fastest) fastest = value;
+      }
+      return MirrorLatencyResult(
+        total: hosts.length,
+        reachable: reachable,
+        fastestMs: fastest,
+      );
+    } catch (_) {
+      if (mounted) {
+        state = state.copyWith(
+          testing: false,
+          testingHosts: const <String>{},
+        );
+      }
+      rethrow;
+    }
+  }
+}
+
+final mirrorLatencyProvider =
+    StateNotifierProvider<MirrorLatencyNotifier, MirrorLatencyState>((ref) {
+  return MirrorLatencyNotifier(
+    ref.watch(instanceManagerProvider),
+    MirrorLatencyTester().measure,
+  );
 });
 
 /// The Anna's Archive base URL the "open in site" button uses, or null
@@ -387,26 +503,37 @@ class SearchPageKey {
   final String query;
   final int page;
 
-  const SearchPageKey(this.query, this.page);
+  /// Restricts this page to one catalog. Null means the normal chain of
+  /// enabled sources. A results route passes the source it was opened
+  /// with, then pins deeper pages to the source that produced page 1.
+  final SearchProviderId? source;
+
+  const SearchPageKey(this.query, this.page, {this.source});
 
   @override
   bool operator ==(Object other) =>
-      other is SearchPageKey && other.query == query && other.page == page;
+      other is SearchPageKey &&
+      other.query == query &&
+      other.page == page &&
+      other.source == source;
 
   @override
-  int get hashCode => Object.hash(query, page);
+  int get hashCode => Object.hash(query, page, source);
 }
 
 // Provider for one page of search results across all enabled providers
 final searchProvider = FutureProvider.family
-    .autoDispose<List<BookData>, SearchPageKey>((ref, key) async {
+    .autoDispose<SearchManagerResult, SearchPageKey>((ref, key) async {
   if (key.query.isEmpty) {
-    return []; // Return empty list if search query is empty
+    return const SearchManagerResult(books: [], failedProviders: []);
   }
 
   // A provider failure must not swallow results from the others: the
   // manager returns what it got and lists the stragglers by name.
   final manager = SearchManager();
+  final enabled = await manager.enabledProviders();
+  final source =
+      key.source != null && enabled.contains(key.source) ? key.source : null;
   final result = await manager.search(SearchQuery(
     text: key.query,
     content: ref.watch(getTypeValue),
@@ -418,23 +545,54 @@ final searchProvider = FutureProvider.family
     publisher: ref.watch(searchPublisherProvider),
     filtersEnabled: ref.watch(enableFiltersState),
     page: key.page,
+    source: source,
   ));
-  final enabledCount = (await manager.enabledProviders()).length;
+  final expectedCount = source == null ? enabled.length : 1;
   if (result.books.isEmpty &&
-      result.failedProviders.length == enabledCount &&
-      enabledCount > 0) {
+      result.failedProviders.length == expectedCount &&
+      expectedCount > 0) {
     // Every enabled provider failed: surface a real error. One failing
     // provider with others merely finding nothing is NOT an error - an
     // empty result from a working source is a valid "no matches".
     throw Exception('All search sources are unreachable: '
         '${result.failedProviders.join(', ')}');
   }
-  return result.books;
+  return result;
+});
+
+/// First page of a results route, streamed per source. The page paints as
+/// soon as the first catalog answers; slower catalogs are filled in later.
+final initialSearchProvider = StreamProvider.family
+    .autoDispose<SearchManagerResult, SearchPageKey>((ref, key) {
+  if (key.query.isEmpty) {
+    return Stream.value(
+        const SearchManagerResult(books: [], failedProviders: []));
+  }
+  final enabledSource = key.source;
+  return SearchManager().watch(SearchQuery(
+    text: key.query,
+    content: ref.watch(getTypeValue),
+    sort: ref.watch(getSortValue),
+    fileType: ref.watch(getFileTypeValue),
+    language: ref.watch(getLanguageValue),
+    year: ref.watch(getYearValue),
+    author: ref.watch(searchAuthorProvider),
+    publisher: ref.watch(searchPublisherProvider),
+    filtersEnabled: ref.watch(enableFiltersState),
+    page: key.page,
+    source: enabledSource,
+  ));
 });
 
 // Which sources the user turned on in settings.
 final searchProviderToggles = FutureProvider<Set<SearchProviderId>>(
     (ref) => SearchManager().enabledProviders());
+
+// The order the user dragged the sources into in settings. Shared by the
+// search capsules, the suggestions panel, the loading skeleton and the
+// manager's chain, so every surface shows the same journey.
+final searchSourceOrderProvider = FutureProvider<List<SearchProviderId>>(
+    (ref) => SearchManager().sourceOrder());
 
 // Provider for Book Info Details
 //
@@ -475,84 +633,9 @@ final bookInfoProvider =
   }
 });
 
-// My Library Database Providers
+// Completed download records
 final myLibraryProvider = FutureProvider((ref) async {
   return dataBase.getAll();
-});
-
-// ====================================================================
-// LIBRARY ORGANIZATION (sorting, tags, reading status filters)
-// ====================================================================
-
-/// The library enriched with tags, reading status and file sizes -
-/// the data every sort/filter view derives from.
-final libraryBooksProvider = FutureProvider<List<LibraryBook>>((ref) async {
-  final books = await dataBase.getAll();
-  if (books.isEmpty) return const [];
-  final tags = await dataBase.getTagsForAll();
-  final positions = await dataBase.getPositionsForAll();
-  final completed = await dataBase.getCompletedForAll();
-  return [
-    for (final book in books)
-      LibraryBook(
-        book: book,
-        tags: tags[book.id] ?? const {},
-        status: _readingStatus(
-          position: positions[book.getFileName()],
-          completed: completed[book.getFileName()] ?? false,
-        ),
-        fileSizeBytes: await _fileSizeOf(book),
-      ),
-  ];
-});
-
-ReadingStatus _readingStatus({String? position, required bool completed}) {
-  if (completed) return ReadingStatus.completed;
-  if (position == null || position.isEmpty) return ReadingStatus.unread;
-  return ReadingStatus.inProgress;
-}
-
-Future<int?> _fileSizeOf(MyBook book) async {
-  try {
-    final path = await getFilePath(book.getFileName());
-    final file = File(path);
-    if (await file.exists()) return await file.length();
-  } catch (_) {}
-  return null;
-}
-
-/// User's chosen sort order, persisted as its stable key.
-final librarySortModeProvider =
-    StateProvider<LibrarySortMode>((ref) => LibrarySortMode.dateAddedDesc);
-
-/// Active tag filters; empty set means no tag filter.
-final libraryTagFilterProvider = StateProvider<Set<String>>((ref) => {});
-
-/// Active reading-status filter; null means no status filter.
-final libraryStatusFilterProvider =
-    StateProvider<ReadingStatus?>((ref) => null);
-
-/// Free-text filter over library metadata (title, author, publisher,
-/// info line). Empty string means no filter.
-final librarySearchQueryProvider = StateProvider<String>((ref) => "");
-
-/// All tags in use across the library.
-final libraryTagsProvider = FutureProvider<Set<String>>((ref) async {
-  return (await dataBase.getAllTags()).toSet();
-});
-
-/// The final, organized library: filtered then sorted.
-final organizedLibraryProvider = Provider<List<LibraryBook>>((ref) {
-  final books = ref.watch(libraryBooksProvider).valueOrNull ?? const [];
-  final mode = ref.watch(librarySortModeProvider);
-  final tagFilter = ref.watch(libraryTagFilterProvider);
-  final statusFilter = ref.watch(libraryStatusFilterProvider);
-  final searchQuery = ref.watch(librarySearchQueryProvider);
-  return sortLibrary(
-    filterLibrary(books,
-        tagFilter: tagFilter, statusFilter: statusFilter, query: searchQuery),
-    mode,
-  );
 });
 
 final checkIdExists =
@@ -580,37 +663,3 @@ final deleteFileFromMyLib =
   return await deleteFileWithDbData(ref, fileName.md5, fileName.format,
       fileName: fileName.fileName);
 });
-
-final filePathProvider =
-    FutureProvider.family<String, String>((ref, fileName) async {
-  // NOTE: Assuming getFilePath is a function in files.dart
-  String path = await getFilePath(fileName);
-  return path;
-});
-
-final getBookPosition =
-    FutureProvider.family.autoDispose<String?, String>((ref, fileName) async {
-  return await dataBase.getBookState(fileName);
-});
-
-// ====================================================================
-// BOOK STATE PERSISTENCE FUNCTIONS
-// ====================================================================
-
-Future<void> savePdfState(String fileName, WidgetRef ref) async {
-  String position = ref.watch(pdfCurrentPage).toString();
-  await dataBase.saveBookState(fileName, position);
-}
-
-/// Position save for the pdfrx viewer, which knows its page directly
-/// and no longer goes through the pdfCurrentPage provider.
-Future<void> savePdfPosition(String fileName, int page) async {
-  if (page < 1) return;
-  await dataBase.saveBookState(fileName, page.toString());
-}
-
-Future<void> saveEpubState(
-    String fileName, String? position, WidgetRef ref) async {
-  String pos = position ?? '';
-  await dataBase.saveBookState(fileName, pos);
-}

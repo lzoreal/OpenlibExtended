@@ -126,9 +126,11 @@ class AnnasArchieve {
     final body = response.data?.toString().toLowerCase() ?? '';
     if (body.isEmpty) return false;
 
-    final title =
-        RegExp(r'<title[^>]*>([^<]*)</title>').firstMatch(body)?.group(1)?.trim() ??
-            '';
+    final title = RegExp(r'<title[^>]*>([^<]*)</title>')
+            .firstMatch(body)
+            ?.group(1)
+            ?.trim() ??
+        '';
     const challengeTitles = [
       'just a moment',
       'ddos-guard',
@@ -217,11 +219,11 @@ class AnnasArchieve {
     // libgen/zlib mirrors 404 on AA paths and waste every retry slot.
     // The list comes from open-slum.org; down mirrors are already
     // filtered out and the easiest (least protected) mirror comes first.
-    final urls =
-        await _instanceManager.enabledUrls(MirrorService.annasArchive);
+    final urls = await _instanceManager.enabledUrls(MirrorService.annasArchive);
 
     if (urls.isEmpty) {
-      _logger.error('No attemptable Anna\'s Archive mirror', tag: 'AnnasArchive');
+      _logger.error('No attemptable Anna\'s Archive mirror',
+          tag: 'AnnasArchive');
       throw await _handleErrorAsync(
         Exception('No Anna\'s Archive mirror is available right now'),
       );
@@ -317,7 +319,11 @@ class AnnasArchieve {
     if (status >= 200 && status < 300) return;
     _logger.warning('Anna\'s Archive returned an error status',
         tag: 'AnnasArchive',
-        metadata: {'status': status, 'url': url, 'length': response.data?.toString().length ?? 0});
+        metadata: {
+          'status': status,
+          'url': url,
+          'length': response.data?.toString().length ?? 0
+        });
     throw DioException.badResponse(
       statusCode: status,
       requestOptions: response.requestOptions,
@@ -943,6 +949,7 @@ class AnnasArchieve {
 
           throw NetworkError(
             type: NetworkErrorType.unknown,
+            kind: NetworkErrorKind.bookDetailsUnavailable,
             userMessage: "Unable to load book details",
             solution:
                 "The book information could not be retrieved. Try again or try a different mirror in Settings.",
@@ -986,6 +993,7 @@ class AnnasArchieve {
                 tag: 'AnnasArchive');
             throw NetworkError(
               type: NetworkErrorType.unknown,
+              kind: NetworkErrorKind.bookNotFound,
               userMessage: "Book not found",
               solution:
                   "The page loaded but no book details were on it. The md5 link may be outdated - try searching for the title instead.",

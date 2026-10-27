@@ -21,6 +21,20 @@ import 'package:openlib/services/webview_challenge_solver.dart';
 /// One searchable catalog the app can query.
 enum SearchProviderId { annasArchive, libgen, zlibrary, welib }
 
+/// The shipped source order: LibGen downloads fast and needs no browser
+/// challenge, Z-Library solves DiamWall headlessly, WeLib and Anna's
+/// Archive sit behind Cloudflare/DDoS-Guard and go last.
+///
+/// Every source is searched in parallel; this order decides how results
+/// are merged and which source is shown first. Settings can reorder it;
+/// this list is the fresh-install fallback and reset target.
+const List<SearchProviderId> defaultSearchSourceOrder = [
+  SearchProviderId.libgen,
+  SearchProviderId.zlibrary,
+  SearchProviderId.welib,
+  SearchProviderId.annasArchive,
+];
+
 /// A source of [BookData] results. Implementations own their fetching,
 /// parsing and error handling - the manager merges whatever comes back.
 abstract class SearchProvider {
@@ -53,6 +67,11 @@ class SearchQuery {
   final bool filtersEnabled;
   final int page;
 
+  /// Restricts this page to one source. The first results page queries
+  /// every enabled source in parallel; the results page uses this only
+  /// when paginating a single-source view.
+  final SearchProviderId? source;
+
   const SearchQuery({
     required this.text,
     this.content = '',
@@ -64,6 +83,7 @@ class SearchQuery {
     this.publisher = '',
     this.filtersEnabled = false,
     this.page = 1,
+    this.source,
   });
 
   bool get isEmpty =>
@@ -291,8 +311,8 @@ class LibgenProvider implements SearchProvider {
       params.write('&page=${query.page}');
     }
 
-    final mirrors = _mirrors ??
-        await InstanceManager().enabledUrls(MirrorService.libgen);
+    final mirrors =
+        _mirrors ?? await InstanceManager().enabledUrls(MirrorService.libgen);
 
     if (mirrors.isEmpty) {
       // Every libgen mirror SLUM knows is DOWN (or switched off by the
@@ -739,12 +759,12 @@ class ZlibraryProvider implements SearchProvider {
   /// caller never shows an invented message.
   String? _refusalFromPage(String html) {
     final text = html_parser
-        .parse(html)
-        .body
-        ?.text
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim()
-        .toLowerCase() ??
+            .parse(html)
+            .body
+            ?.text
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim()
+            .toLowerCase() ??
         '';
     if (text.isEmpty) return null;
 
@@ -1117,9 +1137,10 @@ class WelibProvider implements SearchProvider {
     final description = document
         .querySelector('meta[name="description"]')
         ?.attributes['content'];
-    final author = description != null && description.contains('Downloaded from')
-        ? description.split('Downloaded from').first.trim()
-        : null;
+    final author =
+        description != null && description.contains('Downloaded from')
+            ? description.split('Downloaded from').first.trim()
+            : null;
 
     String? language;
     String? publisher;
@@ -1128,14 +1149,19 @@ class WelibProvider implements SearchProvider {
       if (text.length > 200) continue;
       final lower = text.toLowerCase();
       if (lower.startsWith('language') && language == null) {
-        language = text.replaceFirst(RegExp(r'^language', caseSensitive: false), '').trim();
+        language = text
+            .replaceFirst(RegExp(r'^language', caseSensitive: false), '')
+            .trim();
       }
       if (lower.startsWith('publisher') && publisher == null) {
-        publisher = text.replaceFirst(RegExp(r'^publisher', caseSensitive: false), '').trim();
+        publisher = text
+            .replaceFirst(RegExp(r'^publisher', caseSensitive: false), '')
+            .trim();
       }
     }
 
-    final slowDownload = document.querySelector('a[href^="/slow_download/"]')
+    final slowDownload = document
+            .querySelector('a[href^="/slow_download/"]')
             ?.attributes['href'] ??
         '/slow_download/$id/0/0';
 
@@ -1155,7 +1181,9 @@ class WelibProvider implements SearchProvider {
       md5: id,
       format: format?.toLowerCase() ?? 'epub',
       description: null,
-      mirror: slowDownload.startsWith('http') ? slowDownload : '$baseUrl$slowDownload',
+      mirror: slowDownload.startsWith('http')
+          ? slowDownload
+          : '$baseUrl$slowDownload',
       isFastDownload: false,
     );
   }
@@ -1244,24 +1272,76 @@ class WelibProvider implements SearchProvider {
   }
 }
 
-/// Combined outcome of a fan-out search.
+/// How one enabled catalog fared in a parallel search.
+enum SearchSourceStatus {
+  /// The source is still being queried.
+  pending,
+
+  /// This source produced at least one result.
+  hit,
+
+  /// The source was reached but returned nothing.
+  empty,
+
+  /// The source threw. The other sources still contribute their results.
+  failed,
+
+  /// Kept for stored/older payloads; parallel searches query every source.
+  skipped,
+}
+
+/// One row of the search's source summary, in the configured order.
+@immutable
+class SearchSourceRun {
+  final SearchProviderId id;
+  final String displayName;
+  final int resultCount;
+  final SearchSourceStatus status;
+
+  const SearchSourceRun({
+    required this.id,
+    required this.displayName,
+    required this.resultCount,
+    required this.status,
+  });
+
+  bool get wasAttempted => status != SearchSourceStatus.skipped;
+}
+
+/// Combined outcome of a parallel search.
 @immutable
 class SearchManagerResult {
+  /// All results from every queried source, de-duplicated by md5 in the
+  /// configured source order. This is the "All sources" view.
   final List<BookData> books;
 
   /// Display names of providers that threw; the UI can mention them while
   /// still showing the surviving results.
   final List<String> failedProviders;
 
-  /// The catalog the returned books came from ('' when several sources
-  /// contributed or none found anything). Single value because the chain
-  /// stops at the first provider with results.
+  /// The first catalog that returned anything, in configured order. Kept
+  /// as the default single-source view.
   final String resultSource;
 
-  const SearchManagerResult(
-      {required this.books,
-      required this.failedProviders,
-      this.resultSource = ''});
+  /// The id of [resultSource]; null when nothing was found.
+  final SearchProviderId? resultSourceId;
+
+  /// Every queried source in configured order, with its own status and
+  /// result count. All enabled sources are queried in parallel.
+  final List<SearchSourceRun> sources;
+
+  /// Page results per catalog, already de-duplicated within that catalog.
+  /// The results page switches between these lists without re-searching.
+  final Map<SearchProviderId, List<BookData>> booksBySource;
+
+  const SearchManagerResult({
+    required this.books,
+    required this.failedProviders,
+    this.resultSource = '',
+    this.resultSourceId,
+    this.sources = const [],
+    this.booksBySource = const {},
+  });
 }
 
 /// Fan-out search across the enabled providers, merging and de-duplicating
@@ -1281,6 +1361,13 @@ class SearchManager {
   final List<SearchProvider> _providers;
 
   static const _providerPrefsKey = 'searchProviders';
+  static const _orderPrefsKey = 'searchSourceOrder';
+
+  /// Position of [id] in [order]; unordered ids run last.
+  int _sourceRank(List<SearchProviderId> order, SearchProviderId id) {
+    final index = order.indexOf(id);
+    return index < 0 ? defaultSearchSourceOrder.length : index;
+  }
 
   /// Which providers the user enabled in settings. Defaults to all four:
   /// LibGen downloads fast and works without a browser challenge when a
@@ -1322,46 +1409,212 @@ class SearchManager {
         SearchProviderId.values.map((p) => p.name).join(','));
   }
 
-  /// Searches the enabled providers in order and stops at the first one
-  /// that returns results. The order is the provider list order:
-  /// LibGen (fast, challenge-free downloads) first, then Z-Library, then
-  /// Anna's Archive (behind DDoS-Guard). A provider that finds nothing
-  /// (empty, not an error) does not stop the chain - the next one runs.
-  /// Errors are collected and surface only when every provider fails.
+  /// The source order the user dragged into place in settings.
+  ///
+  /// A saved list never hides a source: ids it does not mention (a
+  /// provider added by a newer release) fall in after it in their default
+  /// order. A missing or unreadable preference means the shipped order.
+  Future<List<SearchProviderId>> sourceOrder() async {
+    try {
+      final stored = await _database.getPreference(_orderPrefsKey);
+      final saved = <SearchProviderId>[];
+      for (final name in (stored as String).split(',')) {
+        final id =
+            SearchProviderId.values.where((v) => v.name == name).firstOrNull;
+        if (id != null && !saved.contains(id)) saved.add(id);
+      }
+      return [...saved, ..._missingFrom(saved)];
+    } catch (_) {
+      return defaultSearchSourceOrder;
+    }
+  }
+
+  /// Stores a new source order, keeping every known source in it.
+  Future<void> setSourceOrder(List<SearchProviderId> order) async {
+    final normalized = [
+      ...order.where(SearchProviderId.values.contains),
+      ..._missingFrom(order),
+    ];
+    await _database.savePreference(
+        _orderPrefsKey, normalized.map((p) => p.name).join(','));
+  }
+
+  /// Puts the source order back to the shipped order.
+  Future<void> resetSourceOrder() async {
+    await _database.savePreference(
+        _orderPrefsKey, defaultSearchSourceOrder.map((p) => p.name).join(','));
+  }
+
+  List<SearchProviderId> _missingFrom(List<SearchProviderId> order) =>
+      defaultSearchSourceOrder.where((id) => !order.contains(id)).toList();
+
+  /// Searches every enabled provider concurrently. One provider failing
+  /// never takes the rest down; an empty source is a valid result, not a
+  /// reason to skip the others. [SearchQuery.source] is used only by the
+  /// results page when it paginates a single catalog.
   Future<SearchManagerResult> search(SearchQuery query) async {
-    final enabled = await enabledProviders();
-    final active = _providers.where((p) => enabled.contains(p.id)).toList();
+    final active = await _activeProviders(query);
     if (active.isEmpty) {
       return const SearchManagerResult(books: [], failedProviders: []);
     }
+    final logger = _logStart(query, active);
+    final outcomes = await Future.wait(
+      active.map((provider) => _searchOne(provider, query, logger)),
+    );
+    final result = _combine(active, outcomes);
+    _logFinished(result);
+    return result;
+  }
 
+  /// Emits a snapshot as soon as each source finishes, so the results page
+  /// can show the first catalog's books without waiting for a slow source.
+  /// Pending catalogs appear as [SearchSourceStatus.pending] and are
+  /// replaced by their real status in later snapshots.
+  Stream<SearchManagerResult> watch(SearchQuery query) {
+    final controller = StreamController<SearchManagerResult>();
+    () async {
+      try {
+        final active = await _activeProviders(query);
+        if (active.isEmpty) {
+          controller.add(
+              const SearchManagerResult(books: [], failedProviders: []));
+          await controller.close();
+          return;
+        }
+        final logger = _logStart(query, active);
+        final outcomes = List<_Outcome?>.filled(active.length, null);
+        final progress = StreamController<int>();
+        var completed = 0;
+        for (var i = 0; i < active.length; i++) {
+          _searchOne(active[i], query, logger).then((outcome) {
+            outcomes[i] = outcome;
+            completed++;
+            if (!progress.isClosed) progress.add(i);
+          });
+        }
+        await for (final _ in progress.stream) {
+          final result = _combine(active, outcomes);
+          final finished = completed == active.length;
+          if (finished) {
+            _logFinished(result);
+            if (!controller.isClosed) {
+              if (result.books.isEmpty &&
+                  result.failedProviders.length == active.length) {
+                controller.addError(Exception(
+                    'All search sources are unreachable: '
+                    '${result.failedProviders.join(', ')}'));
+              } else {
+                controller.add(result);
+              }
+            }
+            break;
+          } else if (result.books.isNotEmpty && !controller.isClosed) {
+            controller.add(result);
+          }
+        }
+        await progress.close();
+        if (!controller.isClosed) await controller.close();
+      } catch (error, stackTrace) {
+        if (!controller.isClosed) controller.addError(error, stackTrace);
+        await controller.close();
+      }
+    }();
+    return controller.stream;
+  }
+
+  Future<List<SearchProvider>> _activeProviders(SearchQuery query) async {
+    final enabled = await enabledProviders();
+    final order = await sourceOrder();
+    final selected = query.source != null && enabled.contains(query.source)
+        ? query.source
+        : null;
+    return _providers
+        .where((p) =>
+            enabled.contains(p.id) && (selected == null || p.id == selected))
+        .toList()
+      ..sort((a, b) =>
+          _sourceRank(order, a.id).compareTo(_sourceRank(order, b.id)));
+  }
+
+  AppLogger _logStart(SearchQuery query, List<SearchProvider> active) {
     final logger = AppLogger();
-    logger.info('Searching sources', tag: 'SearchManager', metadata: {
-      'query': query.text,
-      'providers': [for (final p in active) p.displayName],
+    logger.info('Searching sources in parallel', tag: 'SearchManager',
+        metadata: {
+          'query': query.text,
+          'providers': [for (final p in active) p.displayName],
+        });
+    return logger;
+  }
+
+  void _logFinished(SearchManagerResult result) {
+    AppLogger().info('Search finished', tag: 'SearchManager', metadata: {
+      'results': result.books.length,
+      'failed': result.failedProviders,
+      'perSource': {
+        for (final run in result.sources) run.displayName: run.resultCount,
+      },
     });
+  }
+
+  SearchManagerResult _combine(
+      List<SearchProvider> active, List<_Outcome?> outcomes) {
     final books = <BookData>[];
+    final booksBySource = <SearchProviderId, List<BookData>>{};
     final failed = <String>[];
+    final runs = <SearchSourceRun>[];
     String resultSource = '';
-    for (final provider in active) {
-      logger.debug('Trying ${provider.displayName}', tag: 'SearchManager');
-      final outcome = await _searchOne(provider, query, logger);
+    SearchProviderId? resultSourceId;
+    for (var i = 0; i < active.length; i++) {
+      final provider = active[i];
+      final outcome = outcomes[i];
+      if (outcome == null) {
+        runs.add(SearchSourceRun(
+          id: provider.id,
+          displayName: provider.displayName,
+          resultCount: 0,
+          status: SearchSourceStatus.pending,
+        ));
+        continue;
+      }
       if (outcome.error != null) {
         failed.add(provider.displayName);
-      } else {
-        books.addAll(outcome.books);
-        if (books.isNotEmpty) resultSource = provider.displayName;
+        runs.add(SearchSourceRun(
+          id: provider.id,
+          displayName: provider.displayName,
+          resultCount: 0,
+          status: SearchSourceStatus.failed,
+        ));
+        continue;
       }
-      if (books.isNotEmpty) break;
+      final sourceBooks = _dedupe(outcome.books);
+      if (sourceBooks.isEmpty) {
+        runs.add(SearchSourceRun(
+          id: provider.id,
+          displayName: provider.displayName,
+          resultCount: 0,
+          status: SearchSourceStatus.empty,
+        ));
+        continue;
+      }
+      booksBySource[provider.id] = sourceBooks;
+      books.addAll(sourceBooks);
+      resultSourceId ??= provider.id;
+      if (resultSource.isEmpty) resultSource = provider.displayName;
+      runs.add(SearchSourceRun(
+        id: provider.id,
+        displayName: provider.displayName,
+        resultCount: sourceBooks.length,
+        status: SearchSourceStatus.hit,
+      ));
     }
-
-    logger.info('Search finished', tag: 'SearchManager', metadata: {
-      'results': books.length,
-      'failed': failed,
-      'source': resultSource,
-    });
     return SearchManagerResult(
-        books: _dedupe(books), failedProviders: failed, resultSource: resultSource);
+      books: _dedupe(books),
+      failedProviders: failed,
+      resultSource: resultSource,
+      resultSourceId: resultSourceId,
+      sources: runs,
+      booksBySource: booksBySource,
+    );
   }
 
   Future<_Outcome> _searchOne(
@@ -1370,10 +1623,14 @@ class SearchManager {
       final books = await provider.search(query);
       logger.info('${provider.displayName} returned ${books.length} books',
           tag: 'SearchManager');
+      // Server-side extension filters are not honored by every mirror.
+      // Enforce the same contract locally so the UI can trust the filter.
+      final matching = _filterByFileType(books, query);
       // Stamp every result with its catalog so the UI can show where
       // each book came from.
-      final tagged =
-          books.map((b) => b.copyWith(source: provider.displayName)).toList();
+      final tagged = matching
+          .map((b) => b.copyWith(source: provider.displayName))
+          .toList();
       return _Outcome(provider, tagged, null);
     } catch (e) {
       logger.warning('${provider.displayName} search failed',
@@ -1382,9 +1639,25 @@ class SearchManager {
     }
   }
 
-  /// Keeps the first occurrence per md5. LibGen runs first in the
-  /// provider list (fastest, challenge-free downloads), so its entry
-  /// wins over the same edition on the other sources.
+  List<BookData> _filterByFileType(List<BookData> books, SearchQuery query) {
+    if (!query.filtersEnabled || query.fileType.trim().isEmpty) return books;
+    final wanted = query.fileType.trim().toLowerCase();
+    if (wanted == 'all') return books;
+    return books.where((book) {
+      final info = book.info?.toLowerCase();
+      if (info == null || info.isEmpty) return false;
+      return switch (wanted) {
+        'pdf' => info.contains('pdf'),
+        'epub' => info.contains('epub'),
+        'cbr' => info.contains('cbr'),
+        'cbz' => info.contains('cbz'),
+        _ => info.contains(wanted),
+      };
+    }).toList(growable: false);
+  }
+
+  /// Keeps the first occurrence per md5 in configured source order, so the
+  /// combined view stays deterministic even though sources run in parallel.
   List<BookData> _dedupe(List<BookData> books) {
     final seen = <String>{};
     return books.where((b) => seen.add(b.md5)).toList();

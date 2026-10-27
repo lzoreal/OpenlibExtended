@@ -8,10 +8,9 @@ import 'package:open_file/open_file.dart';
 
 // Project imports:
 import 'package:openlib/services/files.dart' show getFilePath;
+import 'package:openlib/ui/components/detail_bottom_bar.dart';
 import 'package:openlib/ui/components/delete_dialog_widget.dart';
 import 'package:openlib/ui/components/snack_bar_widget.dart';
-import 'package:openlib/ui/epub_viewer.dart' show launchEpubViewer;
-import 'package:openlib/ui/pdf_viewer.dart' show launchPdfViewer;
 
 class FileOpenAndDeleteButtons extends ConsumerWidget {
   final String id;
@@ -31,90 +30,73 @@ class FileOpenAndDeleteButtons extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 21, bottom: 21),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextButton(
-            style: TextButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.secondary,
-                textStyle: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.primary,
-                )),
-            onPressed: () async {
-              if (format == 'pdf') {
-                await launchPdfViewer(
-                    fileName: actualFileName, context: context, ref: ref);
-              } else if (format == 'epub') {
-                await launchEpubViewer(
-                    fileName: actualFileName, context: context, ref: ref);
-              } else {
-                await openCbrAndCbz(fileName: actualFileName, context: context);
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
-              child: Text(AppLocalizations.of(context).open),
+    final l10n = AppLocalizations.of(context);
+
+    return DetailBottomBar(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: () => openBookExternally(
+              fileName: actualFileName,
+              format: format,
+              context: context,
             ),
+            icon: const Icon(Icons.menu_book_outlined),
+            label: Text(l10n.open),
           ),
-          const SizedBox(
-            width: 10,
-          ),
-          TextButton(
-            style: ButtonStyle(
-              shape: WidgetStateProperty.all(
-                RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(50.0),
-                  side: BorderSide(
-                      width: 3, color: Theme.of(context).colorScheme.secondary),
-                ),
-              ),
-            ),
-            onPressed: () {
-              showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (BuildContext context) {
-                    return ShowDeleteDialog(
-                      id: id,
-                      format: format,
-                      fileName: fileName,
-                      onDelete: onDelete,
-                    );
-                  });
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(5.3),
-              child: Text(
-                'Delete',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.tertiary,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 8),
+        IconButton.filledTonal(
+          tooltip: l10n.delete,
+          onPressed: () {
+            showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) {
+                  return ShowDeleteDialog(
+                    id: id,
+                    format: format,
+                    fileName: fileName,
+                    onDelete: onDelete,
+                  );
+                });
+          },
+          icon: const Icon(Icons.delete_outline),
+        ),
+      ],
     );
   }
 }
 
-Future<void> openCbrAndCbz(
-    {required String fileName, required BuildContext context}) async {
+/// Opens a downloaded book with the system/third-party reader. The app
+/// deliberately has no built-in reader any more.
+Future<void> openBookExternally({
+  required String fileName,
+  required String format,
+  required BuildContext context,
+}) async {
   final l10n = AppLocalizations.of(context);
+  String path;
   try {
-    String path = await getFilePath(fileName);
-    await OpenFile.open(path, linuxByProcess: true);
-  } catch (e) {
-    // ignore: avoid_print
-    // print(e);
-    // ignore: use_build_context_synchronously
-    showSnackBar(context: context, message: l10n.unableToOpenFile);
+    path = await getFilePath(fileName);
+  } catch (_) {
+    if (context.mounted) {
+      showSnackBar(
+          context: context, message: l10n.fileNotFoundDownloadFailed);
+    }
+    return;
+  }
+
+  final mime = switch (format.toLowerCase()) {
+    'pdf' => 'application/pdf',
+    'epub' => 'application/epub+zip',
+    _ => null,
+  };
+  try {
+    await OpenFile.open(path, linuxByProcess: true, type: mime);
+  } catch (_) {
+    if (context.mounted) {
+      showSnackBar(context: context, message: l10n.unableToOpenFile);
+    }
   }
 }

@@ -51,14 +51,18 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   Future<void> _loadDonationKey() async {
     final db = MyLibraryDb.instance;
-    final key = await db.getPreference('donationKey');
-    if (key != null && key.isNotEmpty) {
-      if (mounted) {
-        setState(() {
-          _donationKeyController.text = key;
-        });
-        ref.read(donationKeyProvider.notifier).state = key;
-      }
+    String key = '';
+    try {
+      final saved = await db.getPreference('donationKey');
+      if (saved is String) key = saved;
+    } catch (_) {
+      // First install: the preference has not been written yet.
+    }
+    if (key.isNotEmpty && mounted) {
+      setState(() {
+        _donationKeyController.text = key;
+      });
+      ref.read(donationKeyProvider.notifier).state = key;
     }
   }
 
@@ -80,8 +84,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       // Force storage selection
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                AppLocalizations.of(context).selectStorageToContinue)),
+            content:
+                Text(AppLocalizations.of(context).selectStorageToContinue)),
       );
       return;
     }
@@ -179,31 +183,29 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildBottomBar(int pageCount) {
-    return Container(
-      padding: const EdgeInsets.all(20),
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Dots indicator
           Row(
             children: List.generate(pageCount, (index) {
-              return Container(
+              final selected = _currentPage == index;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: 10,
-                height: 10,
+                width: selected ? 22 : 8,
+                height: 8,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _currentPage == index
-                      ? Theme.of(context).colorScheme.secondary
-                      : Theme.of(context)
-                          .colorScheme
-                          .secondary
-                          .withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  color: selected ? scheme.primary : scheme.primaryContainer,
                 ),
               );
             }),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: _nextPage,
             child: Text(_currentPage == pageCount - 1
                 ? AppLocalizations.of(context).getStarted
@@ -215,23 +217,37 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildWelcomePage() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.library_books,
-              size: 80, color: Theme.of(context).colorScheme.secondary),
-          const SizedBox(height: 30),
+          Container(
+            width: 128,
+            height: 128,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.local_library_rounded,
+              size: 64,
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(height: 32),
           Text(
             AppLocalizations.of(context).welcomeTitle,
-            style: Theme.of(context).textTheme.displayLarge,
+            style: theme.textTheme.headlineMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           Text(
             AppLocalizations.of(context).welcomeSubtitle,
-            style: Theme.of(context).textTheme.bodyLarge,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -240,45 +256,44 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildStoragePage() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.folder_open, size: 60),
+          Icon(
+            Icons.folder_open_rounded,
+            size: 60,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(height: 20),
           Text(AppLocalizations.of(context).whereToStoreBooks,
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 30),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
+              style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
                 _storagePath.isEmpty
                     ? AppLocalizations.of(context).noPathSelected
                     : _storagePath,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
           ),
           const SizedBox(height: 20),
-          ElevatedButton.icon(
+          FilledButton.tonalIcon(
             onPressed: _selectStorage,
-            icon: const Icon(Icons.edit),
+            icon: const Icon(Icons.edit_outlined),
             label: Text(AppLocalizations.of(context).selectFolder),
-            style: ElevatedButton.styleFrom(
-              // Ensure visible colors regardless of theme defaults
-              backgroundColor: Theme.of(context).colorScheme.secondary,
-              foregroundColor: Colors.white,
-            ),
           ),
           const SizedBox(height: 20),
           Text(
             AppLocalizations.of(context).storageScanNote,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: theme.textTheme.bodySmall,
           ),
         ],
       ),
@@ -286,77 +301,60 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildUpdatePage() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.system_update, size: 60),
+          Icon(
+            Icons.system_update_rounded,
+            size: 60,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(height: 20),
           Text(AppLocalizations.of(context).automaticUpdates,
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 30),
-          Material(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(12),
+              style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 24),
+          Card(
             clipBehavior: Clip.antiAlias,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    title: Text(
-                        AppLocalizations.of(context).enableAutoUpdates),
-                    subtitle: Text(AppLocalizations.of(context)
-                        .autoUpdatesFdroidNote),
-                    activeThumbColor: Theme.of(context).colorScheme.secondary,
-                    activeTrackColor: Theme.of(context)
-                        .colorScheme
-                        .secondary
-                        .withValues(alpha: 0.5),
-                    inactiveThumbColor: Colors.grey,
-                    inactiveTrackColor: Colors.grey.withValues(alpha: 0.5),
-                    value: _enableAutoUpdate,
-                    onChanged: (val) async {
-                      setState(() {
-                        _enableAutoUpdate = val;
-                      });
-                      if (val && Platform.isAndroid) {
-                        // Request install permission if they enable it
-                        final status =
-                            await Permission.requestInstallPackages.status;
-                        if (!status.isGranted) {
-                          await Permission.requestInstallPackages.request();
-                        }
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: Text(AppLocalizations.of(context).enableAutoUpdates),
+                  subtitle:
+                      Text(AppLocalizations.of(context).autoUpdatesFdroidNote),
+                  value: _enableAutoUpdate,
+                  onChanged: (val) async {
+                    setState(() {
+                      _enableAutoUpdate = val;
+                    });
+                    if (val && Platform.isAndroid) {
+                      // Request install permission if they enable it
+                      final status =
+                          await Permission.requestInstallPackages.status;
+                      if (!status.isGranted) {
+                        await Permission.requestInstallPackages.request();
                       }
-                    },
-                  ),
-                  const Divider(),
-                  SwitchListTile(
-                    title: Text(
-                        AppLocalizations.of(context)
-                            .enableBetaUpdatesOnboarding),
-                    subtitle: Text(
-                        AppLocalizations.of(context).betaUpdatesNote),
-                    activeThumbColor: Colors.orange,
-                    activeTrackColor: Colors.orangeAccent,
-                    inactiveThumbColor: Colors.grey,
-                    inactiveTrackColor: Colors.grey.withValues(alpha: 0.5),
-                    value: _enableBetaUpdates,
-                    onChanged: (val) async {
-                      setState(() {
-                        _enableBetaUpdates = val;
-                      });
-                      final db = MyLibraryDb.instance;
-                      await db.savePreference(
-                          'includePrereleaseUpdates', val ? 1 : 0);
-                    },
-                  ),
-                ],
-              ),
+                    }
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  title: Text(
+                      AppLocalizations.of(context).enableBetaUpdatesOnboarding),
+                  subtitle: Text(AppLocalizations.of(context).betaUpdatesNote),
+                  value: _enableBetaUpdates,
+                  onChanged: (val) async {
+                    setState(() {
+                      _enableBetaUpdates = val;
+                    });
+                    final db = MyLibraryDb.instance;
+                    await db.savePreference(
+                        'includePrereleaseUpdates', val ? 1 : 0);
+                  },
+                ),
+              ],
             ),
           ),
         ],
@@ -365,27 +363,34 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildDonationPage() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.favorite, size: 60, color: Colors.red),
+          Icon(
+            Icons.favorite_rounded,
+            size: 60,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(height: 20),
           Text(AppLocalizations.of(context).supportAnnasArchive,
-              style: Theme.of(context).textTheme.headlineSmall),
+              style: theme.textTheme.headlineSmall),
           const SizedBox(height: 20),
           Text(
             AppLocalizations.of(context).donationPitch,
             textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 20),
           TextField(
             controller: _donationKeyController,
             decoration: InputDecoration(
-              labelText:
-                  AppLocalizations.of(context).annasSecretKey,
-              border: const OutlineInputBorder(),
+              labelText: AppLocalizations.of(context).annasSecretKey,
+              prefixIcon: const Icon(Icons.key_outlined),
             ),
             onChanged: (value) {
               ref.read(donationKeyProvider.notifier).state = value;
@@ -397,22 +402,26 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildSponsorPage() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.code, size: 60),
+          Icon(Icons.code_rounded, size: 60, color: theme.colorScheme.primary),
           const SizedBox(height: 20),
           Text(AppLocalizations.of(context).supportThisApp,
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 30),
+              style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 24),
           Text(
             AppLocalizations.of(context).sponsorPitch,
             textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
+          const SizedBox(height: 24),
+          FilledButton.tonalIcon(
             onPressed: () =>
                 launchUrl(Uri.parse('https://github.com/sponsors/warreth')),
             icon: const Icon(Icons.open_in_new),
@@ -424,30 +433,36 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildNotificationPage() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.notifications, size: 60),
+          Icon(
+            Icons.notifications_rounded,
+            size: 60,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(height: 20),
           Text(AppLocalizations.of(context).stayUpdated,
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 30),
-          SwitchListTile(
-            title: Text(
-                AppLocalizations.of(context).enableNotifications),
-            subtitle: Text(
-                AppLocalizations.of(context).notifyOnComplete),
-            value: _enableNotifications,
-            onChanged: (val) async {
-              setState(() {
-                _enableNotifications = val;
-              });
-              if (val) {
-                await Permission.notification.request();
-              }
-            },
+              style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 24),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: SwitchListTile(
+              title: Text(AppLocalizations.of(context).enableNotifications),
+              subtitle: Text(AppLocalizations.of(context).notifyOnComplete),
+              value: _enableNotifications,
+              onChanged: (val) async {
+                setState(() {
+                  _enableNotifications = val;
+                });
+                if (val) {
+                  await Permission.notification.request();
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -455,33 +470,35 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   }
 
   Widget _buildThemePage() {
+    final theme = Theme.of(context);
     final mode = ref.watch(themeModeProvider);
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.palette, size: 60),
+          Icon(Icons.palette_rounded,
+              size: 60, color: theme.colorScheme.primary),
           const SizedBox(height: 20),
           Text(AppLocalizations.of(context).chooseTheme,
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 30),
+              style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _ThemeCard(
                   title: AppLocalizations.of(context).lightThemeShort,
-                  icon: Icons.light_mode,
+                  icon: Icons.light_mode_rounded,
                   selected: mode == ThemeMode.light,
                   onTap: () {
                     ref
                         .read(themeModeProvider.notifier)
                         .setTheme(ThemeMode.light);
                   }),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
               _ThemeCard(
                   title: AppLocalizations.of(context).darkThemeShort,
-                  icon: Icons.dark_mode,
+                  icon: Icons.dark_mode_rounded,
                   selected: mode == ThemeMode.dark,
                   onTap: () {
                     ref
@@ -511,35 +528,44 @@ class _ThemeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 100,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)
-              : null,
-          border: Border.all(
-            color: selected
-                ? Theme.of(context).colorScheme.secondary
-                : Colors.grey,
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return SizedBox(
+      width: 112,
+      child: Card(
+        color: selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: selected ? scheme.primary : scheme.outlineVariant,
             width: selected ? 2 : 1,
           ),
-          borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
-          children: [
-            Icon(icon,
-                size: 30,
-                color:
-                    selected ? Theme.of(context).colorScheme.secondary : null),
-            const SizedBox(height: 8),
-            Text(title,
-                style: TextStyle(
-                    fontWeight:
-                        selected ? FontWeight.bold : FontWeight.normal)),
-          ],
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                Icon(
+                  icon,
+                  size: 32,
+                  color: selected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color:
+                        selected ? scheme.onPrimaryContainer : scheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

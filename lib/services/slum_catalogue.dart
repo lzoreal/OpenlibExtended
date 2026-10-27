@@ -66,7 +66,8 @@ extension ProtectionRank on Protection {
 
   /// True when a plain Dio client has any chance without a browser.
   /// Used to decide whether a provider should even attempt a mirror.
-  bool get solvableHeadless => this == Protection.none || this == Protection.diamwall;
+  bool get solvableHeadless =>
+      this == Protection.none || this == Protection.diamwall;
 }
 
 /// One mirror as open-slum.org reports it, plus the two facts SLUM
@@ -118,8 +119,7 @@ class SlumSite {
       };
 
   @override
-  String toString() =>
-      'SlumSite($host, ${status.name}, ${protection.name})';
+  String toString() => 'SlumSite($host, ${status.name}, ${protection.name})';
 }
 
 /// Reads mirror lists and their status from open-slum.org.
@@ -235,8 +235,7 @@ class SlumCatalogue {
     if (!force &&
         nothingKnown &&
         _lastAttemptAt != null &&
-        DateTime.now().difference(_lastAttemptAt!) <
-            _retryAfterFailedFetch) {
+        DateTime.now().difference(_lastAttemptAt!) < _retryAfterFailedFetch) {
       return _cache;
     }
     _lastAttemptAt = DateTime.now();
@@ -347,8 +346,9 @@ class SlumCatalogue {
     if (fromBadge != null) return fromBadge;
 
     // Timeline readings are oldest first; the last one is the newest.
-    final readings =
-        card.querySelectorAll('[data-status]').map((e) => e.attributes['data-status']);
+    final readings = card
+        .querySelectorAll('[data-status]')
+        .map((e) => e.attributes['data-status']);
     for (final value in readings.toList().reversed) {
       final parsed = _statusFromWord(value);
       if (parsed != null) return parsed;
@@ -396,7 +396,8 @@ class SlumCatalogue {
       final text = div.text;
       final index = text.indexOf(label);
       if (index == -1) continue;
-      final match = RegExp(r'\d+').firstMatch(text.substring(index + label.length));
+      final match =
+          RegExp(r'\d+').firstMatch(text.substring(index + label.length));
       if (match != null) return int.tryParse(match.group(0)!);
     }
     return null;
@@ -405,21 +406,35 @@ class SlumCatalogue {
   String _normalize(String url) =>
       url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 
-  /// Auto order: never-down mirrors first by protection difficulty
-  /// (unprotected -> DiamWall -> DDoS-Guard/Cloudflare -> unknown), then
-  /// by SLUM status, then by latency. Mirrors SLUM reports DOWN sort
-  /// last whatever their protection - they are never attempted - and
-  /// callers that must not touch them filter with [SlumSite.isDown].
-  static List<SlumSite> sortAuto(Iterable<SlumSite> sites) {
+  /// Auto order: mirrors with a fresh local reading come first, fastest
+  /// first; mirrors without one keep SLUM's protection/status/latency
+  /// order after them. A mirror SLUM reports DOWN always sorts last and
+  /// is never attempted - callers filter with [SlumSite.isDown].
+  static List<SlumSite> sortAuto(
+    Iterable<SlumSite> sites, {
+    Map<String, int> localLatencyMs = const {},
+  }) {
+    int latencyOf(SlumSite site) =>
+        localLatencyMs[site.host] ?? site.latencyMs ?? 1 << 30;
+
     final list = sites.toList();
     list.sort((a, b) {
       if (a.isDown != b.isDown) return a.isDown ? 1 : -1;
+
+      final aLocal = localLatencyMs[a.host];
+      final bLocal = localLatencyMs[b.host];
+      if (aLocal != null || bLocal != null) {
+        if (aLocal == null) return 1;
+        if (bLocal == null) return -1;
+        final byLocal = aLocal.compareTo(bLocal);
+        if (byLocal != 0) return byLocal;
+      }
+
       final byProtection = a.protection.rank.compareTo(b.protection.rank);
       if (byProtection != 0) return byProtection;
       final byStatus = a.statusTier.compareTo(b.statusTier);
       if (byStatus != 0) return byStatus;
-      final byLatency =
-          (a.latencyMs ?? 1 << 30).compareTo(b.latencyMs ?? 1 << 30);
+      final byLatency = latencyOf(a).compareTo(latencyOf(b));
       if (byLatency != 0) return byLatency;
       return a.host.compareTo(b.host);
     });

@@ -81,7 +81,7 @@ void main() {
 - No mirror probing
 - Fast hosts first
 
-See the [release page](https://github.com/warreth/OpenlibExtended/releases).
+See the [release page](https://github.com/lzoreal/OpenlibExtended/releases).
 '''),
       ),
     );

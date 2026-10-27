@@ -19,6 +19,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
+import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/logger.dart';
 
@@ -137,7 +138,7 @@ class UpdateCheckerService {
   final MyLibraryDb _database = MyLibraryDb.instance;
 
   // GitHub repository information - update these for your repo
-  static const String _owner = "warreth";
+  static const String _owner = "lzoreal";
   static const String _repo = "OpenlibExtended";
   static const String _apiUrl = "https://api.github.com/repos";
 
@@ -365,30 +366,27 @@ class UpdateCheckerService {
     final shouldRequest = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
         return AlertDialog(
           title: Row(
             children: [
               Icon(Icons.security,
-                  color: Theme.of(dialogContext).colorScheme.secondary),
+                  color: Theme.of(dialogContext).colorScheme.primary),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  "Permission Required",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  l10n.updatePermissionTitle,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-          content: const Text(
-            "To install app updates, OpenlibExtended needs permission to install packages.\n\n"
-            "This allows the app to automatically install new versions with bug fixes and new features.\n\n"
-            "You will be taken to Settings to enable this permission.",
-          ),
+          content: Text(l10n.updatePermissionBody),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
               child: Text(
-                "Cancel",
+                l10n.cancel,
                 style: TextStyle(
                   color: Theme.of(dialogContext)
                       .colorScheme
@@ -400,10 +398,10 @@ class UpdateCheckerService {
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: Text(
-                "Open Settings",
+                l10n.updateOpenSettings,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(dialogContext).colorScheme.secondary,
+                  color: Theme.of(dialogContext).colorScheme.primary,
                 ),
               ),
             ),
@@ -557,6 +555,7 @@ class UpdateCheckerService {
   // Open/Install the downloaded update file with fallback mechanisms
   Future<bool> openUpdateFile(String filePath, BuildContext context,
       {ReleaseInfo? release}) async {
+    final l10n = AppLocalizations.of(context);
     _logger.info("Opening update file", tag: "UpdateChecker", metadata: {
       "path": filePath,
     });
@@ -566,7 +565,7 @@ class UpdateCheckerService {
     if (!await file.exists()) {
       _logger.error("Update file does not exist", tag: "UpdateChecker");
       if (context.mounted) {
-        _showInstallErrorDialog(context, filePath, "Downloaded file not found",
+        _showInstallErrorDialog(context, filePath, l10n.updateFileNotFound,
             release: release);
       }
       return false;
@@ -577,8 +576,8 @@ class UpdateCheckerService {
       _logger.error("Update file is too small, likely corrupted",
           tag: "UpdateChecker", metadata: {"size": fileSize});
       if (context.mounted) {
-        _showInstallErrorDialog(context, filePath,
-            "Downloaded file appears to be corrupted (only ${_formatBytes(fileSize)})",
+        _showInstallErrorDialog(
+            context, filePath, l10n.updateFileCorrupted(_formatBytes(fileSize)),
             release: release);
       }
       return false;
@@ -614,6 +613,8 @@ class UpdateCheckerService {
   // Install APK on Android with multiple fallback methods
   Future<bool> _installApkWithFallbacks(String filePath, BuildContext context,
       {ReleaseInfo? release}) async {
+    final l10n = AppLocalizations.of(context);
+    final mayHaveFailedSilently = [l10n.updateMayHaveFailedSilently];
     // Track errors from each method for user display
     List<String> attemptedMethods = [];
     List<String> errorMessages = [];
@@ -623,8 +624,7 @@ class UpdateCheckerService {
     if (!hasPermission) {
       _logger.warning("Install permission denied", tag: "UpdateChecker");
       if (context.mounted) {
-        _showInstallErrorDialog(context, filePath,
-            "Permission to install apps was denied. You can still install manually.",
+        _showInstallErrorDialog(context, filePath, l10n.updatePermissionDenied,
             release: release);
       }
       return false;
@@ -633,18 +633,15 @@ class UpdateCheckerService {
     // Warn about debug builds
     if (kDebugMode && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Debug Build Detected: Update may fail with 'App not installed' due to signature mismatch. Uninstall this app first.",
-          ),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 10),
+        SnackBar(
+          content: Text(l10n.updateDebugBuildWarning),
+          duration: const Duration(seconds: 10),
         ),
       );
     }
 
     // Method 1: Try open_file (Most standard method)
-    attemptedMethods.add("Open File");
+    attemptedMethods.add(l10n.updateMethodOpenFile);
     try {
       _logger.info("Attempting installation with open_file",
           tag: "UpdateChecker");
@@ -655,19 +652,14 @@ class UpdateCheckerService {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text(
-                  "Opening installer... If nothing happens, the install failed."),
+              content: Text(l10n.updateOpeningInstaller),
               duration: const Duration(seconds: 5),
               action: SnackBarAction(
-                label: "Manual Install",
+                label: l10n.updateManualInstall,
                 onPressed: () {
                   if (context.mounted) {
-                    _showInstallFallbackDialog(
-                        context,
-                        filePath,
-                        attemptedMethods,
-                        ["May have failed silently"],
-                        release);
+                    _showInstallFallbackDialog(context, filePath,
+                        attemptedMethods, mayHaveFailedSilently, release);
                   }
                 },
               ),
@@ -689,7 +681,7 @@ class UpdateCheckerService {
     }
 
     // Method 2: Try apk_sideload
-    attemptedMethods.add("APK Sideload");
+    attemptedMethods.add(l10n.updateMethodApkSideload);
     try {
       _logger.info("Attempting installation with apk_sideload",
           tag: "UpdateChecker");
@@ -700,15 +692,14 @@ class UpdateCheckerService {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text(
-                "Opening installer... If nothing happens, the install failed."),
+            content: Text(l10n.updateOpeningInstaller),
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
-              label: "Manual Install",
+              label: l10n.updateManualInstall,
               onPressed: () {
                 if (context.mounted) {
                   _showInstallFallbackDialog(context, filePath,
-                      attemptedMethods, ["May have failed silently"], release);
+                      attemptedMethods, mayHaveFailedSilently, release);
                 }
               },
             ),
@@ -729,7 +720,7 @@ class UpdateCheckerService {
     }
 
     // Method 3: Try android_package_installer
-    attemptedMethods.add("Package Installer");
+    attemptedMethods.add(l10n.updateMethodPackageInstaller);
     try {
       _logger.info("Attempting installation with android_package_installer",
           tag: "UpdateChecker");
@@ -745,19 +736,14 @@ class UpdateCheckerService {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text(
-                    "Opening installer... If nothing happens, the install failed."),
+                content: Text(l10n.updateOpeningInstaller),
                 duration: const Duration(seconds: 5),
                 action: SnackBarAction(
-                  label: "Manual Install",
+                  label: l10n.updateManualInstall,
                   onPressed: () {
                     if (context.mounted) {
-                      _showInstallFallbackDialog(
-                          context,
-                          filePath,
-                          attemptedMethods,
-                          ["May have failed silently"],
-                          release);
+                      _showInstallFallbackDialog(context, filePath,
+                          attemptedMethods, mayHaveFailedSilently, release);
                     }
                   },
                 ),
@@ -799,6 +785,7 @@ class UpdateCheckerService {
       [List<String>? attemptedMethods,
       List<String>? errorMessages,
       ReleaseInfo? release]) async {
+    final l10n = AppLocalizations.of(context);
     final fileName = filePath.split("/").last;
     final hasErrors = errorMessages != null && errorMessages.isNotEmpty;
     final hasMethods = attemptedMethods != null && attemptedMethods.isNotEmpty;
@@ -807,14 +794,18 @@ class UpdateCheckerService {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-              SizedBox(width: 10),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Theme.of(dialogContext).colorScheme.tertiary,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  "Installation Issue",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  l10n.updateInstallationIssueTitle,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -824,13 +815,10 @@ class UpdateCheckerService {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "The automatic installer couldn't open the APK. This can happen on some Android versions.\n\n"
-                  "You can install manually using one of these options:",
-                ),
+                Text(l10n.updateInstallationIssueBody),
                 const SizedBox(height: 16),
                 Text(
-                  "File: $fileName",
+                  l10n.updateFileLabel(fileName),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(dialogContext)
@@ -862,7 +850,7 @@ class UpdateCheckerService {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Installation Failed",
+                          l10n.updateInstallationFailed,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -872,7 +860,7 @@ class UpdateCheckerService {
                         const SizedBox(height: 8),
                         if (hasMethods) ...[
                           Text(
-                            "Methods tried:",
+                            l10n.updateMethodsTried,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -895,7 +883,7 @@ class UpdateCheckerService {
                         if (hasErrors) ...[
                           const SizedBox(height: 8),
                           Text(
-                            "Errors encountered:",
+                            l10n.updateErrorsEncountered,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -909,7 +897,7 @@ class UpdateCheckerService {
                             final methodName =
                                 hasMethods && index < attemptedMethods.length
                                     ? attemptedMethods[index]
-                                    : "Method ${index + 1}";
+                                    : l10n.updateMethodNumber(index + 1);
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 4),
                               child: SelectableText(
@@ -935,7 +923,7 @@ class UpdateCheckerService {
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
-                "Cancel",
+                l10n.cancel,
                 style: TextStyle(
                   color: Theme.of(dialogContext)
                       .colorScheme
@@ -956,10 +944,10 @@ class UpdateCheckerService {
                   }
                 },
                 child: Text(
-                  "Download via Browser",
+                  l10n.updateDownloadViaBrowser,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(dialogContext).colorScheme.secondary,
+                    color: Theme.of(dialogContext).colorScheme.primary,
                   ),
                 ),
               ),
@@ -973,18 +961,23 @@ class UpdateCheckerService {
   Future<void> _showInstallErrorDialog(
       BuildContext context, String filePath, String errorMessage,
       {ReleaseInfo? release}) async {
+    final l10n = AppLocalizations.of(context);
     await showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 28),
-              SizedBox(width: 10),
+              Icon(
+                Icons.error_outline,
+                color: Theme.of(dialogContext).colorScheme.error,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  "Installation Error",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  l10n.updateInstallationErrorTitle,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -994,9 +987,9 @@ class UpdateCheckerService {
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
-                "OK",
+                l10n.updateOk,
                 style: TextStyle(
-                  color: Theme.of(dialogContext).colorScheme.secondary,
+                  color: Theme.of(dialogContext).colorScheme.primary,
                 ),
               ),
             ),
@@ -1008,10 +1001,10 @@ class UpdateCheckerService {
                       context, filePath, null, null, release);
                 },
                 child: Text(
-                  "Try Manual Install",
+                  l10n.updateTryManualInstall,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(dialogContext).colorScheme.secondary,
+                    color: Theme.of(dialogContext).colorScheme.primary,
                   ),
                 ),
               ),
@@ -1061,8 +1054,8 @@ class UpdateCheckerService {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Failed to install update: $e"),
-              backgroundColor: Colors.red,
+              content:
+                  Text(AppLocalizations.of(context).updateInstallFailed('$e')),
             ),
           );
         }
@@ -1089,6 +1082,7 @@ class UpdateCheckerService {
   Future<void> showUpdateDialog(
       BuildContext context, ReleaseInfo release) async {
     final downloadUrl = getDownloadUrlForPlatform(release);
+    final l10n = AppLocalizations.of(context);
 
     return showDialog(
       context: context,
@@ -1097,13 +1091,13 @@ class UpdateCheckerService {
           title: Row(
             children: [
               Icon(Icons.system_update,
-                  color: Theme.of(dialogContext).colorScheme.secondary),
+                  color: Theme.of(dialogContext).colorScheme.primary),
               const SizedBox(width: 10),
               Text(
-                "Update Available",
+                l10n.updateAvailableTitle,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(dialogContext).colorScheme.secondary,
+                  color: Theme.of(dialogContext).colorScheme.primary,
                 ),
               ),
             ],
@@ -1114,11 +1108,11 @@ class UpdateCheckerService {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "Version ${release.version} is available!",
+                  l10n.updateVersionAvailable(release.version),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(dialogContext).colorScheme.tertiary,
+                    color: Theme.of(dialogContext).colorScheme.onSurface,
                   ),
                 ),
                 if (release.isPrerelease)
@@ -1127,26 +1121,29 @@ class UpdateCheckerService {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
+                      color:
+                          Theme.of(dialogContext).colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      "Pre-release",
+                    child: Text(
+                      l10n.updatePreRelease,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange,
+                        color: Theme.of(dialogContext)
+                            .colorScheme
+                            .onTertiaryContainer,
                       ),
                     ),
                   ),
                 const SizedBox(height: 12),
                 if (release.body.isNotEmpty) ...[
                   Text(
-                    "What's new:",
+                    l10n.updateWhatsNew,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(dialogContext).colorScheme.tertiary,
+                      color: Theme.of(dialogContext).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1173,7 +1170,7 @@ class UpdateCheckerService {
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
-                "Later",
+                l10n.updateLater,
                 style: TextStyle(
                   color: Theme.of(dialogContext)
                       .colorScheme
@@ -1192,10 +1189,10 @@ class UpdateCheckerService {
                   }
                 },
                 child: Text(
-                  "Download & Install",
+                  l10n.updateDownloadAndInstall,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(dialogContext).colorScheme.secondary,
+                    color: Theme.of(dialogContext).colorScheme.primary,
                   ),
                 ),
               ),
@@ -1216,11 +1213,11 @@ class UpdateCheckerService {
                 },
                 child: Text(
                   downloadUrl != null
-                      ? "Download & Install"
-                      : "Download from GitHub",
+                      ? l10n.updateDownloadAndInstall
+                      : l10n.updateDownloadFromGithub,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(dialogContext).colorScheme.secondary,
+                    color: Theme.of(dialogContext).colorScheme.primary,
                   ),
                 ),
               ),
@@ -1235,10 +1232,10 @@ class UpdateCheckerService {
                   }
                 },
                 child: Text(
-                  "View on GitHub",
+                  l10n.updateViewOnGithub,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.secondary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
@@ -1354,6 +1351,7 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Row(
         children: [
@@ -1364,26 +1362,26 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
                     ? Icons.error
                     : Icons.download,
             color: _downloadComplete
-                ? Colors.green
+                ? Theme.of(context).colorScheme.primary
                 : _errorMessage != null
-                    ? Colors.red
-                    : Theme.of(context).colorScheme.secondary,
+                    ? Theme.of(context).colorScheme.error
+                    : Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _downloadComplete
-                  ? "Download Complete"
+                  ? l10n.updateDownloadComplete
                   : _errorMessage != null
-                      ? "Download Failed"
-                      : "Downloading Update",
+                      ? l10n.downloadFailedGeneric
+                      : l10n.updateDownloading,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: _downloadComplete
-                    ? Colors.green
+                    ? Theme.of(context).colorScheme.primary
                     : _errorMessage != null
-                        ? Colors.red
-                        : Theme.of(context).colorScheme.secondary,
+                        ? Theme.of(context).colorScheme.error
+                        : Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
@@ -1394,31 +1392,35 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Version ${widget.release.version}",
+            l10n.updateVersionLabel(widget.release.version),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.tertiary,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 16),
           if (_errorMessage != null) ...[
             Text(
               _errorMessage!,
-              style: const TextStyle(
-                color: Colors.red,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
                 fontSize: 13,
               ),
             ),
           ] else if (_downloadComplete) ...[
-            const Row(
+            Row(
               children: [
-                Icon(Icons.check, color: Colors.green, size: 20),
-                SizedBox(width: 8),
+                Icon(
+                  Icons.check,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
                 Text(
-                  "Opening installer...",
+                  l10n.updateOpeningInstallerShort,
                   style: TextStyle(
-                    color: Colors.green,
+                    color: Theme.of(context).colorScheme.primary,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1428,10 +1430,12 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
           ] else ...[
             LinearProgressIndicator(
               value: _progress,
-              backgroundColor:
-                  Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.2),
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.2),
               valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).colorScheme.secondary,
+                Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(height: 8),
@@ -1443,13 +1447,13 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.tertiary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   _totalBytes > 0
                       ? "${_formatBytes(_downloadedBytes)} / ${_formatBytes(_totalBytes)}"
-                      : "Connecting...",
+                      : l10n.updateConnecting,
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context)
@@ -1468,7 +1472,7 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
           TextButton(
             onPressed: _cancelDownload,
             child: Text(
-              "Cancel",
+              l10n.cancel,
               style: TextStyle(
                 color: Theme.of(context)
                     .colorScheme
@@ -1481,7 +1485,7 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
           TextButton(
             onPressed: widget.onCancel,
             child: Text(
-              "Close",
+              l10n.close,
               style: TextStyle(
                 color: Theme.of(context)
                     .colorScheme
@@ -1503,10 +1507,10 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
               _startDownload();
             },
             child: Text(
-              "Retry",
+              l10n.retry,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.secondary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),

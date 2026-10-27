@@ -154,8 +154,7 @@ class LibgenService {
           options: Options(headers: {'Referer': '$origin/index.php'}),
         );
         if (response.statusCode != 200) continue;
-        final cover =
-            parseAdsCover(response.data.toString(), origin);
+        final cover = parseAdsCover(response.data.toString(), origin);
         if (cover != null) return cover;
       } catch (_) {
         // Next mirror.

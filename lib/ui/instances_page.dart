@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/instance_manager.dart';
+import 'package:openlib/services/mirror_latency.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/settings_row.dart';
@@ -43,6 +44,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
         ref.read(instanceAutoModeProvider.notifier).state = auto;
       }
     });
+    ref.read(mirrorLatencyProvider.notifier).load();
   }
 
   static const _serviceOrder = [
@@ -111,15 +113,72 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     }
   }
 
+  Future<void> _testLatency() async {
+    if (ref.read(mirrorLatencyProvider).testing) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
+    final views = <InstanceView>[];
+    for (final service in _serviceOrder) {
+      try {
+        views.addAll(await ref.read(serviceInstancesProvider(service).future));
+      } catch (_) {
+        // A service with no catalogue answer simply has nothing to probe.
+      }
+    }
+    if (!mounted) return;
+
+    try {
+      final result = await ref.read(mirrorLatencyProvider.notifier).test(views);
+      if (!mounted) return;
+      for (final service in _serviceOrder) {
+        ref.invalidate(serviceInstancesProvider(service));
+      }
+      final String message;
+      if (result.total == 0) {
+        message = l10n.mirrorLatencyNoTargets;
+      } else if (result.reachable == 0) {
+        message = l10n.mirrorLatencyAllTimedOut;
+      } else {
+        message = l10n.mirrorLatencyDone(
+          result.reachable,
+          result.total,
+          formatMirrorLatency(result.fastestMs!),
+        );
+      }
+      messenger.showSnackBar(SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text(l10n.mirrorLatencyFailed('$e')),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final autoMode = ref.watch(instanceAutoModeProvider);
+    final latency = ref.watch(mirrorLatencyProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.mirrorsAndProviders),
         actions: [
+          IconButton(
+            key: const ValueKey('mirror-latency-test'),
+            onPressed: latency.testing ? null : _testLatency,
+            tooltip: l10n.mirrorLatencyTestTooltip,
+            icon: latency.testing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.speed_rounded, size: 20),
+          ),
           IconButton(
             onPressed: _refreshing ? null : _refresh,
             tooltip: l10n.refreshMirrors,
@@ -143,7 +202,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
               InlineHint(
                   message: l10n.mirrorFooterNote, icon: Icons.shield_outlined),
               for (final service in _serviceOrder)
-                _serviceList(service, autoMode),
+                _serviceList(service, autoMode, latency),
               const SizedBox(height: 16),
               _buildModeCard(autoMode),
             ],
@@ -177,7 +236,8 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     );
   }
 
-  Widget _serviceList(MirrorService service, bool autoMode) {
+  Widget _serviceList(
+      MirrorService service, bool autoMode, MirrorLatencyState latency) {
     final l10n = AppLocalizations.of(context);
     final async = ref.watch(serviceInstancesProvider(service));
 
@@ -201,7 +261,8 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
               )
             else
               for (var i = 0; i < views.length; i++) ...[
-                _mirrorCard(service, views[i], i, views.length, autoMode),
+                _mirrorCard(
+                    service, views[i], i, views.length, autoMode, latency),
                 if (i < views.length - 1) const SizedBox(height: 8),
               ],
           ],
@@ -252,7 +313,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
   }
 
   Widget _mirrorCard(MirrorService service, InstanceView view, int index,
-      int total, bool autoMode) {
+      int total, bool autoMode, MirrorLatencyState latency) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
@@ -352,62 +413,74 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                     ),
                   ),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: _statusColor(scheme, site.status),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        [
-                          _statusLabel(l10n, site.status),
-                          if (site.latencyMs != null) '${site.latencyMs}ms',
-                          if (down) l10n.reportedDownNeverContacted,
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SwissText.micro.copyWith(
-                          color:
-                              down ? scheme.tertiary : scheme.onSurfaceVariant,
+                    Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: _statusColor(scheme, site.status),
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            [
+                              _statusLabel(l10n, site.status),
+                              if (site.latencyMs != null)
+                                'SLUM ${formatMirrorLatency(site.latencyMs!)}',
+                              if (down) l10n.reportedDownNeverContacted,
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: SwissText.micro.copyWith(
+                              color: down
+                                  ? scheme.tertiary
+                                  : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (!autoMode) ...[
+                          IconButton(
+                            icon: const Icon(Icons.keyboard_arrow_up, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            tooltip: l10n.moveUp,
+                            onPressed: index == 0
+                                ? null
+                                : () async {
+                                    await ref
+                                        .read(instanceManagerProvider)
+                                        .move(service, site.host, -1);
+                                    ref.invalidate(
+                                        serviceInstancesProvider(service));
+                                  },
+                          ),
+                          IconButton(
+                            icon:
+                                const Icon(Icons.keyboard_arrow_down, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            tooltip: l10n.moveDown,
+                            onPressed: index == total - 1
+                                ? null
+                                : () async {
+                                    await ref
+                                        .read(instanceManagerProvider)
+                                        .move(service, site.host, 1);
+                                    ref.invalidate(
+                                        serviceInstancesProvider(service));
+                                  },
+                          ),
+                        ],
+                      ],
                     ),
-                    const Spacer(),
-                    if (!autoMode) ...[
-                      IconButton(
-                        icon: const Icon(Icons.keyboard_arrow_up, size: 18),
-                        visualDensity: VisualDensity.compact,
-                        tooltip: l10n.moveUp,
-                        onPressed: index == 0
-                            ? null
-                            : () async {
-                                await ref
-                                    .read(instanceManagerProvider)
-                                    .move(service, site.host, -1);
-                                ref.invalidate(
-                                    serviceInstancesProvider(service));
-                              },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                        visualDensity: VisualDensity.compact,
-                        tooltip: l10n.moveDown,
-                        onPressed: index == total - 1
-                            ? null
-                            : () async {
-                                await ref
-                                    .read(instanceManagerProvider)
-                                    .move(service, site.host, 1);
-                                ref.invalidate(
-                                    serviceInstancesProvider(service));
-                              },
-                      ),
+                    if (!down) ...[
+                      const SizedBox(height: 4),
+                      _localLatencyLine(view, latency),
                     ],
                   ],
                 ),
@@ -417,6 +490,87 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
         ),
       ),
     );
+  }
+
+  Widget _localLatencyLine(InstanceView view, MirrorLatencyState latency) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final site = view.site;
+    final reading = latency.readings[site.host];
+    final testing = latency.testing && latency.testingHosts.contains(site.host);
+
+    Widget dot(Color color) => Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        );
+
+    Widget line(Widget leading, String text, Color color) {
+      return Row(
+        key: ValueKey('mirror-local-latency-${site.host}'),
+        children: [
+          leading,
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: SwissText.micro.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (testing) {
+      return line(
+        const SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(strokeWidth: 1.5),
+        ),
+        l10n.mirrorLatencyTesting,
+        scheme.onSurfaceVariant,
+      );
+    }
+    if (reading == null) {
+      return line(
+        dot(scheme.outlineVariant),
+        l10n.mirrorLatencyNotTested,
+        scheme.outline,
+      );
+    }
+
+    final milliseconds = reading.milliseconds;
+    if (milliseconds == null) {
+      return line(
+        dot(scheme.error),
+        l10n.mirrorLatencyTimeout,
+        scheme.error,
+      );
+    }
+
+    final now = DateTime.now();
+    final stale = !reading.isFreshAt(now);
+    final parts = [l10n.mirrorLatencyLocal(formatMirrorLatency(milliseconds))];
+    if (stale) {
+      parts.add(l10n.mirrorLatencyExpired);
+    } else {
+      final age = now.difference(reading.testedAt);
+      if (!age.isNegative && age < const Duration(minutes: 1)) {
+        parts.add(l10n.mirrorLatencyJustNow);
+      }
+    }
+    final color = stale
+        ? scheme.outline
+        : milliseconds >= 1000
+            ? scheme.tertiary
+            : scheme.primary;
+    return line(dot(color), parts.join(' · '), color);
   }
 
   Color _statusColor(ColorScheme scheme, SlumStatus status) {
