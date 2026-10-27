@@ -515,9 +515,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       ),
                       child: Text(
                         'O',
-                        style: TextStyle(
+                        style: SwissText.headline.copyWith(
                           color: scheme.onPrimary,
-                          fontSize: 24,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -529,32 +528,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                         children: [
                           Text(
                             'OpenlibExtended',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelLarge
-                                ?.copyWith(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.2,
-                                ),
+                            style: SwissText.subtitle.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: scheme.onSurface,
+                            ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Text(
                             version.isEmpty
                                 ? 'AGPL-3.0'
                                 : '$version · AGPL-3.0',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                  fontSize: 11,
-                                ),
+                            style: SwissText.micro.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     Container(
+                      height: 24,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 4,
@@ -565,11 +557,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       ),
                       child: Text(
                         'AGPL-3.0',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: scheme.secondary,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: SwissText.badge.copyWith(
+                          color: scheme.secondary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -637,11 +628,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           child: Text(
             l10n.aboutDisclaimer,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                  fontSize: 10.5,
-                  height: 1.7,
-                ),
+            style: SwissText.micro.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
         ),
       ],
@@ -902,11 +891,7 @@ class _SearchProvidersWidget extends ConsumerWidget {
                       l10n.searchOrderHint,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.outline,
-                        fontSize: 10.5,
-                        height: 1.5,
-                      ),
+                      style: SwissText.micro.copyWith(color: scheme.outline),
                     ),
                   ),
                   TextButton(
@@ -925,9 +910,8 @@ class _SearchProvidersWidget extends ConsumerWidget {
                     ),
                     child: Text(
                       l10n.searchOrderReset,
-                      style: theme.textTheme.labelSmall?.copyWith(
+                      style: SwissText.micro.copyWith(
                         color: scheme.primary,
-                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1136,9 +1120,8 @@ class _ProviderCard extends StatelessWidget {
                         ),
                         child: Text(
                           mark,
-                          style: theme.textTheme.labelSmall?.copyWith(
+                          style: SwissText.micro.copyWith(
                             color: logoForeground,
-                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -1150,19 +1133,15 @@ class _ProviderCard extends StatelessWidget {
                           children: [
                             Text(
                               name,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: SwissText.label,
                             ),
                             const SizedBox(height: 2),
                             Text(
                               subtitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
+                              style: SwissText.micro.copyWith(
                                 color: scheme.onSurfaceVariant,
-                                fontSize: 10.5,
                               ),
                             ),
                           ],
@@ -1198,9 +1177,8 @@ class _ProviderCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           selected ? l10n.sourceOn : l10n.sourceOff,
-                          style: theme.textTheme.labelSmall?.copyWith(
+                          style: SwissText.badge.copyWith(
                             color: selected ? scheme.secondary : scheme.outline,
-                            fontSize: 10,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1217,9 +1195,8 @@ class _ProviderCard extends StatelessWidget {
                           ),
                           child: Text(
                             l10n.mirrorsShort,
-                            style: theme.textTheme.labelSmall?.copyWith(
+                            style: SwissText.micro.copyWith(
                               color: scheme.primary,
-                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1447,18 +1424,14 @@ class _LanguageSelectorWidgetState
                       children: [
                         Text(
                           l10n.languageSetting,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: SwissText.label,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           l10n.languageCardHint,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontSize: 11,
+                          style: SwissText.micro.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
@@ -1468,9 +1441,8 @@ class _LanguageSelectorWidgetState
                   const SizedBox(width: 8),
                   Text(
                     nativeName,
-                    style: theme.textTheme.labelSmall?.copyWith(
+                    style: SwissText.caption.copyWith(
                       color: scheme.outline,
-                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1565,13 +1537,12 @@ class _LanguageRow extends StatelessWidget {
                 ),
                 child: Text(
                   code,
-                  style: theme.textTheme.labelSmall?.copyWith(
+                  style: SwissText.badge.copyWith(
                     color: selected
                         ? scheme.onPrimaryContainer
                         : scheme.onSurfaceVariant,
-                    fontSize: 9,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.04,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),
@@ -1584,19 +1555,17 @@ class _LanguageRow extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontSize: 12.5,
+                      style: SwissText.caption.copyWith(
                         fontWeight: FontWeight.w700,
                         color: selected ? scheme.primary : scheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontSize: 10.5,
+                      style: SwissText.micro.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
@@ -1774,8 +1743,7 @@ class _ThemeOption extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 10,
+                style: SwissText.badge.copyWith(
                   fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                   color:
                       selected ? scheme.onPrimaryContainer : scheme.onSurface,
@@ -1895,17 +1863,13 @@ class _FontSizeSelector extends ConsumerWidget {
             Expanded(
               child: Text(
                 l10n.fontSizeTitle,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: SwissText.label,
               ),
             ),
             Text(
               '${(scale * 100).round()}%',
-              style: theme.textTheme.labelSmall?.copyWith(
+              style: SwissText.caption.copyWith(
                 color: scheme.primary,
-                fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1922,9 +1886,7 @@ class _FontSizeSelector extends ConsumerWidget {
             children: [
               Text(
                 'Aa',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
+                style: SwissText.title.copyWith(
                   letterSpacing: -1,
                   color: scheme.primary,
                 ),

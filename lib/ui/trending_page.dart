@@ -6,146 +6,160 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
-import 'package:openlib/ui/components/error_widget.dart';
-import 'package:openlib/ui/results_page.dart';
-import 'extensions.dart';
-
+import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/services/open_library.dart' show TrendingBookData;
 import 'package:openlib/state/state.dart'
     show getTrendingBooks, enableFiltersState;
+import 'package:openlib/ui/categories_page.dart' show GenreShortcutSection;
+import 'package:openlib/ui/components/error_widget.dart';
+import 'package:openlib/ui/components/section_header.dart';
+import 'package:openlib/ui/results_page.dart';
+import 'package:openlib/ui/swiss_grid.dart';
 
 class TrendingPage extends ConsumerWidget {
   const TrendingPage({super.key});
 
-  final double imageHeight = 145;
-  final double imageWidth = 105;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final trendingBooks = ref.watch(getTrendingBooks);
+
     return trendingBooks.when(
-        skipLoadingOnRefresh: false,
-        data: (data) {
-          return Padding(
-            padding: const EdgeInsets.only(left: 5, right: 5, top: 10),
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.all(5),
-                  sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 10.0,
-                      crossAxisSpacing: 13.0,
-                      mainAxisExtent: 205,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (BuildContext context, int index) {
-                        return InkWell(
-                          onTap: () {
-                            ref.read(enableFiltersState.notifier).state = false;
-                            Navigator.push(context, MaterialPageRoute(
-                                builder: (BuildContext context) {
-                              return ResultPage(
-                                  searchQuery: data[index].title!);
-                            }));
-                          },
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: double.infinity,
-                            child: Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  CachedNetworkImage(
-                                    height: imageHeight,
-                                    width: imageWidth,
-                                    imageUrl: data[index].thumbnail!,
-                                    imageBuilder: (context, imageProvider) =>
-                                        Container(
-                                      decoration: BoxDecoration(
-                                        boxShadow: const [
-                                          BoxShadow(
-                                              color: Colors.grey,
-                                              spreadRadius: 0.1,
-                                              blurRadius: 1)
-                                        ],
-                                        borderRadius: const BorderRadius.all(
-                                            Radius.circular(5)),
-                                        image: DecorationImage(
-                                          image: imageProvider,
-                                          fit: BoxFit.fill,
-                                        ),
-                                      ),
-                                    ),
-                                    placeholder: (context, url) => Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(5),
-                                        color: "#E3E8E9".toColor(),
-                                      ),
-                                      height: imageHeight,
-                                      width: imageWidth,
-                                    ),
-                                    errorWidget: (context, url, error) {
-                                      return Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(5),
-                                          color: Colors.grey,
-                                        ),
-                                        height: imageHeight,
-                                        width: imageWidth,
-                                        child: const Center(
-                                          child: Icon(Icons.image_rounded),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: SizedBox(
-                                      width: imageWidth,
-                                      child: Text(
-                                        data[index].title!,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .displayMedium,
-                                        maxLines: 2,
-                                      ),
-                                    ),
-                                  ),
-                                ]),
+      skipLoadingOnRefresh: false,
+      data: (data) {
+        return CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              sliver: SliverToBoxAdapter(
+                child: SectionHeader(
+                  title: l10n.trendingThisWeek,
+                  hint: l10n.trendingSource,
+                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 232,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: data.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final book = data[index];
+                    return _TrendingBookCard(
+                      book: book,
+                      onTap: () {
+                        ref.read(enableFiltersState.notifier).state = false;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ResultPage(searchQuery: book.title!),
                           ),
                         );
                       },
-                      childCount: data.length,
+                    );
+                  },
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: GenreShortcutSection(title: l10n.keepExploring),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          ],
+        );
+      },
+      error: (error, _) {
+        return CustomErrorWidget(
+          error: error,
+          stackTrace: StackTrace.empty,
+          onRefresh: () {
+            // ignore: unused_result
+            ref.refresh(getTrendingBooks);
+          },
+        );
+      },
+      loading: () {
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+}
+
+class _TrendingBookCard extends StatelessWidget {
+  const _TrendingBookCard({required this.book, required this.onTap});
+
+  final TrendingBookData book;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return SizedBox(
+      key: const ValueKey('trending-poster'),
+      width: 128,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(SwissRadius.field),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(SwissRadius.field),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.shadow.withValues(alpha: 0.09),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(SwissRadius.field),
+                child: AspectRatio(
+                  key: const ValueKey('trending-cover'),
+                  aspectRatio: 2 / 3,
+                  child: CachedNetworkImage(
+                    imageUrl: book.thumbnail ?? '',
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.menu_book_outlined,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          );
-        },
-        error: (error, _) {
-          return CustomErrorWidget(
-            error: error,
-            stackTrace: StackTrace.empty,
-            onRefresh: () {
-              // ignore: unused_result
-              ref.refresh(getTrendingBooks);
-            },
-          );
-        },
-        loading: () {
-          return Center(
-              child: SizedBox(
-            width: 25,
-            height: 25,
-            child: CircularProgressIndicator(
-              color: Theme.of(context).colorScheme.secondary,
-              strokeCap: StrokeCap.round,
+            const SizedBox(height: 8),
+            Text(
+              book.title ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: SwissText.micro.copyWith(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface,
+              ),
             ),
-          ));
-        });
+          ],
+        ),
+      ),
+    );
   }
 }

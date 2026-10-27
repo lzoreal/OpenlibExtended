@@ -1111,19 +1111,16 @@ class _EmptyResults extends StatelessWidget {
                 Text(
                   l10n.noResultsFor(query),
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  style: SwissText.subtitle.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 8),
                 Text(
                   l10n.noResultsSourcesBody,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: SwissText.micro.copyWith(
                     color: scheme.onSurfaceVariant,
-                    fontSize: 11.5,
-                    height: 1.7,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -1206,16 +1203,12 @@ class _SourceStatusCard extends StatelessWidget {
                   children: [
                     Text(
                       l10n.sourceStatusTitle,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: SwissText.label,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       l10n.sourceStatusSummary(responded, failed),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontSize: 11,
+                      style: SwissText.micro.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
@@ -1272,18 +1265,14 @@ class _SourceStatusRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: scheme.outline,
-                fontSize: 11.5,
-              ),
+              style: SwissText.micro.copyWith(color: scheme.outline),
             ),
           ),
           Text(
             status,
             textAlign: TextAlign.right,
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: SwissText.micro.copyWith(
               color: color,
-              fontSize: 11.5,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1348,17 +1337,13 @@ class _SourcePickerSheet extends StatelessWidget {
                       children: [
                         Text(
                           l10n.sourceSheetTitle,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
+                          style: SwissText.subtitle,
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 4),
                         Text(
                           l10n.sourceSheetSubtitle(query),
-                          style: theme.textTheme.labelSmall?.copyWith(
+                          style: SwissText.badge.copyWith(
                             color: scheme.onSurfaceVariant,
-                            fontSize: 10,
                           ),
                         ),
                       ],
@@ -1427,10 +1412,8 @@ class _SourcePickerSheet extends StatelessWidget {
                     Expanded(
                       child: Text(
                         l10n.sourceSheetNote,
-                        style: theme.textTheme.labelSmall?.copyWith(
+                        style: SwissText.badge.copyWith(
                           color: scheme.onSurfaceVariant,
-                          fontSize: 9,
-                          height: 1.4,
                         ),
                       ),
                     ),
@@ -1477,13 +1460,12 @@ class _SourceOptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
         color: selected ? scheme.primaryContainer : Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(SwissRadius.field),
           side: BorderSide(
             color: selected ? scheme.primary : Colors.transparent,
           ),
@@ -1508,8 +1490,7 @@ class _SourceOptionRow extends StatelessWidget {
                               title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                fontSize: 11,
+                              style: SwissText.micro.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: selected
                                     ? scheme.onPrimaryContainer
@@ -1524,13 +1505,12 @@ class _SourceOptionRow extends StatelessWidget {
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
+                        style: SwissText.badge.copyWith(
                           color: failed
                               ? scheme.tertiary
                               : (selected
                                   ? scheme.onPrimaryContainer
                                   : scheme.onSurfaceVariant),
-                          fontSize: 8.5,
                         ),
                       ),
                     ],
@@ -1607,9 +1587,8 @@ class _SourceMarkBox extends StatelessWidget {
       ),
       child: Text(
         sourceMark(id),
-        style: TextStyle(
+        style: SwissText.badge.copyWith(
           color: scheme.onSurfaceVariant,
-          fontSize: 7.5,
           fontWeight: FontWeight.w800,
         ),
       ),

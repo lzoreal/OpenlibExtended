@@ -2,6 +2,7 @@
 import 'dart:io' show Platform;
 
 // Flutter imports:
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 // Package imports:
@@ -21,6 +22,7 @@ import 'package:openlib/services/update_checker.dart';
 import 'package:openlib/services/upgrade_detector.dart';
 import 'package:openlib/ui/components/bottom_nav_bar.dart';
 import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/components/swiss_grid_overlay.dart';
 import 'package:openlib/ui/download_center_page.dart';
 import 'package:openlib/ui/motion.dart';
 import 'package:openlib/ui/search_page.dart';
@@ -254,10 +256,27 @@ class MyApp extends ConsumerWidget {
       locale: ref.watch(localeOverrideProvider),
       builder: (context, child) {
         final scale = ref.watch(fontSizeScaleProvider);
-        return MediaQuery(
+        final content = MediaQuery(
           data: MediaQuery.of(context)
               .copyWith(textScaler: TextScaler.linear(scale)),
           child: child!,
+        );
+        if (!kDebugMode || !const bool.fromEnvironment('SWISS_GRID')) {
+          return content;
+        }
+        return Stack(
+          children: [
+            content,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: SwissGridOverlay(
+                    dark: Theme.of(context).brightness == Brightness.dark,
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
       debugShowCheckedModeBanner: false,
@@ -391,13 +410,12 @@ class _MainScreenState extends ConsumerState<MainScreen>
           ),
           content: Text(
             AppLocalizations.of(context).notificationsExplanation,
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context)
-                  .colorScheme
-                  .tertiary
-                  .withValues(alpha: 0.78),
-            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .tertiary
+                      .withValues(alpha: 0.78),
+                ),
           ),
           actions: [
             TextButton(
