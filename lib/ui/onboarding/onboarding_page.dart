@@ -423,7 +423,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           const SizedBox(height: 24),
           FilledButton.tonalIcon(
             onPressed: () =>
-                launchUrl(Uri.parse('https://github.com/sponsors/warreth')),
+                launchUrl(Uri.parse('https://github.com/sponsors/lzoreal')),
             icon: const Icon(Icons.open_in_new),
             label: Text(AppLocalizations.of(context).sponsorOnGithub),
           ),
