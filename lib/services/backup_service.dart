@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
 // Project imports:
+import 'package:openlib/services/book_info_cache.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/logger.dart';
 
@@ -30,7 +31,13 @@ class BackupService {
   Future<String> createBackupJson() async {
     final db = await _database.database;
 
-    final preferences = await db.query('preferences');
+    // The detail-page cache is rebuilable by design and would only bloat
+    // the file, so it never travels with a backup.
+    final preferences = (await db.query('preferences'))
+        .where((row) =>
+            !(row['name'] as String? ?? '')
+                .startsWith(BookInfoCache.keyPrefix))
+        .toList();
     final books = await db.query('mybooks');
     final bookPositions = await db.query('bookposition');
     final browserOptions = await db.query('browserOptions');

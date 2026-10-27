@@ -482,11 +482,6 @@
   .badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
   .badge.run .dot{animation:pulse 1.4s var(--ease) infinite}
 
-  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-  .stat-box{background:var(--low);border-radius:16px;padding:8px;text-align:center}
-  .stat-box b{display:block;font-size:14px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
-  .stat-box small{display:block;font-size:10px;color:var(--faint);margin-top:3px}
-
   /* ── 设置 ───────────────────────────────────────────────── */
   .group-card{
     background:var(--surface);border-radius:var(--r-card);border:1px solid var(--outline-v);
@@ -1092,6 +1087,11 @@
                     <span class="chip on">全部</span>
                     <span class="chip">PDF</span>
                     <span class="chip">EPUB</span>
+                    <span class="chip">MOBI</span>
+                    <span class="chip">AZW3</span>
+                    <span class="chip">FB2</span>
+                    <span class="chip">DJVU</span>
+                    <span class="chip">TXT</span>
                     <span class="chip">CBR</span>
                     <span class="chip">CBZ</span>
                   </div>
@@ -1174,11 +1174,18 @@
                 <span class="grow">WeLib 仍在检索，结果将自动补充。</span>
               </div>
 
+              <!-- 需要手动验证：立即给入口，不等无头超时 -->
+              <div class="inline-hint" style="margin-top:8px;background:var(--t-container);color:var(--tertiary)">
+                <svg class="ic sm"><use href="#i-shield"/></svg>
+                <span class="grow">需要手动验证，验证通过后会自动继续检索。</span>
+                <b style="color:var(--primary)">去验证</b>
+              </div>
+
               <!-- 筛选 -->
               <div class="chips" style="margin-top:12px">
                 <span class="chip on"><svg class="ic sm"><use href="#i-tune"/></svg>相关度</span>
-                <span class="chip">EPUB</span>
-                <span class="chip">中文</span>
+                <span class="chip">文件类型<svg class="ic sm" style="transform:rotate(90deg)"><use href="#i-chev"/></svg></span>
+                <span class="chip">语言<svg class="ic sm" style="transform:rotate(90deg)"><use href="#i-chev"/></svg></span>
               </div>
 
               <!-- 结果列表 -->
@@ -1276,8 +1283,8 @@
 
               <div class="chips" style="margin-top:12px">
                 <span class="chip">相关度</span>
-                <span class="chip on">EPUB</span>
-                <span class="chip">English</span>
+                <span class="chip on">文件类型<svg class="ic sm" style="transform:rotate(90deg)"><use href="#i-chev"/></svg></span>
+                <span class="chip">语言<svg class="ic sm" style="transform:rotate(90deg)"><use href="#i-chev"/></svg></span>
               </div>
 
               <div class="resgroup" style="margin-top:12px">
@@ -1402,7 +1409,7 @@
             </div>
           </div>
         </div>
-        <figcaption><em>06</em>书籍详情</figcaption>
+        <figcaption><em>06</em>书籍详情 · 首屏先用检索结果渲染，简介区显示骨架</figcaption>
       </figure>
 
     </div>
@@ -1442,12 +1449,6 @@
                   <div class="progress"><i></i></div>
                   <div class="stat" style="margin-top:8px"><span>2.21 / 3.58 MB · Range 续传</span></div>
                 </div>
-              </div>
-
-              <div class="stat-grid" style="margin-top:12px">
-                <div class="stat-box"><b>2</b><small>进行中</small></div>
-                <div class="stat-box"><b>1</b><small>已完成</small></div>
-                <div class="stat-box"><b>1</b><small>失败</small></div>
               </div>
 
               <div class="seg" style="margin-top:16px">
@@ -1533,24 +1534,19 @@
                 <div class="opt on">已完成</div>
               </div>
 
-              <div class="section-row" style="margin-top:16px;padding:0 2px">
-                <h3>已完成</h3>
-                <span>点书名看详情 · 点打开用外部阅读器</span>
-              </div>
-
               <div class="task">
                 <div class="top">
                   <div class="mini c2"><b>Normal<br>People</b></div>
                   <div class="grow">
                     <b>Normal People</b>
                     <small>Sally Rooney · EPUB · 1.8 MB · 已校验</small>
-                    <span class="badge done" style="margin-top:8px"><svg class="ic" style="width:10px;height:10px"><use href="#i-check"/></svg>完成</span>
+                    <small style="color:var(--faint)">昨天 21:04 · Anna's Archive</small>
                   </div>
                 </div>
                 <div class="actions">
-                  <span style="font-size:11px;color:var(--faint)">昨天 21:04 · Anna's Archive</span>
                   <span class="spacer"></span>
-                  <div class="btn sm tonal"><svg class="ic sm"><use href="#i-book"/></svg>打开</div>
+                  <span class="badge done" style="height:36px;padding:0 10px"><svg class="ic" style="width:10px;height:10px"><use href="#i-check"/></svg>完成</span>
+                  <div class="btn sm tonal" style="height:36px"><svg class="ic sm"><use href="#i-book"/></svg>打开</div>
                 </div>
               </div>
 
@@ -1990,7 +1986,7 @@
               </div>
               <div class="setrow">
                 <div class="ic"><svg class="ic"><use href="#i-shield"/></svg></div>
-                <div class="grow"><b>后台完成验证</b><small>无感完成 DDoS 验证；可关闭后在可见窗口验证</small></div>
+                <div class="grow"><b>后台完成验证</b><small>无感完成 DDoS 验证；关闭后会立即弹出可见验证页</small></div>
                 <div class="toggle on"></div>
               </div>
             </div>
@@ -2472,7 +2468,7 @@
   </section>
 
   <footer class="deck-foot">
-    <span><b>21 个界面</b> · 全部可交互原型 · 底部页与分段标签可左右滑动</span>
+    <span><b>21 个界面</b> · 全部可交互原型 · 底栏点击与设置标签同款滑动 · 底部页与分段标签可左右滑动</span>
     <span>字阶 10 – 34 · 圆角 8 / 12 / 16 / 20 / 28 · 4 列 × 76 + 3 × 8</span>
     <span>主题源 lib/ui/themes.dart</span>
     <span class="spacer"></span>

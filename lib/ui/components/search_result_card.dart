@@ -11,6 +11,7 @@ import 'package:openlib/state/state.dart'
     show checkIdExists, resultCoverProvider;
 import 'package:openlib/ui/components/book_card_widget.dart'
     show getFileType, getLanguage;
+import 'package:openlib/ui/components/language_names.dart';
 import 'package:openlib/ui/swiss_grid.dart';
 
 /// Parses the size token out of the provider's comma-separated info line.
@@ -148,7 +149,8 @@ class SearchResultCard extends ConsumerWidget {
                     children: [
                       if (fileType != null)
                         _FormatBadge(label: fileType.toUpperCase()),
-                      if (language != null) _MetaText(language),
+                      if (language != null)
+                        _MetaText(localizedLanguageName(l10n, language)),
                       if (fileSize != null) ...[
                         const _Dot(),
                         _MetaText(fileSize),

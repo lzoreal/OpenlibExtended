@@ -77,6 +77,34 @@ class DiamWallSolver {
     return compute(solveSync, html);
   }
 
+  /// How long a solved cookie set is reused before paying the
+  /// proof-of-work again. Mirrors accept the token well beyond this.
+  static const cookieTtl = Duration(minutes: 30);
+
+  static final Map<String, ({Map<String, String> cookies, DateTime savedAt})>
+      _cookieCache = {};
+
+  /// Cookies from an earlier solve on [mirror]'s host, when still fresh.
+  static Map<String, String>? cachedCookies(String mirror) {
+    final host = Uri.tryParse(mirror)?.host ?? mirror;
+    final entry = _cookieCache[host];
+    if (entry == null) return null;
+    if (DateTime.now().difference(entry.savedAt) > cookieTtl) {
+      _cookieCache.remove(host);
+      return null;
+    }
+    return entry.cookies;
+  }
+
+  static void rememberCookies(String mirror, Map<String, String> cookies) {
+    final host = Uri.tryParse(mirror)?.host ?? mirror;
+    _cookieCache[host] =
+        (cookies: Map.of(cookies), savedAt: DateTime.now());
+  }
+
+  @visibleForTesting
+  static void clearCookieCache() => _cookieCache.clear();
+
   /// The actual brute force, isolated so it can run on another isolate
   /// and be unit-tested directly without spinning up `compute`.
   /// Static and public so tests can exercise it synchronously.

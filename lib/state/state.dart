@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // NOTE: These imports are crucial and must exist in your project structure.
 import 'package:openlib/services/annas_archieve.dart';
 import 'package:openlib/services/book_detail_routing.dart';
+import 'package:openlib/services/book_info_cache.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/libgen_service.dart';
 import 'package:openlib/services/search_manager.dart';
@@ -22,6 +23,7 @@ import 'package:openlib/services/goodreads.dart';
 import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/services/mirror_latency.dart';
 import 'package:openlib/services/download_manager.dart';
+import 'package:openlib/services/stream_throttle.dart';
 // Assuming OpenLibrary, Goodreads, PenguinRandomHouse, BookDigits, and SubCategoriesTypeList are defined
 // or are simple placeholder services/models that work as intended.
 
@@ -51,7 +53,20 @@ Map<String, String> sortValues = {
   'Smallest': 'smallest',
 };
 
-List<String> fileType = ["All", "PDF", "Epub", "Cbr", "Cbz"];
+// Values double as the persisted filterFileType preference, so keep the
+// historical casing of the original entries; chips display them uppercase.
+List<String> fileType = [
+  "All",
+  "PDF",
+  "Epub",
+  "Mobi",
+  "Azw3",
+  "Fb2",
+  "Djvu",
+  "Txt",
+  "Cbr",
+  "Cbz",
+];
 
 // Language filter values (display name: code)
 Map<String, String> languageValues = {
@@ -281,7 +296,13 @@ final downloadManagerProvider = Provider<DownloadManager>((ref) {
 final activeDownloadsProvider =
     StreamProvider<Map<String, DownloadTask>>((ref) {
   final manager = ref.watch(downloadManagerProvider);
-  return manager.downloadsStream;
+  // The manager emits per network chunk; 10 progress updates per second is
+  // all any of the progress UIs can show, and coalescing here keeps every
+  // listening page from rebuilding dozens of times per second.
+  return throttleLatest(
+    manager.downloadsStream,
+    const Duration(milliseconds: 100),
+  );
 });
 
 /// Mirrors of one service (SLUM reading + the user's enable choice), as
@@ -606,6 +627,14 @@ final searchSourceOrderProvider = FutureProvider<List<SearchProviderId>>(
 // host for an AA mirror that does not carry the book (404 city).
 final bookInfoProvider =
     FutureProvider.family<BookInfoData, String>((ref, url) async {
+  final cached = await BookInfoCache.read(url);
+  if (cached != null) return cached;
+  final data = await _fetchBookInfo(ref, url);
+  await BookInfoCache.write(url, data);
+  return data;
+});
+
+Future<BookInfoData> _fetchBookInfo(Ref ref, String url) async {
   final route = await routeBookDetail(url);
   switch (route) {
     case BookDetailRoute.libgen:
@@ -631,7 +660,7 @@ final bookInfoProvider =
       final donationKey = ref.watch(donationKeyProvider);
       return annasArchieve.bookInfo(url: url, donationKey: donationKey);
   }
-});
+}
 
 // Completed download records
 final myLibraryProvider = FutureProvider((ref) async {

@@ -303,6 +303,53 @@ void main() {
       expect(allFormats.books.length, 4);
     });
 
+    test('filters by newer formats and folds azw into azw3', () async {
+      final provider = _FakeProvider('libgen', [
+        BookData(
+            title: 'MOBI Book',
+            link: 'https://l/mobi',
+            md5: 'l-mobi',
+            info: 'English, MOBI, 1 MB'),
+        BookData(
+            title: 'AZW Book',
+            link: 'https://l/azw',
+            md5: 'l-azw',
+            info: 'English, AZW, 1 MB'),
+        BookData(
+            title: 'EPUB Book',
+            link: 'https://l/epub',
+            md5: 'l-epub',
+            info: 'English, EPUB, 1 MB'),
+      ]);
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [provider],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+
+      final mobi = await manager.search(const SearchQuery(
+        text: 'q',
+        fileType: 'mobi',
+        filtersEnabled: true,
+      ));
+      expect(mobi.books.map((book) => book.title), ['MOBI Book']);
+
+      final azw = await manager.search(const SearchQuery(
+        text: 'q',
+        fileType: 'azw3',
+        filtersEnabled: true,
+      ));
+      expect(azw.books.map((book) => book.title), ['AZW Book'],
+          reason: 'AZW is Kindle AZW3 family');
+
+      final pdf = await manager.search(const SearchQuery(
+        text: 'q',
+        fileType: 'pdf',
+        filtersEnabled: true,
+      ));
+      expect(pdf.books, isEmpty);
+    });
+
     test('tags results with the provider that produced them', () async {
       final provider = _FakeProvider('libgen', [
         BookData(title: 'Tagged', link: 'https://l/1', md5: 'tag-1'),

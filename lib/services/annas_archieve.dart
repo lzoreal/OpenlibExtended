@@ -9,20 +9,37 @@ import 'package:html/dom.dart' as dom;
 import 'package:meta/meta.dart';
 
 // Project imports:
+import 'package:openlib/services/book_detail_source.dart';
+import 'package:openlib/services/book_format.dart';
 import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/services/logger.dart';
 import 'package:openlib/services/network_error.dart';
 import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 
-class BookData {
+class BookData implements BookDetailSource {
+  @override
   final String title;
+  @override
   final String? author;
+  @override
   final String? thumbnail;
+  @override
   final String link;
+  @override
   final String md5;
+  @override
   final String? publisher;
+  @override
   final String? info;
+
+  /// A search row carries no description or format of its own; the
+  /// detail page fills them in when the book page arrives.
+  @override
+  String? get description => null;
+
+  @override
+  String? get format => null;
 
   /// Which catalog produced this result, for UI labelling. Null on
   /// records that predate tagging (trending rows, older caches).
@@ -52,7 +69,9 @@ class BookData {
 
 class BookInfoData extends BookData {
   String? mirror;
+  @override
   final String? description;
+  @override
   final String? format;
   bool isFastDownload;
 
@@ -230,6 +249,10 @@ class AnnasArchieve {
     }
 
     Exception? lastException;
+    // A challenge is the one failure that has a remedy (the browser
+    // solver). Later mirrors failing with a plain network error used to
+    // overwrite it, which silently disabled the verification path.
+    NetworkError? firstChallenge;
     String? lastUsedHost;
 
     // Try each mirror - they are already ordered by open-slum.org data
@@ -259,6 +282,11 @@ class AnnasArchieve {
           return result;
         } catch (e) {
           lastException = e is Exception ? e : Exception(e.toString());
+          if (e is NetworkError &&
+              e.type == NetworkErrorType.cloudflareBlock &&
+              e.blockedUrl != null) {
+            firstChallenge ??= e;
+          }
 
           _logger.debug('Instance failed', tag: 'AnnasArchive', metadata: {
             'mirror': baseUrl,
@@ -278,9 +306,10 @@ class AnnasArchieve {
     // All instances failed - throw with diagnostic info
     _logger.error('All instances failed', tag: 'AnnasArchive');
 
-    // Throw a diagnostic NetworkError instead of the raw exception
+    // A challenge wins over later network failures: it is the only error
+    // the browser solver can act on.
     throw await _handleErrorAsync(
-      lastException ?? Exception('All instances failed'),
+      firstChallenge ?? lastException ?? Exception('All instances failed'),
       targetHost: lastUsedHost,
     );
   }
@@ -364,17 +393,7 @@ class AnnasArchieve {
     return clone.text.trim();
   }
 
-  String getFormat(String info) {
-    final infoLower = info.toLowerCase();
-    if (infoLower.contains('pdf')) {
-      return 'pdf';
-    } else if (infoLower.contains('cbr')) {
-      return "cbr";
-    } else if (infoLower.contains('cbz')) {
-      return "cbz";
-    }
-    return "epub";
-  }
+  String getFormat(String info) => detectBookFormat(info) ?? 'epub';
 
   // --------------------------------------------------------------------
   // _parser FUNCTION (Search Results - Fixed nth-of-type issue)
@@ -426,6 +445,7 @@ class AnnasArchieve {
     }
 
     List<BookData> bookList = [];
+    final wantedFormat = detectBookFormat(fileType);
 
     for (int idx = 0; idx < bookContainers.length; idx++) {
       var container = bookContainers[idx];
@@ -479,9 +499,8 @@ class AnnasArchieve {
 
       // If info is null (HTML structure changed) or no filter is specified,
       // include the book. Only filter when a specific file type is requested.
-      final bool hasMatchingFileType = fileType.isEmpty
-          ? true
-          : info?.toLowerCase().contains(fileType.toLowerCase()) == true;
+      final bool hasMatchingFileType =
+          fileType.isEmpty ? true : detectBookFormat(info) == wantedFormat;
 
       if (!hasMatchingFileType) {
         _logger.debug('Skipped container (no matching fileType)',
@@ -740,6 +759,15 @@ class AnnasArchieve {
           return _parser(cached, fileType, currentBaseUrl);
         }
 
+        // A cleared browser session for this host means the search page
+        // can be read without passing the gate again.
+        final sessionHtml =
+            await WebviewChallengeSolver.fetchWithSession(encodedURL);
+        if (sessionHtml != null) {
+          final parsed = _parser(sessionHtml, fileType, currentBaseUrl);
+          if (parsed.isNotEmpty) return parsed;
+        }
+
         _logger.debug('Fetching search results',
             tag: 'AnnasArchive', metadata: {'url': encodedURL});
         final response = await _makeRequest(encodedURL);
@@ -902,6 +930,14 @@ class AnnasArchieve {
               tag: 'AnnasArchive', metadata: {'url': adjustedUrl});
           final data =
               await _bookInfoParser(cached, adjustedUrl, currentBaseUrl);
+          if (data != null) return data;
+        }
+
+        final sessionHtml =
+            await WebviewChallengeSolver.fetchWithSession(adjustedUrl);
+        if (sessionHtml != null) {
+          final data =
+              await _bookInfoParser(sessionHtml, adjustedUrl, currentBaseUrl);
           if (data != null) return data;
         }
 

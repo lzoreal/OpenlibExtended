@@ -58,7 +58,9 @@ class SectionHeader extends StatelessWidget {
           ),
           if (action != null) ...[
             const SizedBox(width: 8),
-            Flexible(child: action!),
+            // Unflexible on purpose: a flexible action claimed its own share
+            // of the row and stopped short of the right edge.
+            action!,
           ] else if (hint != null) ...[
             const SizedBox(width: 8),
             Expanded(

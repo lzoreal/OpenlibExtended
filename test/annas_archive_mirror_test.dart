@@ -630,4 +630,73 @@ void main() {
     }, timeout: const Timeout(Duration(seconds: 30)));
   });
 
+
+  group("Anna's Archive keeps the challenge signal", () {
+    test('a dead mirror after a gated one still reaches the solver', () async {
+      final challenge = '<!doctype html><html><head>'
+          '<title>DDoS-Guard</title></head><body>'
+          '<script src="https://check.ddos-guard.net/check.js"></script>'
+          '</body></html>';
+      final (gated, _) = await mirrorServer(body: challenge);
+
+      // Bind a port, then close it, so connections to it are refused.
+      final deadSocket =
+          await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final deadPort = deadSocket.port;
+      await deadSocket.close();
+
+      final (slum, _) = await mirrorServer(
+        body: slumPage([
+          (
+            url: 'http://127.0.0.1:${gated.port}',
+            status: 'protected',
+            vendor: 'DDoS-Guard'
+          ),
+          (
+            url: 'http://127.0.0.1:$deadPort',
+            status: 'protected',
+            vendor: 'DDoS-Guard'
+          ),
+        ]),
+      );
+
+      WebviewChallengeSolver.guiEnabled = false;
+      WebviewChallengeSolver.overrideIsMobile = true;
+      WebviewChallengeSolver.visibleSolverFallback = (url) async => null;
+      try {
+        final manager = InstanceManager.forTest(
+          catalogue: SlumCatalogue(
+            store: MemoryPreferenceStore(),
+            baseUrl: 'http://127.0.0.1:${slum.port}',
+          ),
+          store: MemoryPreferenceStore(),
+        );
+
+        await expectLater(
+          AnnasArchieve(
+            dio: Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 3),
+              receiveTimeout: const Duration(seconds: 3),
+            )),
+            instanceManager: manager,
+          ).searchBooks(searchQuery: 'harry potter'),
+          throwsA(
+            isA<NetworkError>().having(
+              (error) => error.type,
+              'type',
+              NetworkErrorType.cloudflareBlock,
+            ),
+          ),
+          reason: 'the network failure of the last mirror must not hide '
+              'the challenge that the solver can act on',
+        );
+      } finally {
+        WebviewChallengeSolver.guiEnabled = true;
+        WebviewChallengeSolver.overrideIsMobile = null;
+        WebviewChallengeSolver.visibleSolverFallback = null;
+        await gated.close();
+        await slum.close();
+      }
+    }, timeout: const Timeout(Duration(seconds: 60)));
+  });
 }

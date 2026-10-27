@@ -8,7 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/annas_archieve.dart';
+import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/services/webview_challenge_solver.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/components/search_result_card.dart';
 import 'package:openlib/ui/components/source_journey_card.dart';
@@ -254,5 +256,195 @@ void main() {
         reason: 'the first page always queries every source');
     expect(find.text('WeLib 1-0'), findsWidgets);
     expect(find.text('LibGen 1-0'), findsNothing);
+  });
+
+  testWidgets('format and language filters are single multi-select capsules',
+      (tester) async {
+    SearchManagerResult infoPage(int page) {
+      final books = [
+        BookData(
+          title: 'Epub Book',
+          author: 'Author',
+          link: 'https://example.com/md5/epub',
+          md5: 'epub',
+          info: 'English · EPUB · 2 MB',
+          source: 'Library Genesis',
+        ),
+        BookData(
+          title: 'Pdf Book',
+          author: 'Author',
+          link: 'https://example.com/md5/pdf',
+          md5: 'pdf',
+          info: 'English · PDF · 3 MB',
+          source: 'Library Genesis',
+        ),
+      ];
+      return SearchManagerResult(
+        books: books,
+        failedProviders: const [],
+        sources: [
+          SearchSourceRun(
+            id: SearchProviderId.libgen,
+            displayName: 'Library Genesis',
+            resultCount: books.length,
+            status: SearchSourceStatus.hit,
+          ),
+        ],
+        booksBySource: {SearchProviderId.libgen: books},
+      );
+    }
+
+    await pumpResults(tester, search: (key) async => infoPage(key.page));
+
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+    expect(find.byKey(const ValueKey('format-filter-capsule')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('language-filter-capsule')),
+      findsOneWidget,
+    );
+    // One capsule per dimension: no chip per format any more.
+    expect(find.widgetWithText(FilterChip, 'EPUB'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('format-filter-capsule')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'EPUB'));
+    await tester.pump();
+    await tester.tap(find.text(l10n.done));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Epub Book'), findsWidgets);
+    expect(find.text('Pdf Book'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('format-filter-capsule')),
+        matching: find.text('EPUB'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the language capsule filters by the picked language',
+      (tester) async {
+    SearchManagerResult infoPage(int page) {
+      final books = [
+        BookData(
+          title: 'Epub Book',
+          author: 'Author',
+          link: 'https://example.com/md5/epub',
+          md5: 'epub',
+          info: 'English · EPUB · 2 MB',
+          source: 'Library Genesis',
+        ),
+        BookData(
+          title: 'Pdf Book',
+          author: 'Author',
+          link: 'https://example.com/md5/pdf',
+          md5: 'pdf',
+          info: 'Chinese · PDF · 3 MB',
+          source: 'Library Genesis',
+        ),
+      ];
+      return SearchManagerResult(
+        books: books,
+        failedProviders: const [],
+        sources: [
+          SearchSourceRun(
+            id: SearchProviderId.libgen,
+            displayName: 'Library Genesis',
+            resultCount: books.length,
+            status: SearchSourceStatus.hit,
+          ),
+        ],
+        booksBySource: {SearchProviderId.libgen: books},
+      );
+    }
+
+    await pumpResults(tester, search: (key) async => infoPage(key.page));
+
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+    final capsule = find.byKey(const ValueKey('language-filter-capsule'));
+    expect(capsule, findsOneWidget);
+
+    await tester.tap(capsule);
+    await tester.pumpAndSettle();
+    await tester.tap(
+        find.widgetWithText(CheckboxListTile, l10n.languageNameZh),
+      );
+    await tester.pump();
+    await tester.tap(find.text(l10n.done));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pdf Book'), findsWidgets);
+    expect(find.text('Epub Book'), findsNothing);
+    expect(
+      find.descendant(of: capsule, matching: find.text(l10n.languageNameZh)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a pending challenge offers the verification page',
+      (tester) async {
+    SearchManagerResult pendingPage(int page) {
+      final books = [
+        BookData(
+          title: 'Libgen Book',
+          author: 'Author',
+          link: 'https://example.com/md5/libgen',
+          md5: 'libgen',
+          info: 'English · EPUB · 2 MB',
+          source: 'Library Genesis',
+        ),
+      ];
+      return SearchManagerResult(
+        books: books,
+        failedProviders: const [],
+        sources: [
+          SearchSourceRun(
+            id: SearchProviderId.libgen,
+            displayName: 'Library Genesis',
+            resultCount: books.length,
+            status: SearchSourceStatus.hit,
+          ),
+          SearchSourceRun(
+            id: SearchProviderId.welib,
+            displayName: 'WeLib',
+            resultCount: 0,
+            status: SearchSourceStatus.pending,
+          ),
+        ],
+        booksBySource: {SearchProviderId.libgen: books},
+      );
+    }
+
+    ChallengeHtmlCache.clear();
+    var asked = '';
+    WebviewChallengeSolver.visibleSolverFallback = (url) async {
+      asked = url;
+      return '<html>solved visibly</html>';
+    };
+    addTearDown(() {
+      WebviewChallengeSolver.visibleSolverFallback = null;
+      WebviewChallengeSolver.clearPendingChallenges();
+    });
+
+    await pumpResults(tester, search: (key) async => pendingPage(key.page));
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+
+    // Nothing blocked yet: just the plain "still searching" hint.
+    expect(find.text(l10n.challengeVerifyNow), findsNothing);
+
+    const challengeUrl = 'https://welib.org/search?q=docker';
+    WebviewChallengeSolver.pendingChallenges.value = [challengeUrl];
+    await tester.pump();
+
+    expect(find.text(l10n.challengeNeedsVerification), findsOneWidget);
+    await tester.tap(find.text(l10n.challengeVerifyNow));
+    await tester.pump();
+    await tester.pump();
+
+    expect(asked, challengeUrl);
   });
 }

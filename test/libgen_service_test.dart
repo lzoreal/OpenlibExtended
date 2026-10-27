@@ -153,6 +153,17 @@ void main() {
       expect(book, isNotNull);
       expect(book!.format, equals('epub'));
     });
+
+    test('format reads newer extensions from the ext query parameter', () {
+      final html =
+          File('test/fixtures/libgen_ads_page.html').readAsStringSync();
+
+      for (final format in ['mobi', 'azw3', 'fb2', 'djvu', 'txt']) {
+        final book = LibgenService().parseAdsPage(html, 'https://libgen.vg',
+            'https://libgen.vg/ads.php?md5=$_md5Temple&ext=$format');
+        expect(book?.format, format);
+      }
+    });
   });
 
   group('parseAdsCover (lazy result-list covers)', () {

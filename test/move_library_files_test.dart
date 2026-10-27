@@ -33,20 +33,38 @@ void main() {
     return f;
   }
 
-  test('moves book files and leaves non-book files alone', () async {
-    final epub = writeFile(source.path, 'book.epub');
-    final pdf = writeFile(source.path, 'other.pdf');
-    writeFile(source.path, 'notes.txt');
+  test('moves every supported book format and leaves other files alone',
+      () async {
+    final books = [
+      'book.epub',
+      'other.pdf',
+      'kindle.mobi',
+      'kindle.azw3',
+      'legacy.azw',
+      'fiction.fb2',
+      'scan.djvu',
+      'notes.txt',
+      'comic.cbr',
+      'comic.cbz',
+    ];
+    for (final name in books) {
+      writeFile(source.path, name);
+    }
+    writeFile(source.path, 'cover.jpg');
+    writeFile(source.path, 'draft.docx');
 
     await moveLibraryFiles(source.path, destination.path);
 
-    expect(File('${destination.path}/book.epub').existsSync(), isTrue,
-        reason: 'epub must arrive in the new directory');
-    expect(File('${destination.path}/other.pdf').existsSync(), isTrue);
-    expect(File('${destination.path}/notes.txt').existsSync(), isFalse,
+    for (final name in books) {
+      expect(File('${destination.path}/$name').existsSync(), isTrue,
+          reason: '$name must arrive in the new directory');
+      expect(File('${source.path}/$name').existsSync(), isFalse,
+          reason: 'source must be emptied of $name');
+    }
+    expect(File('${destination.path}/cover.jpg').existsSync(), isFalse,
         reason: 'non-book files are not library content');
-    expect(epub.existsSync(), isFalse, reason: 'source must be emptied');
-    expect(pdf.existsSync(), isFalse);
+    expect(File('${destination.path}/draft.docx').existsSync(), isFalse,
+        reason: 'unsupported formats stay in the source folder');
   });
 
   test('does not overwrite an existing file at the destination', () async {

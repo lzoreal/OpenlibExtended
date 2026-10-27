@@ -1,5 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <g transform="translate(512 512) scale(1.28) translate(-512 -506)">
+  <!-- Adaptive-icon foreground: the whole About tile, scaled into the
+       66dp safe zone so the launcher composes the same mark (inner circle
+       + books) over its own background colour. -->
+  <g transform="translate(512 512) scale(0.66) translate(-512 -512)">
+    <rect width="1024" height="1024" fill="#0F6B5C"/>
+    <circle cx="512" cy="512" r="352" fill="#0C5A4E"/>
     <rect x="286" y="286" width="452" height="120" rx="34" fill="#F7F1E8"/>
     <path d="M286 320c0-19 15-34 34-34h30v120h-30c-19 0-34-15-34-34z" fill="#E2D5C3"/>
     <path d="M654 310v72M672 310v72M690 310v72" stroke="#D6C7B4" stroke-width="6" stroke-linecap="round"/>

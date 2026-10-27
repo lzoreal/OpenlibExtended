@@ -75,6 +75,12 @@ void main() {
     test('getFormat correctly detects formats from metadata string', () {
       expect(api.getFormat('English [en], epub, 2.4MB, 2021'), equals('epub'));
       expect(api.getFormat('German [de], PDF, 15.1MB'), equals('pdf'));
+      expect(api.getFormat('English [en], MOBI, 1.2MB'), equals('mobi'));
+      expect(api.getFormat('English [en], AZW3, 1.2MB'), equals('azw3'));
+      expect(api.getFormat('English [en], AZW, 1.2MB'), equals('azw3'));
+      expect(api.getFormat('Russian [ru], FB2, 0.9MB'), equals('fb2'));
+      expect(api.getFormat('French [fr], DJVU, 8MB'), equals('djvu'));
+      expect(api.getFormat('English [en], TXT, 0.4MB'), equals('txt'));
       expect(api.getFormat('Comic, CBR, 45MB'), equals('cbr'));
       expect(api.getFormat('Comic, CBZ, 30MB'), equals('cbz'));
       expect(api.getFormat('Unknown format string'),

@@ -97,6 +97,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('section header action sits on the right edge', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 320,
+            child: SectionHeader(
+              title: 'Recent searches',
+              action: Text('Clear all'),
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    expect(tester.getTopRight(find.text('Clear all')).dx, closeTo(320, 0.1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('pill tab track is 44 high', (tester) async {
     final controller = TabController(length: 2, vsync: const TestVSync());
     addTearDown(controller.dispose);

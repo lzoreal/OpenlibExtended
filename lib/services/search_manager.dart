@@ -11,9 +11,11 @@ import 'package:html/parser.dart' as html_parser;
 
 // Project imports:
 import 'package:openlib/services/annas_archieve.dart';
+import 'package:openlib/services/book_format.dart';
 import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/diamwall_solver.dart';
+import 'package:openlib/services/hedged_requests.dart';
 import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/services/logger.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
@@ -381,8 +383,8 @@ class ZlibraryProvider implements SearchProvider {
       : _dio = dio ??
             createDioWithLogging(
                 options: BaseOptions(
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 30),
+              connectTimeout: const Duration(seconds: 6),
+              receiveTimeout: const Duration(seconds: 15),
               headers: _browserHeaders,
             )),
         _mirrors = mirrors,
@@ -434,24 +436,26 @@ class ZlibraryProvider implements SearchProvider {
         var response = await _dio.get(
           '$mirror/s/${Uri.encodeComponent(query.text)}',
           queryParameters: {if (query.page > 1) 'page': query.page},
-          options: acceptAnyStatus,
+          options: _withCachedCookies(mirror, acceptAnyStatus),
         );
         if (_solver.looksLikeChallenge(
             response.statusCode ?? 0, response.data.toString())) {
           // DiamWall 503: solve the embedded SHA1 proof-of-work,
           // attach the resulting cookies and retry once.
-          final cookies = await _solver.solve(response.data.toString());
+          final cookies = await _solveAndRemember(
+              mirror, response.data.toString());
           if (cookies != null) {
             _logger.debug('DiamWall solved, retrying with cookies',
                 tag: 'ZlibraryProvider', metadata: {'mirror': mirror});
-            final cookieHeader =
-                cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
             try {
               response = await _dio.get(
                 '$mirror/s/${Uri.encodeComponent(query.text)}',
                 queryParameters: {if (query.page > 1) 'page': query.page},
-                options:
-                    acceptAnyStatus.copyWith(headers: {'Cookie': cookieHeader}),
+                options: _withCachedCookies(
+                  mirror,
+                  acceptAnyStatus,
+                  extra: cookies,
+                ),
               );
             } catch (e) {
               _logger.warning('Request failed after solving the challenge',
@@ -541,22 +545,63 @@ class ZlibraryProvider implements SearchProvider {
   Future<BookInfoData?> bookInfo(String url) async {
     final mirrors = _mirrors ?? await _resolveMirrors();
     final path = Uri.parse(url).path;
-    final acceptAnyStatus = Options(validateStatus: (_) => true);
 
-    for (final mirror in mirrors) {
-      try {
-        var response = await _dio.get('$mirror$path', options: acceptAnyStatus);
-        response = await _passDiamWall(mirror, response, '$mirror$path');
-        if (response.statusCode != 200) continue;
+    final winner = await hedgeFirst<BookInfoData>(
+      [for (final mirror in mirrors) () => _fetchBookInfo(mirror, path)],
+    );
+    if (winner != null) return winner;
 
-        final pageUrl = '$mirror$path';
-        final data = parseBookPage(response.data.toString(), mirror, pageUrl);
-        if (data != null) return data;
-      } catch (_) {
-        // Next mirror; Z-Library mirrors are unstable by nature.
-      }
+    // The hedged pair failed; give the remaining mirrors one quiet try
+    // each instead of leaving the page with nothing.
+    for (final mirror in mirrors.skip(2)) {
+      final data = await _fetchBookInfo(mirror, path);
+      if (data != null) return data;
     }
     return null;
+  }
+
+  Future<BookInfoData?> _fetchBookInfo(String mirror, String path) async {
+    final acceptAnyStatus = Options(validateStatus: (_) => true);
+    final pageUrl = '$mirror$path';
+    try {
+      var response = await _dio.get(
+        pageUrl,
+        options: _withCachedCookies(mirror, acceptAnyStatus),
+      );
+      response = await _passDiamWall(mirror, response, pageUrl);
+      if (response.statusCode != 200) return null;
+      return parseBookPage(response.data.toString(), mirror, pageUrl);
+    } catch (_) {
+      // Next mirror; Z-Library mirrors are unstable by nature.
+      return null;
+    }
+  }
+
+  /// Solves a DiamWall challenge and keeps the cookies for the next
+  /// request to the same host, so search, detail and the download hop do
+  /// not each pay for the proof-of-work.
+  Future<Map<String, String>?> _solveAndRemember(
+      String mirror, String html) async {
+    final cookies = await _solver.solve(html);
+    if (cookies != null) DiamWallSolver.rememberCookies(mirror, cookies);
+    return cookies;
+  }
+
+  /// [base] with any freshly solved cookies for [url]'s host attached.
+  Options _withCachedCookies(
+    String url,
+    Options base, {
+    Map<String, String>? extra,
+  }) {
+    final cookies = <String, String>{
+      ...?DiamWallSolver.cachedCookies(url),
+      ...?extra,
+    };
+    if (cookies.isEmpty) return base;
+    return base.copyWith(headers: {
+      ...?base.headers,
+      'Cookie': cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
+    });
   }
 
   /// GETs [url], solving a DiamWall 503 (once) and a second 503 on the
@@ -571,23 +616,24 @@ class ZlibraryProvider implements SearchProvider {
         response.statusCode ?? 0, response.data.toString())) {
       return response;
     }
-    final cookies = await _solver.solve(response.data.toString());
+    final cookies = await _solveAndRemember(mirror, response.data.toString());
     if (cookies == null) return response;
-    final cookieHeader =
-        cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
 
-    response = await _dio.get(url,
-        options: acceptAnyStatus.copyWith(headers: {'Cookie': cookieHeader}));
+    response = await _dio.get(
+      url,
+      options: _withCachedCookies(mirror, acceptAnyStatus, extra: cookies),
+    );
     // A second challenge can appear right at the download hop; solve
     // it too before giving up on this mirror.
     if (_solver.looksLikeChallenge(
         response.statusCode ?? 0, response.data.toString())) {
-      final again = await _solver.solve(response.data.toString());
+      final again =
+          await _solveAndRemember(mirror, response.data.toString());
       if (again != null) {
-        final header =
-            again.entries.map((e) => '${e.key}=${e.value}').join('; ');
-        response = await _dio.get(url,
-            options: acceptAnyStatus.copyWith(headers: {'Cookie': header}));
+        response = await _dio.get(
+          url,
+          options: _withCachedCookies(mirror, acceptAnyStatus, extra: again),
+        );
       }
     }
     return response;
@@ -636,7 +682,10 @@ class ZlibraryProvider implements SearchProvider {
 
     for (final mirror in mirrors) {
       try {
-        var response = await _dio.get('$mirror$path', options: acceptAnyStatus);
+        var response = await _dio.get(
+          '$mirror$path',
+          options: _withCachedCookies(mirror, acceptAnyStatus),
+        );
         response = await _passDiamWall(mirror, response, '$mirror$path');
         if (response.statusCode != 200) {
           _logger.warning('Book page fetch got a non-200',
@@ -722,15 +771,19 @@ class ZlibraryProvider implements SearchProvider {
   /// user something actionable instead of a bare failure.
   Future<({String? url, String? refusal})> _resolveOneDownloadUrl(
       String candidate, Options acceptAnyStatus) async {
-    var response = await _dio.get(candidate, options: acceptAnyStatus);
+    var response = await _dio.get(
+      candidate,
+      options: _withCachedCookies(candidate, acceptAnyStatus),
+    );
     if (_solver.looksLikeChallenge(
         response.statusCode ?? 0, response.data.toString())) {
-      final cookies = await _solver.solve(response.data.toString());
+      final cookies =
+          await _solveAndRemember(candidate, response.data.toString());
       if (cookies == null) return (url: null, refusal: null);
-      final cookieHeader =
-          cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
-      response = await _dio.get(candidate,
-          options: acceptAnyStatus.copyWith(headers: {'Cookie': cookieHeader}));
+      response = await _dio.get(
+        candidate,
+        options: _withCachedCookies(candidate, acceptAnyStatus, extra: cookies),
+      );
     }
 
     final status = response.statusCode ?? 0;
@@ -895,8 +948,8 @@ class WelibProvider implements SearchProvider {
       : _dio = dio ??
             createDioWithLogging(
                 options: BaseOptions(
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 30),
+              connectTimeout: const Duration(seconds: 6),
+              receiveTimeout: const Duration(seconds: 15),
               headers: _browserHeaders,
             )),
         _mirrors = mirrors;
@@ -964,6 +1017,15 @@ class WelibProvider implements SearchProvider {
       _logger.debug('Using cached challenge HTML',
           tag: 'WelibProvider', metadata: {'url': url});
       return (html: cached, status: 200);
+    }
+
+    // The host may still have a cleared browser session from an earlier
+    // solve; reuse it so a new search does not verify all over again.
+    final sessionHtml = await WebviewChallengeSolver.fetchWithSession(url);
+    if (sessionHtml != null) {
+      _logger.debug('Using cleared browser session',
+          tag: 'WelibProvider', metadata: {'url': url});
+      return (html: sessionHtml, status: 200);
     }
 
     final acceptAnyStatus = Options(validateStatus: (_) => true);
@@ -1092,19 +1154,29 @@ class WelibProvider implements SearchProvider {
     final id = _bookIdFromHref(url);
     if (id == null) return null;
 
-    for (final mirror in mirrors) {
-      try {
-        final pageUrl = '$mirror/md5/$id';
-        final html = await _fetchHtml(pageUrl);
-        if (html == null) continue;
-        final data = parseBookPage(html, mirror, pageUrl);
-        if (data != null) return data;
-      } catch (e) {
-        _logger.warning('WeLib book page failed, trying next mirror',
-            tag: 'WelibProvider', error: e, metadata: {'mirror': mirror});
-      }
+    final winner = await hedgeFirst<BookInfoData>(
+      [for (final mirror in mirrors) () => _fetchBookInfo(mirror, id)],
+    );
+    if (winner != null) return winner;
+
+    for (final mirror in mirrors.skip(2)) {
+      final data = await _fetchBookInfo(mirror, id);
+      if (data != null) return data;
     }
     return null;
+  }
+
+  Future<BookInfoData?> _fetchBookInfo(String mirror, String id) async {
+    try {
+      final pageUrl = '$mirror/md5/$id';
+      final html = await _fetchHtml(pageUrl);
+      if (html == null) return null;
+      return parseBookPage(html, mirror, pageUrl);
+    } catch (e) {
+      _logger.warning('WeLib book page failed, trying next mirror',
+          tag: 'WelibProvider', error: e, metadata: {'mirror': mirror});
+      return null;
+    }
   }
 
   /// Parses a welib book page. Live markup: `<h1>` is the title, the
@@ -1641,19 +1713,12 @@ class SearchManager {
 
   List<BookData> _filterByFileType(List<BookData> books, SearchQuery query) {
     if (!query.filtersEnabled || query.fileType.trim().isEmpty) return books;
-    final wanted = query.fileType.trim().toLowerCase();
-    if (wanted == 'all') return books;
-    return books.where((book) {
-      final info = book.info?.toLowerCase();
-      if (info == null || info.isEmpty) return false;
-      return switch (wanted) {
-        'pdf' => info.contains('pdf'),
-        'epub' => info.contains('epub'),
-        'cbr' => info.contains('cbr'),
-        'cbz' => info.contains('cbz'),
-        _ => info.contains(wanted),
-      };
-    }).toList(growable: false);
+    if (query.fileType.trim().toLowerCase() == 'all') return books;
+    final wanted = detectBookFormat(query.fileType);
+    if (wanted == null) return books;
+    return books
+        .where((book) => detectBookFormat(book.info) == wanted)
+        .toList(growable: false);
   }
 
   /// Keeps the first occurrence per md5 in configured source order, so the

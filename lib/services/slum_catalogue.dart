@@ -202,6 +202,10 @@ class SlumCatalogue {
   bool get lastFetchSucceeded => _lastFetchSucceeded;
   bool _lastFetchSucceeded = true;
 
+  /// The fetch currently talking to SLUM, shared by every caller that
+  /// asks while it runs.
+  Future<Map<MirrorService, List<SlumSite>>>? _inFlight;
+
   /// How long to wait before trying SLUM again after a fetch yielded
   /// nothing. Long enough that an outage does not turn every provider
   /// call into four requests, short enough that the user does not stare
@@ -231,6 +235,45 @@ class SlumCatalogue {
       {bool force = false}) async {
     if (!force && _isFresh) return _cache;
 
+    final hasMirrors = _cache.values.any((sites) => sites.isNotEmpty);
+    if (!force && hasMirrors) {
+      // Stale but usable: answer from the cache now and refresh behind
+      // the caller. Awaiting open-slum.org here made the first tap after
+      // the ttl wait on the network (up to its 15s connect timeout).
+      unawaited(_refreshInBackground());
+      return _cache;
+    }
+    return _refresh(force: force);
+  }
+
+  Future<void> _refreshInBackground() async {
+    try {
+      await _refresh();
+    } catch (_) {
+      // A background refresh never surfaces to the caller.
+    }
+  }
+
+  /// Drops the freshness stamp so the next call treats the cache as
+  /// stale. Tests use it to exercise the stale-while-revalidate path.
+  @visibleForTesting
+  void debugExpireCache() {
+    _fetchedAt = null;
+  }
+
+  Future<Map<MirrorService, List<SlumSite>>> _refresh({bool force = false}) {
+    final inFlight = _inFlight;
+    if (inFlight != null) return inFlight;
+    final future = _fetchAndMerge(force: force);
+    _inFlight = future;
+    future.whenComplete(() {
+      if (identical(_inFlight, future)) _inFlight = null;
+    });
+    return future;
+  }
+
+  Future<Map<MirrorService, List<SlumSite>>> _fetchAndMerge(
+      {bool force = false}) async {
     final nothingKnown = _cache.values.every((sites) => sites.isEmpty);
     if (!force &&
         nothingKnown &&

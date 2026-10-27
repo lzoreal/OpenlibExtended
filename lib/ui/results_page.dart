@@ -12,6 +12,7 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/annas_archieve.dart' show BookData;
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/services/webview_challenge_solver.dart';
 import 'package:openlib/state/state.dart' as app_state;
 import 'package:openlib/ui/book_info_page.dart';
 import 'package:openlib/ui/components/book_card_widget.dart'
@@ -19,6 +20,7 @@ import 'package:openlib/ui/components/book_card_widget.dart'
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/error_widget.dart';
 import 'package:openlib/ui/components/inline_hint.dart';
+import 'package:openlib/ui/components/language_names.dart';
 import 'package:openlib/ui/components/search_result_card.dart';
 import 'package:openlib/ui/components/search_source_meta.dart';
 import 'package:openlib/ui/components/source_journey_card.dart';
@@ -225,6 +227,63 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     _retryPageOne();
   }
 
+  String _filterLabel(String base, Set<String> selection) {
+    if (selection.isEmpty) return base;
+    if (selection.length == 1) return selection.first;
+    return '$base · ${selection.length}';
+  }
+
+  Future<void> _pickFormats(List<String> options) async {
+    final picked = await _pickMultiSelect(
+      title: AppLocalizations.of(context).filterFileTypeLabel,
+      options: options,
+      selected: _formatFilters,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _formatFilters
+        ..clear()
+        ..addAll(picked);
+    });
+  }
+
+  Future<void> _pickLanguages(List<String> options) async {
+    final l10n = AppLocalizations.of(context);
+    final picked = await _pickMultiSelect(
+      title: l10n.languageSetting,
+      options: options,
+      labels: {
+        for (final code in options) code: localizedLanguageName(l10n, code),
+      },
+      selected: _languageFilters,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _languageFilters
+        ..clear()
+        ..addAll(picked);
+    });
+  }
+
+  Future<Set<String>?> _pickMultiSelect({
+    required String title,
+    required List<String> options,
+    required Set<String> selected,
+    Map<String, String>? labels,
+  }) {
+    return showModalBottomSheet<Set<String>>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _MultiSelectFilterSheet(
+        title: title,
+        options: options,
+        labels: labels,
+        selected: selected,
+      ),
+    );
+  }
+
   void _resetLocalPager() {
     setState(() {
       _viewBooks.clear();
@@ -303,7 +362,11 @@ class _ResultPageState extends ConsumerState<ResultPage> {
   void _openBook(BookData book) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => BookInfoPage(url: book.link, source: book.source),
+        builder: (_) => BookInfoPage(
+          url: book.link,
+          source: book.source,
+          preview: book,
+        ),
       ),
     );
   }
@@ -458,6 +521,34 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       }
     }
 
+    Widget capsule({
+      required Key key,
+      required String label,
+      required bool active,
+      required VoidCallback? onTap,
+    }) {
+      return FilterChip(
+        key: key,
+        selected: active,
+        showCheckmark: false,
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.expand_more_rounded,
+              size: 16,
+              color: active
+                  ? scheme.onPrimaryContainer
+                  : scheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+        onSelected: onTap == null ? null : (_) => onTap(),
+      );
+    }
+
     final filterChips = <Widget>[
       FilterChip(
         selected: true,
@@ -474,36 +565,25 @@ class _ResultPageState extends ConsumerState<ResultPage> {
         ),
         onSelected: (_) => _pickSort(),
       ),
-      for (final format in formats)
-        FilterChip(
-          selected: _formatFilters.contains(format),
-          showCheckmark: false,
-          label: Text(format),
-          onSelected: (value) {
-            setState(() {
-              if (value) {
-                _formatFilters.add(format);
-              } else {
-                _formatFilters.remove(format);
-              }
-            });
-          },
+      // One capsule per dimension: the picker behind it is multi-select,
+      // so results pages no longer grow a chip per format and language.
+      capsule(
+        key: const ValueKey('format-filter-capsule'),
+        label: _filterLabel(l10n.filterFileTypeLabel, _formatFilters),
+        active: _formatFilters.isNotEmpty,
+        onTap: formats.isEmpty ? null : () => _pickFormats(formats),
+      ),
+      capsule(
+        key: const ValueKey('language-filter-capsule'),
+        label: _filterLabel(
+          l10n.languageSetting,
+          _languageFilters
+              .map((code) => localizedLanguageName(l10n, code))
+              .toSet(),
         ),
-      for (final language in languages.take(3))
-        FilterChip(
-          selected: _languageFilters.contains(language),
-          showCheckmark: false,
-          label: Text(language),
-          onSelected: (value) {
-            setState(() {
-              if (value) {
-                _languageFilters.add(language);
-              } else {
-                _languageFilters.remove(language);
-              }
-            });
-          },
-        ),
+        active: _languageFilters.isNotEmpty,
+        onTap: languages.isEmpty ? null : () => _pickLanguages(languages),
+      ),
     ];
 
     return Padding(
@@ -532,11 +612,55 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                 ),
                 if (pending.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  InlineHint(
-                    icon: Icons.refresh_rounded,
-                    message: pending.length == 1
-                        ? l10n.sourceStillSearching(pending.first)
-                        : l10n.sourceStillSearching(pending.join(' · ')),
+                  ValueListenableBuilder<List<String>>(
+                    valueListenable: WebviewChallengeSolver.pendingChallenges,
+                    builder: (context, challengeUrls, _) {
+                      if (challengeUrls.isEmpty) {
+                        return InlineHint(
+                          icon: Icons.refresh_rounded,
+                          message: pending.length == 1
+                              ? l10n.sourceStillSearching(pending.first)
+                              : l10n.sourceStillSearching(pending.join(' · ')),
+                        );
+                      }
+                      final challengeUrl = challengeUrls.first;
+                      // A source is stuck on a challenge: offer the
+                      // verification page now instead of letting the
+                      // invisible solve run out its timeout first.
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: InlineHint(
+                              icon: Icons.shield_outlined,
+                              tone: InlineHintTone.warning,
+                              message: l10n.challengeNeedsVerification,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () => unawaited(
+                              WebviewChallengeSolver.requestVisibleSolve(
+                                  challengeUrl),
+                            ),
+                            style: TextButton.styleFrom(
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              l10n.challengeVerifyNow,
+                              style: SwissText.micro.copyWith(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -1591,6 +1715,89 @@ class _SourceMarkBox extends StatelessWidget {
           color: scheme.onSurfaceVariant,
           fontWeight: FontWeight.w800,
         ),
+      ),
+    );
+  }
+}
+
+/// Multi-select picker behind the format and language capsules.
+class _MultiSelectFilterSheet extends StatefulWidget {
+  const _MultiSelectFilterSheet({
+    required this.title,
+    required this.options,
+    required this.selected,
+    this.labels,
+  });
+
+  final String title;
+  final List<String> options;
+  final Set<String> selected;
+
+  /// Display name per value (language codes show their localized name).
+  final Map<String, String>? labels;
+
+  @override
+  State<_MultiSelectFilterSheet> createState() =>
+      _MultiSelectFilterSheetState();
+}
+
+class _MultiSelectFilterSheetState extends State<_MultiSelectFilterSheet> {
+  late final Set<String> _selected = {...widget.selected};
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(widget.title, style: theme.textTheme.titleMedium),
+                ),
+                TextButton(
+                  onPressed:
+                      _selected.isEmpty ? null : () => setState(_selected.clear),
+                  child: Text(l10n.clearAll),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final option in widget.options)
+                  CheckboxListTile(
+                    value: _selected.contains(option),
+                    title: Text(widget.labels?[option] ?? option),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked ?? false) {
+                          _selected.add(option);
+                        } else {
+                          _selected.remove(option);
+                        }
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context, _selected),
+              child: Text(l10n.done),
+            ),
+          ),
+        ],
       ),
     );
   }

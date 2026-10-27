@@ -195,7 +195,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get backgroundVerificationHint =>
-      'Löst DDoS-Prüfungen unsichtbar. Auf manchen Geräten schlägt das fehl - ausschalten, um stattdessen in einem sichtbaren Fenster zu prüfen';
+      'Löst DDoS-Prüfungen unsichtbar. Auf manchen Geräten schlägt das fehl - ausschalten, um sofort das sichtbare Fenster zu öffnen';
 
   @override
   String get backgroundVerificationFix =>
@@ -1844,10 +1844,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get downloadCenterQueueMemory => 'Warteschlange nur im Speicher';
 
   @override
-  String get downloadCenterCompletedHint =>
-      'Titel antippen für Details · Öffnen für einen externen Reader';
-
-  @override
   String get downloadCenterRemoveNote =>
       'Beim Entfernen kann die lokale Datei mitgelöscht werden; die Warteschlange liegt nur im Speicher und wird nach dem Beenden nicht fortgesetzt.';
 
@@ -2078,4 +2074,104 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get verificationPageInstructions =>
       'Schließe die Prüfung unten ab; die App fährt automatisch fort.';
+
+  @override
+  String get challengeNeedsVerification =>
+      'Manuelle Prüfung nötig - die Suche läuft danach automatisch weiter';
+
+  @override
+  String get challengeVerifyNow => 'Jetzt prüfen';
+
+  @override
+  String get languageNameEn => 'Englisch';
+
+  @override
+  String get languageNameEs => 'Spanisch';
+
+  @override
+  String get languageNameFr => 'Französisch';
+
+  @override
+  String get languageNameDe => 'Deutsch';
+
+  @override
+  String get languageNameIt => 'Italienisch';
+
+  @override
+  String get languageNamePt => 'Portugiesisch';
+
+  @override
+  String get languageNameRu => 'Russisch';
+
+  @override
+  String get languageNameZh => 'Chinesisch';
+
+  @override
+  String get languageNameJa => 'Japanisch';
+
+  @override
+  String get languageNameKo => 'Koreanisch';
+
+  @override
+  String get languageNameAr => 'Arabisch';
+
+  @override
+  String get languageNameHi => 'Hindi';
+
+  @override
+  String get languageNameMl => 'Malayalam';
+
+  @override
+  String get languageNameNl => 'Niederländisch';
+
+  @override
+  String get languageNamePl => 'Polnisch';
+
+  @override
+  String get languageNameTr => 'Türkisch';
+
+  @override
+  String get languageNameSv => 'Schwedisch';
+
+  @override
+  String get languageNameId => 'Indonesisch';
+
+  @override
+  String get languageNameVi => 'Vietnamesisch';
+
+  @override
+  String get languageNameCs => 'Tschechisch';
+
+  @override
+  String get languageNameEl => 'Griechisch';
+
+  @override
+  String get languageNameRo => 'Rumänisch';
+
+  @override
+  String get languageNameHu => 'Ungarisch';
+
+  @override
+  String get languageNameUk => 'Ukrainisch';
+
+  @override
+  String get languageNameHe => 'Hebräisch';
+
+  @override
+  String get languageNameTh => 'Thailändisch';
+
+  @override
+  String get languageNameFa => 'Persisch';
+
+  @override
+  String get languageNameBn => 'Bengalisch';
+
+  @override
+  String get languageNameFi => 'Finnisch';
+
+  @override
+  String get languageNameNo => 'Norwegisch';
+
+  @override
+  String get languageNameDa => 'Dänisch';
 }

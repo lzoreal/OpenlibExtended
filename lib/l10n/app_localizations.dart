@@ -455,7 +455,7 @@ abstract class AppLocalizations {
   /// Background challenge verification toggle
   ///
   /// In en, this message translates to:
-  /// **'Solve DDoS checks invisibly. Some devices fail this - turn it off to verify in a visible window instead'**
+  /// **'Solve DDoS checks invisibly. Some devices fail this - turn it off to open the visible verification page straight away'**
   String get backgroundVerificationHint;
 
   /// Background challenge verification toggle
@@ -3309,12 +3309,6 @@ abstract class AppLocalizations {
   /// **'Queue lives in memory'**
   String get downloadCenterQueueMemory;
 
-  /// Hint for the completed downloads section.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap a title for details · Tap Open for an external reader'**
-  String get downloadCenterCompletedHint;
-
   /// Note under the completed download records.
   ///
   /// In en, this message translates to:
@@ -3722,6 +3716,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Complete the check below; the app will continue automatically.'**
   String get verificationPageInstructions;
+
+  /// Shown while a source waits on a manual challenge; the button opens the verification page.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual verification needed - the search continues as soon as it passes'**
+  String get challengeNeedsVerification;
+
+  /// Button that opens the manual verification page for a blocked source.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify now'**
+  String get challengeVerifyNow;
+
+  /// Name of the language with code "en", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageNameEn;
+
+  /// Name of the language with code "es", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Spanish'**
+  String get languageNameEs;
+
+  /// Name of the language with code "fr", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'French'**
+  String get languageNameFr;
+
+  /// Name of the language with code "de", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'German'**
+  String get languageNameDe;
+
+  /// Name of the language with code "it", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Italian'**
+  String get languageNameIt;
+
+  /// Name of the language with code "pt", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Portuguese'**
+  String get languageNamePt;
+
+  /// Name of the language with code "ru", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian'**
+  String get languageNameRu;
+
+  /// Name of the language with code "zh", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Chinese'**
+  String get languageNameZh;
+
+  /// Name of the language with code "ja", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Japanese'**
+  String get languageNameJa;
+
+  /// Name of the language with code "ko", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Korean'**
+  String get languageNameKo;
+
+  /// Name of the language with code "ar", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic'**
+  String get languageNameAr;
+
+  /// Name of the language with code "hi", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Hindi'**
+  String get languageNameHi;
+
+  /// Name of the language with code "ml", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Malayalam'**
+  String get languageNameMl;
+
+  /// Name of the language with code "nl", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Dutch'**
+  String get languageNameNl;
+
+  /// Name of the language with code "pl", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Polish'**
+  String get languageNamePl;
+
+  /// Name of the language with code "tr", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Turkish'**
+  String get languageNameTr;
+
+  /// Name of the language with code "sv", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Swedish'**
+  String get languageNameSv;
+
+  /// Name of the language with code "id", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Indonesian'**
+  String get languageNameId;
+
+  /// Name of the language with code "vi", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Vietnamese'**
+  String get languageNameVi;
+
+  /// Name of the language with code "cs", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Czech'**
+  String get languageNameCs;
+
+  /// Name of the language with code "el", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Greek'**
+  String get languageNameEl;
+
+  /// Name of the language with code "ro", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Romanian'**
+  String get languageNameRo;
+
+  /// Name of the language with code "hu", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Hungarian'**
+  String get languageNameHu;
+
+  /// Name of the language with code "uk", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Ukrainian'**
+  String get languageNameUk;
+
+  /// Name of the language with code "he", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Hebrew'**
+  String get languageNameHe;
+
+  /// Name of the language with code "th", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Thai'**
+  String get languageNameTh;
+
+  /// Name of the language with code "fa", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Persian'**
+  String get languageNameFa;
+
+  /// Name of the language with code "bn", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Bengali'**
+  String get languageNameBn;
+
+  /// Name of the language with code "fi", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Finnish'**
+  String get languageNameFi;
+
+  /// Name of the language with code "no", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Norwegian'**
+  String get languageNameNo;
+
+  /// Name of the language with code "da", shown in result chips and the language filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Danish'**
+  String get languageNameDa;
 }
 
 class _AppLocalizationsDelegate

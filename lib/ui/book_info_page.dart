@@ -32,54 +32,36 @@ import 'package:openlib/state/state.dart'
         donationKeyProvider;
 
 class BookInfoPage extends ConsumerWidget {
-  const BookInfoPage({super.key, required this.url, this.source});
+  const BookInfoPage({
+    super.key,
+    required this.url,
+    this.source,
+    this.preview,
+  });
 
   final String url;
   final String? source;
+
+  /// What the results row already knew. The page paints from it while
+  /// the detail page is fetched, so a tap never lands on a blank spinner
+  /// for the seconds a mirror takes.
+  final BookData? preview;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final bookInfo = ref.watch(bookInfoProvider(url));
+    final data = bookInfo.valueOrNull;
+    final book = data ?? preview;
 
-    return bookInfo.when(
-      skipLoadingOnRefresh: false,
-      data: (data) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(l10n.bookDetailsTitle),
-            actions: [
-              IconButton(
-                icon: ShareIcon(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                onPressed: () async {
-                  final outcome = await shareBook(
-                      data.title, data.link, data.thumbnail ?? '',
-                      format: data.format,
-                      message: l10n.shareBookMessage(data.title, data.link));
-                  if (context.mounted && outcome == ShareOutcome.pathCopied) {
-                    showSnackBar(
-                        context: context, message: l10n.copiedBookLink);
-                  }
-                },
-              ),
-            ],
-          ),
-          body: ContentWidth(
-            maxWidth: 840,
-            child: BookInfoWidget(data: data, source: source),
-          ),
-          bottomNavigationBar: ActionButtonWidget(data: data),
-        );
-      },
-      error: (err, _) {
+    if (book == null) {
+      if (bookInfo.hasError) {
         return Scaffold(
           appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
           body: ContentWidth(
             maxWidth: 840,
             child: CustomErrorWidget(
-              error: err,
+              error: bookInfo.error!,
               stackTrace: StackTrace.empty,
               onRefresh: () {
                 ref.invalidate(bookInfoProvider(url));
@@ -87,19 +69,136 @@ class BookInfoPage extends ConsumerWidget {
             ),
           ),
         );
-      },
-      loading: () {
-        return Scaffold(
-          appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
-          body: const Center(
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
+      }
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
+        body: const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    final loading = data == null && !bookInfo.hasError;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.bookDetailsTitle),
+        actions: [
+          IconButton(
+            icon: ShareIcon(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            onPressed: () async {
+              final outcome = await shareBook(
+                  book.title, book.link, book.thumbnail ?? '',
+                  format: data?.format,
+                  message: l10n.shareBookMessage(book.title, book.link));
+              if (context.mounted && outcome == ShareOutcome.pathCopied) {
+                showSnackBar(context: context, message: l10n.copiedBookLink);
+              }
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (bookInfo.hasError && data == null)
+            _DetailErrorStrip(
+              onRetry: () => ref.invalidate(bookInfoProvider(url)),
+            ),
+          if (loading) const LinearProgressIndicator(minHeight: 2),
+          Expanded(
+            child: ContentWidth(
+              maxWidth: 840,
+              child: BookInfoWidget(
+                data: book,
+                source: source,
+                loading: loading,
+              ),
             ),
           ),
-        );
-      },
+        ],
+      ),
+      bottomNavigationBar: data != null
+          ? ActionButtonWidget(data: data)
+          : const _DetailLoadingBar(),
+    );
+  }
+}
+
+class _DetailErrorStrip extends StatelessWidget {
+  const _DetailErrorStrip({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      color: scheme.errorContainer,
+      padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+      child: Row(
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 16,
+            color: scheme.onErrorContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              l10n.networkErrorBookDetailsUnavailableTitle,
+              style: SwissText.micro.copyWith(color: scheme.onErrorContainer),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: scheme.onErrorContainer,
+            ),
+            child: Text(l10n.retry),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailLoadingBar extends StatelessWidget {
+  const _DetailLoadingBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return DetailBottomBar(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            key: const ValueKey('detail-loading-download'),
+            onPressed: null,
+            icon: const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            label: Text(l10n.downloadThisBook),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              textStyle: SwissText.label.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -160,8 +259,11 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                     // proof-of-work and a 302 to a signed CDN URL, and
                     // some ids answer 204 forever; re-fetch the page for
                     // the live ids and resolve the first working one.
-                    final isZlib =
-                        downloadUrl != null && downloadUrl.contains('/dl/');
+                    // A cached detail page keeps no signed mirror, so the
+                    // book page itself is the signal to resolve one.
+                    final isZlib = (downloadUrl?.contains('/dl/') ?? false) ||
+                        (downloadUrl == null &&
+                            widget.data.link.contains('/book/'));
                     String? zlibRefusal;
                     if (isZlib && !isDirectLink) {
                       try {

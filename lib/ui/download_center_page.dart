@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 // Flutter imports:
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
@@ -32,6 +33,7 @@ import 'package:openlib/ui/components/file_buttons_widget.dart'
 import 'package:openlib/ui/components/page_header.dart';
 import 'package:openlib/ui/components/pill_tabs.dart';
 import 'package:openlib/ui/components/section_header.dart';
+import 'package:openlib/ui/components/tab_keep_alive.dart';
 import 'package:openlib/ui/mybook_page.dart';
 import 'package:openlib/ui/swiss_grid.dart';
 import 'package:openlib/ui/webview_page.dart';
@@ -58,16 +60,21 @@ class CompletedDownload {
 final completedDownloadsProvider =
     FutureProvider<List<CompletedDownload>>((ref) async {
   final books = await ref.watch(myLibraryProvider.future);
+  // Resolve the folder once: reading the preference per book turned
+  // opening the tab into N database queries on top of N stat calls.
+  final storageDirectory = await _bookStorageDirectory();
   final entries = await Future.wait(books.map((book) async {
     int? size;
     DateTime? modified;
-    try {
-      final path = await getFilePath(book.getFileName());
-      final stat = await File(path).stat();
-      size = stat.size;
-      modified = stat.modified;
-    } catch (_) {
-      // The record survives even if the file was moved away.
+    if (storageDirectory != null) {
+      try {
+        final stat =
+            await File('$storageDirectory/${book.getFileName()}').stat();
+        size = stat.size;
+        modified = stat.modified;
+      } catch (_) {
+        // The record survives even if the file was moved away.
+      }
     }
     return CompletedDownload(
       book: book,
@@ -83,6 +90,16 @@ final completedDownloadsProvider =
   });
   return entries;
 });
+
+Future<String?> _bookStorageDirectory() async {
+  try {
+    final directory =
+        await MyLibraryDb.instance.getPreference('bookStorageDirectory');
+    return directory is String ? directory : null;
+  } catch (_) {
+    return null;
+  }
+}
 
 enum _DownloadFilter { all, active, completed }
 
@@ -102,6 +119,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
   final Map<String, double> _speeds = {};
   DateTime _lastSample = DateTime.now();
   bool _hasSample = false;
+  bool _tabActive = false;
   String? _verifyingTaskId;
   _DownloadFilter _filter = _DownloadFilter.all;
   late final TabController _filterController;
@@ -115,6 +133,22 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
       initialIndex: _filter.index,
     );
     _filterController.addListener(_syncFilter);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = TabVisibility.of(context);
+    if (active == _tabActive) return;
+    _tabActive = active;
+    _speedTimer?.cancel();
+    _speedTimer = null;
+    if (!active) return;
+    // Speeds come from byte deltas, so a tab that was hidden for a while
+    // needs a fresh baseline instead of one giant spike on return.
+    _hasSample = false;
+    _lastBytes.clear();
+    _speeds.clear();
     _speedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _sampleSpeeds();
     });
@@ -347,6 +381,14 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
         await Process.run('open', [directory]);
       } else if (PlatformUtils.isLinux) {
         await Process.run('xdg-open', [directory]);
+      } else if (Platform.isAndroid) {
+        // Android has no intent that reliably reaches a file manager for a
+        // folder; the system document browser is the one UI every device
+        // ships, and it can be opened straight at the library folder.
+        await FilePicker.getDirectoryPath(
+          dialogTitle: l10n.downloadCenterShowInFolder,
+          initialDirectory: '$directory',
+        );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.storagePathMessage(directory))),
@@ -390,8 +432,15 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
       }
     });
 
-    final activeAsync = ref.watch(activeDownloadsProvider);
-    final completedAsync = ref.watch(completedDownloadsProvider);
+    // A hidden tab stays mounted, so it must not keep subscribing: every
+    // download event would rebuild this whole page behind the user's back.
+    final tabActive = TabVisibility.of(context);
+    final activeAsync = tabActive
+        ? ref.watch(activeDownloadsProvider)
+        : const AsyncData<Map<String, DownloadTask>>({});
+    final completedAsync = tabActive
+        ? ref.watch(completedDownloadsProvider)
+        : const AsyncData<List<CompletedDownload>>([]);
     final active = (activeAsync.valueOrNull ?? const <String, DownloadTask>{})
         .values
         .where((task) =>
@@ -440,14 +489,6 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
               task: currentTask,
               speed: _speeds[currentTask.id],
             ),
-          if (allCount > 0) ...[
-            const SizedBox(height: 12),
-            _StatsGrid(
-              active: activeOnly.length,
-              completed: completed.length,
-              failed: failed.length,
-            ),
-          ],
           const SizedBox(height: 16),
           if (!hasContent)
             Padding(
@@ -530,10 +571,11 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
                 ),
             ],
             if (includeCompleted && completed.isNotEmpty) ...[
-              SectionHeader(
-                title: l10n.downloadCenterCompleted,
-                hint: l10n.downloadCenterCompletedHint,
-              ),
+              // Only separate from a section above: with nothing before it
+              // this left a blank band right under the filter tabs.
+              if ((includeActive && activeOnly.isNotEmpty) ||
+                  (includeCompleted && failed.isNotEmpty))
+                const SizedBox(height: 16),
               _CompletedList(
                 items: completed,
                 onOpen: _openCompleted,
@@ -743,84 +785,6 @@ class _ProgressHero extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({
-    required this.active,
-    required this.completed,
-    required this.failed,
-  });
-
-  final int active;
-  final int completed;
-  final int failed;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: _StatBox(
-            value: active,
-            label: l10n.downloadCenterInProgress,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatBox(
-            value: completed,
-            label: l10n.downloadCenterCompleted,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatBox(
-            value: failed,
-            label: l10n.downloadCenterFailed,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatBox extends StatelessWidget {
-  const _StatBox({required this.value, required this.label});
-
-  final int value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      constraints: const BoxConstraints(minHeight: SwissGrid.row),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(SwissRadius.field),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '$value',
-            style: SwissText.headline.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: SwissText.micro.copyWith(color: scheme.outline),
-          ),
-        ],
       ),
     );
   }
@@ -1215,21 +1179,25 @@ class _CoverFallback extends StatelessWidget {
 
 class _StatusPill extends StatelessWidget {
   const _StatusPill({
+    super.key,
     required this.label,
     required this.color,
     this.dot = false,
     this.icon,
+    this.minHeight = 24,
   });
 
   final String label;
   final Color color;
   final bool dot;
   final IconData? icon;
+  final double minHeight;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 24),
+      constraints: BoxConstraints(minHeight: minHeight),
+      alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
@@ -1459,12 +1427,17 @@ class _CompletedRow extends StatelessWidget {
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      _StatusPill(
-                        label: l10n.statusCompleted,
-                        color: scheme.secondary,
-                        icon: Icons.check_rounded,
-                      ),
+                      if (footer.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          footer,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SwissText.micro.copyWith(
+                            color: scheme.outline,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1473,22 +1446,25 @@ class _CompletedRow extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    footer,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SwissText.micro.copyWith(color: scheme.outline),
-                  ),
+                const Spacer(),
+                // The completed state sits with the actions it describes,
+                // and shares their height so the row reads as one line.
+                _StatusPill(
+                  key: const ValueKey('completed-status-pill'),
+                  label: l10n.statusCompleted,
+                  color: scheme.secondary,
+                  icon: Icons.check_rounded,
+                  minHeight: 36,
                 ),
+                const SizedBox(width: 8),
                 FilledButton.tonal(
+                  key: const ValueKey('completed-open-button'),
                   style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    minimumSize: const Size(0, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    minimumSize: const Size(0, 36),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     textStyle:
-                        SwissText.micro.copyWith(fontWeight: FontWeight.w700),
+                        SwissText.badge.copyWith(fontWeight: FontWeight.w800),
                   ),
                   onPressed: onOpen,
                   child: Text(l10n.open),

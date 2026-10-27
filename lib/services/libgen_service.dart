@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 
 // Project imports:
 import 'package:openlib/services/annas_archieve.dart';
+import 'package:openlib/services/hedged_requests.dart';
 import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/services/logger.dart';
 
@@ -32,8 +33,8 @@ class LibgenService {
       : _dio = dio ??
             createDioWithLogging(
                 options: BaseOptions(
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 30),
+              connectTimeout: const Duration(seconds: 6),
+              receiveTimeout: const Duration(seconds: 15),
               headers: _browserHeaders,
               followRedirects: true,
               maxRedirects: 5,
@@ -55,39 +56,45 @@ class LibgenService {
     final mirrors = await _instanceManager.enabledUrls(MirrorService.libgen);
     final candidates = _candidateUrls(url, mirrors);
 
-    Object? lastError;
-    for (final candidate in candidates) {
-      try {
-        _logger.debug('Fetching libgen ads page',
-            tag: 'LibgenService', metadata: {'url': candidate});
-        final baseUrl = Uri.parse(candidate).origin;
-        final response = await _dio.get(
-          candidate,
-          options: Options(headers: {'Referer': '$baseUrl/index.php'}),
-        );
-        if (response.statusCode != 200) continue;
+    final winner = await hedgeFirst<BookInfoData>(
+      [for (final candidate in candidates) () => _fetchAdsPage(candidate)],
+    );
+    if (winner != null) return winner;
 
-        final data = parseAdsPage(response.data.toString(), baseUrl, candidate);
-        if (data != null) return data;
-
-        _logger.warning('Libgen ads page did not parse',
-            tag: 'LibgenService', metadata: {'url': candidate});
-      } catch (e) {
-        lastError = e;
-        _logger.debug('Libgen mirror failed, trying next',
-            tag: 'LibgenService',
-            metadata: {
-              'url': candidate,
-              'error': e.toString(),
-            });
-      }
-    }
-
-    if (lastError != null) {
-      _logger.error('All libgen mirrors failed for book info',
-          tag: 'LibgenService', error: lastError);
+    // The hedged pair failed; give the rest one quiet try each.
+    for (final candidate in candidates.skip(2)) {
+      final data = await _fetchAdsPage(candidate);
+      if (data != null) return data;
     }
     return null;
+  }
+
+  Future<BookInfoData?> _fetchAdsPage(String candidate) async {
+    try {
+      _logger.debug('Fetching libgen ads page',
+          tag: 'LibgenService', metadata: {'url': candidate});
+      final baseUrl = Uri.parse(candidate).origin;
+      final response = await _dio.get(
+        candidate,
+        options: Options(headers: {'Referer': '$baseUrl/index.php'}),
+      );
+      if (response.statusCode != 200) return null;
+
+      final data = parseAdsPage(response.data.toString(), baseUrl, candidate);
+      if (data == null) {
+        _logger.warning('Libgen ads page did not parse',
+            tag: 'LibgenService', metadata: {'url': candidate});
+      }
+      return data;
+    } catch (e) {
+      _logger.debug('Libgen mirror failed, trying next',
+          tag: 'LibgenService',
+          metadata: {
+            'url': candidate,
+            'error': e.toString(),
+          });
+      return null;
+    }
   }
 
   /// Every candidate for [url], best first.
@@ -286,8 +293,8 @@ class LibgenService {
   String _formatFrom(String html, String url) {
     for (final source in [url, html]) {
       final match = RegExp(
-        r'[?&](?:ext|format)=\w*?(epub|pdf|mobi|azw3?|cbr|cbz|djvu)|'
-        r'\.(epub|pdf|mobi|azw3?|cbr|cbz|djvu)(?=["<\s?])',
+        r'[?&](?:ext|format)=\w*?(epub|pdf|mobi|azw3?|cbr|cbz|djvu|fb2|txt)|'
+        r'\.(epub|pdf|mobi|azw3?|cbr|cbz|djvu|fb2|txt)(?=["<\s?]|$)',
         caseSensitive: false,
       ).firstMatch(source);
       final ext = match?.group(1) ?? match?.group(2);

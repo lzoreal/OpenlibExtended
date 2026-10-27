@@ -5,6 +5,9 @@
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
 
+// Dart imports:
+import 'dart:async';
+
 // Project imports:
 import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
@@ -233,6 +236,80 @@ void main() {
 
       expect(fallbackCalls, 1);
       expect(result, '<html>visible</html>');
+    });
+  });
+
+  test('without a cleared session there is nothing to reuse', () async {
+    await WebviewChallengeSolver.clearSessions();
+    addTearDown(WebviewChallengeSolver.clearSessions);
+
+    expect(WebviewChallengeSolver.sessionCount, 0);
+    expect(
+      await WebviewChallengeSolver.fetchWithSession(
+          'https://welib.org/search?q=docker'),
+      isNull,
+    );
+  });
+
+  group('verification entry points', () {
+    test('a host that failed headless stops trying it on mobile', () {
+      WebviewChallengeSolver.guiEnabled = true;
+      WebviewChallengeSolver.overrideIsMobile = true;
+      WebviewChallengeSolver.clearHeadlessFailures();
+      addTearDown(() {
+        WebviewChallengeSolver.guiEnabled = true;
+        WebviewChallengeSolver.overrideIsMobile = null;
+        WebviewChallengeSolver.clearHeadlessFailures();
+        WebviewChallengeSolver.clearPendingChallenges();
+      });
+
+      const url = 'https://welib.org/search?q=docker';
+      expect(WebviewChallengeSolver.shouldTryHeadless(url), isTrue);
+
+      WebviewChallengeSolver.debugRememberHeadlessFailure(url);
+
+      expect(WebviewChallengeSolver.shouldTryHeadless(url), isFalse);
+      expect(
+        WebviewChallengeSolver.shouldTryHeadless('https://welib.org/md5/abc'),
+        isFalse,
+        reason: 'the failure is remembered per host',
+      );
+      expect(
+        WebviewChallengeSolver.shouldTryHeadless('https://annas-archive.gl/x'),
+        isTrue,
+      );
+    });
+
+    test('the requested visible solve caches its HTML and runs once',
+        () async {
+      ChallengeHtmlCache.clear();
+      var calls = 0;
+      final started = Completer<void>();
+      final release = Completer<void>();
+      WebviewChallengeSolver.visibleSolverFallback = (url) async {
+        calls++;
+        if (!started.isCompleted) started.complete();
+        await release.future;
+        return '<html>solved by the user</html>';
+      };
+      addTearDown(() {
+        WebviewChallengeSolver.visibleSolverFallback = null;
+        WebviewChallengeSolver.clearPendingChallenges();
+      });
+
+      const url = 'https://welib.org/search?q=manual';
+      WebviewChallengeSolver.pendingChallenges.value = [url];
+
+      final first = WebviewChallengeSolver.requestVisibleSolve(url);
+      await started.future;
+      // A second tap while the page is open must not push it twice.
+      await WebviewChallengeSolver.requestVisibleSolve(url);
+      release.complete();
+      await first;
+
+      expect(calls, 1);
+      expect(ChallengeHtmlCache.get(url), '<html>solved by the user</html>');
+      expect(WebviewChallengeSolver.pendingChallenges.value, isEmpty);
     });
   });
 }

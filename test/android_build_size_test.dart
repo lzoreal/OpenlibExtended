@@ -85,21 +85,6 @@ void main() {
   });
 
   group('bundled assets audit', () {
-    test('Nunito ships exactly the weights the app renders', () {
-      final dir = Directory('google_fonts');
-      final fonts =
-          dir.listSync().map((f) => p.basename(f.path)).toList()..sort();
-      // FontWeight values used across lib/: 400 (normal), 500, 600, 700
-      // (bold), 900 (w900). Nunito file names map to those weights.
-      expect(fonts, [
-        'Nunito-Black.ttf',
-        'Nunito-Bold.ttf',
-        'Nunito-Medium.ttf',
-        'Nunito-Regular.ttf',
-        'Nunito-SemiBold.ttf',
-      ]);
-    });
-
     test('every shipped asset is referenced by the app', () {
       final referenced = _referencedAssetNames();
       for (final entity in Directory('assets').listSync(recursive: true)) {

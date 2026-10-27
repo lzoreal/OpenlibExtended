@@ -22,6 +22,7 @@ import 'package:openlib/services/update_checker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // Project imports:
+import 'package:openlib/services/book_format.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/logger.dart';
 import 'package:openlib/services/search_manager.dart';
@@ -63,11 +64,10 @@ Future<void> scanAndImportBooks(
 
     for (var entity in files) {
       if (entity is File) {
-        final fileName = entity.path.split('/').last;
+        final fileName = entity.path.split(Platform.pathSeparator).last;
         final extension = fileName.split('.').last.toLowerCase();
 
-        // Only process epub and pdf files
-        if (extension == 'epub' || extension == 'pdf') {
+        if (isSupportedBookFormat(extension)) {
           // Extract the md5 hash from the filename (the part before the extension)
           final parts = fileName.split('.');
           if (parts.length >= 2) {
@@ -263,6 +263,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   late final TabController _tabController =
       TabController(length: 4, vsync: this);
 
+  // Kept on the State instead of being rebuilt in build(): a new future
+  // per build meant a database query and a platform-channel call every
+  // time the page rebuilt, including while switching tabs.
+  late Future<dynamic> _storageDirectory = _readStorageDirectory();
+  late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+
+  Future<dynamic> _readStorageDirectory() async {
+    try {
+      return await MyLibraryDb.instance.getPreference('bookStorageDirectory');
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -389,7 +403,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           title: l10n.generalSection,
           children: [
             FutureBuilder<dynamic>(
-              future: dataBase.getPreference('bookStorageDirectory'),
+              future: _storageDirectory,
               builder: (context, snapshot) {
                 String subtitle = l10n.changeStorageHint;
                 if (snapshot.hasData && snapshot.data is String) {
@@ -415,7 +429,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                     await scanAndImportBooks(pickedDirectory, dataBase, ref);
                     // ignore: unused_result
                     ref.refresh(myLibraryProvider);
-                    (context as Element).markNeedsBuild();
+                    if (!mounted) return;
+                    setState(() {
+                      _storageDirectory = Future.value(pickedDirectory);
+                    });
                   },
                 );
               },
@@ -477,7 +494,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         FutureBuilder<PackageInfo>(
-          future: PackageInfo.fromPlatform(),
+          future: _packageInfo,
           builder: (context, snapshot) {
             final version =
                 snapshot.hasData ? 'v${snapshot.data!.version}' : '';

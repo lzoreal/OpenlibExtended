@@ -2,7 +2,7 @@
 import 'dart:io' show Platform;
 
 // Flutter imports:
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:flutter/material.dart';
 
 // Package imports:
@@ -23,6 +23,7 @@ import 'package:openlib/services/upgrade_detector.dart';
 import 'package:openlib/ui/components/bottom_nav_bar.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/swiss_grid_overlay.dart';
+import 'package:openlib/ui/components/tab_keep_alive.dart';
 import 'package:openlib/ui/download_center_page.dart';
 import 'package:openlib/ui/motion.dart';
 import 'package:openlib/ui/search_page.dart';
@@ -303,6 +304,22 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<ConsumerStatefulWidget> createState() => _MainScreenState();
 }
 
+/// Moves the root PageView to [next] with the same slide the settings
+/// tabs use, including taps that skip pages. The pages stay alive and each
+/// is its own repaint layer, so crossing them is paint-only after the
+/// first visit.
+@visibleForTesting
+void switchToTab(PageController controller, int next) {
+  if (!controller.hasClients) return;
+  final current = controller.page?.round() ?? next;
+  if (current == next) return;
+  controller.animateToPage(
+    next,
+    duration: kPageSwitchDuration,
+    curve: kPageSwitchCurve,
+  );
+}
+
 class _MainScreenState extends ConsumerState<MainScreen>
     with WidgetsBindingObserver {
   static const List<Widget> _widgetOptions = <Widget>[
@@ -320,14 +337,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     _pageController =
         PageController(initialPage: ref.read(selectedIndexProvider));
     ref.listenManual<int>(selectedIndexProvider, (previous, next) {
-      if (_pageController.hasClients &&
-          (_pageController.page?.round() ?? next) != next) {
-        _pageController.animateToPage(
-          next,
-          duration: kPageSwitchDuration,
-          curve: kPageSwitchCurve,
-        );
-      }
+      switchToTab(_pageController, next);
     });
     WidgetsBinding.instance.addObserver(this);
     // Request notification permission after first frame (only on mobile)
@@ -479,13 +489,17 @@ class _MainScreenState extends ConsumerState<MainScreen>
   @override
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(selectedIndexProvider);
-    final downloadCount = (ref.watch(activeDownloadsProvider).valueOrNull ??
-            const <String, DownloadTask>{})
-        .values
-        .where((task) =>
-            task.status != DownloadStatus.completed &&
-            task.status != DownloadStatus.cancelled)
-        .length;
+    // Only the badge count matters here; watching the whole task map made
+    // the scaffold and dock rebuild for every network chunk.
+    final downloadCount = ref.watch(activeDownloadsProvider.select(
+      (downloads) =>
+          (downloads.valueOrNull ?? const <String, DownloadTask>{})
+              .values
+              .where((task) =>
+                  task.status != DownloadStatus.completed &&
+                  task.status != DownloadStatus.cancelled)
+              .length,
+    ));
 
     return Scaffold(
       body: SafeArea(
@@ -498,7 +512,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 ref.read(selectedIndexProvider.notifier).state = index;
               }
             },
-            children: _widgetOptions,
+            children: [
+              for (var index = 0; index < _widgetOptions.length; index++)
+                TabKeepAlive(
+                  active: index == selectedIndex,
+                  child: _widgetOptions[index],
+                ),
+            ],
           ),
         ),
       ),

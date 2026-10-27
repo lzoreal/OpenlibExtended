@@ -7,17 +7,26 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 // Project imports:
+import 'package:openlib/services/book_detail_source.dart';
 import 'package:openlib/services/files.dart';
 
-class MyBook {
+class MyBook implements BookDetailSource {
   final String id;
+  @override
   final String title;
+  @override
   final String? author;
+  @override
   final String? thumbnail;
+  @override
   final String link;
+  @override
   final String? publisher;
+  @override
   final String? info;
+  @override
   final String? description;
+  @override
   final String? format;
   final String? fileName;
 
@@ -33,7 +42,8 @@ class MyBook {
       required this.description,
       this.fileName});
 
-  // Getter for compatibility with BookInfoWidget which expects 'md5'
+  // Getter for compatibility with the detail page, which expects 'md5'.
+  @override
   String get md5 => id;
 
   Map<String, dynamic> toMap() {

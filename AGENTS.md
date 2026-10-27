@@ -4,6 +4,8 @@
 
 技术术语、代码标识符、命令保持英文；解释用中文。
 
+> **UI 流程约束**：涉及 UI 的更新，必须先更新 `design/ui_prototype.html` 原型并让用户确认，确认后再改代码；原型与实现必须保持一致。
+
 ---
 
 ## 1. 项目速览
@@ -12,6 +14,7 @@
 - 入口 `lib/main.dart`；全局状态 `lib/state/state.dart`；服务 `lib/services/`；页面 `lib/ui/`；数据库 `lib/services/database.dart`。
 - 发布平台：Android、iOS（未签名侧载）、Windows、Linux。**Web 不可用**；macOS 有工程但未发布。
 - “我的书库”已重构为“下载中心”：标签、阅读状态筛选、排序/筛选、磁盘同步入口均已删除，不要恢复。
+- 主导航与子标签均支持左右滑动；镜像页支持本机测速并按本机延迟自动排序。
 - CI 固定 Flutter **3.47.2**；Dart SDK `>=3.3.0 <4.0.0`。
 
 ---
@@ -31,6 +34,9 @@ flutter build apk --split-per-abi --release
 flutter build windows --release
 flutter build linux --release
 flutter build ios --release --no-codesign
+
+flutter build apk --debug -Pkotlin.incremental=false   # 本机调试；关闭 Kotlin 增量缓存
+dart run flutter_launcher_icons                        # 改 assets/icons/appIcon*.svg 后重新生成平台图标
 ```
 
 没有 Makefile / 自定义脚本别名。不要引入新的构建系统。
@@ -45,6 +51,9 @@ flutter build ios --release --no-codesign
    - 唯一允许硬编码的镜像相关 URL 是 `https://open-slum.org`（`lib/services/slum_catalogue.dart`）。
    - 取镜像用 `InstanceManager().enabledUrls(...)`；不要在 provider/UI 里写 `z-lib.*`、`libgen.*`、AA host 常量。
    - DOWN 镜像永不请求；用户禁用和 `headlessOnly` 过滤必须保留。
+   - 本机测速只在 `lib/services/mirror_latency.dart` 发起（HEAD → GET 回退，TTFB，6s 超时，最多 4 并发）；不要从 UI 直接做网络探测。
+   - 测速结果用 `InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时；过期结果仅展示“已过期”，不再参与排序。
+   - 自动排序：已测且可达的节点优先，按本机延迟升序；未测节点回退保护等级/状态/SLUM 延迟；DOWN 永远最后。手动模式不受影响。
 
 2. **书源协议**
    - 实现 `SearchProvider`：搜索成功但无结果返回 `[]`；不可达/解析失败抛异常。
@@ -94,12 +103,19 @@ flutter build ios --release --no-codesign
 11. **UI 必须遵循 MD3 设计系统**
     - 颜色/形状/文字样式只从 `Theme.of(context)` 取；主题源是 `lib/ui/themes.dart`（暖纸 + 翡翠绿 `#0F6B5C`，light/dark）。
     - 使用语义角色：`primary`/`primaryContainer`、`onSurface`/`onSurfaceVariant`、`surfaceContainerLow/High/Highest`、`error`/`errorContainer`；不要新增硬编码 `Colors.*` 或十六进制色值（深色遮罩上的白字除外）。
-    - 使用 MD3 组件：`NavigationBar`、`Card`、`FilledButton`/`OutlinedButton`/`TextButton`、`FilterChip`、`SegmentedButton`、`SearchBar`、`AlertDialog`、`BottomSheet`。
-    - 一级页统一 `PageHeader`（小标签 + 标题 + 可选操作，**不带副标题**），列表节标题统一 `SectionHeader`，设置/What's New 选项卡统一 `PillTabs`。
+    - 使用 MD3 组件：`Card`、`FilledButton`/`OutlinedButton`/`TextButton`、`FilterChip`、`SearchBar`、`AlertDialog`、`BottomSheet`；分段统一用 `PillTabs` + `TabBarView`。
+    - 主导航用 `PageView`；发现/搜索/下载中心的子标签与设置页一样用 `PillTabs + TabBarView`。搜索、下载、设置的页头与标签固定，内容区独立滚动。
+    - 根页面滑动只在页头/标题/空白 chrome 区生效；内容区横向手势属于内层子标签，不要试图让两层同时抢占同一手势。
+    - 一级页统一 `PageHeader`（小标签 + 标题 + 可选操作，**不带副标题**），列表节标题统一 `SectionHeader`，设置/What's New/主页面选项卡统一 `PillTabs`。
     - 设置分组固定为搜索来源 / 外观 / 高级 / 关于；存储位置在“高级 → 通用”，不要放回外观。
     - 语言默认收起、点击展开；主题用带预览的选项卡，不用下拉框。
     - 页面横向内边距 16dp、卡片圆角 20dp、输入框/选项 16dp、对话框 28dp；底部导航首页标签用 `homeTitle`（发现）。新页面复用 `BookInfoWidget`、`ActiveDownloadsWidget`、`CustomErrorWidget` 等共享组件。
+    - 大字体：固定高度卡、导航、标签和表单必须在 200% 字体下不溢出；优先动态高度或可滚动，不要靠缩小字号。
     - 不要恢复已移除的 `google_nav_bar`、旧的红色/紫色主题或内置阅读器。
+
+12. **应用图标**
+    - 源文件是 `assets/icons/appIcon.svg`、`appIcon_foreground.svg`、`appIcon_desktop.svg`；`appIcon.png` / `appIcon_foreground.png` / `appIcon_desktop.png` 由它们渲染。
+    - 改图标后运行 `dart run flutter_launcher_icons`，并同步关于页；不要手改 Android/iOS/Windows/macOS 生成物。
 
 ---
 
@@ -128,18 +144,19 @@ flutter test
 
 | 改动 | 必测 |
 |---|---|
-| HTML 解析器 | 用 `test/fixtures/` 的抓取页做纯解析测试 |
+| HTML 解析器 | 用 `test/fixtures/` 的抓取页做纯解析测试；分类页使用 `goodreads_shelf.html` |
 | 书源/镜像 | provider 测试 + `instance_manager_test` / `slum_catalogue_test` |
+| 本机镜像测速 | `mirror_latency_test`（HEAD/GET/超时/并发）、`mirror_latency_state_test`、`mirror_latency_ui_test`、排序/过期测试 |
 | 下载 | `download_manager_test`（本地 HTTP 服务模拟 Range/失败/重试） |
 | 数据库/迁移 | 备份恢复、升级路径 |
-| 设置/UI | widget 测试（参考 `settings_page_test`、`download_center_page_test`） |
+| 设置/UI | widget 测试（参考 `settings_page_test`、`download_center_page_test`）；导航/标签改动覆盖 `home_metrics_test`、`search_metrics_test` 与 200% 字体 |
 | 结果页/来源切换 | `results_page_test`（首屏流式、全部/单源切换、分页跟随视图） |
 | 本地化 | `localization_test` |
 | 构建/发布配置 | `android_build_size_test`、`scoop_manifest_test` |
 
 - 真实网络用例默认 `skip`；不要为了“跑绿”把普通单测也 skip。
 - 不要修改测试来迁就有缺陷的实现；先确认需求。
-- UI 改动尽量在目标平台实际运行验证（至少桌面 + 一个移动端）；无法验证时要在交付说明中明确写出。
+- 实机验证按批次进行：不必每次改完代码就上设备。把改动攒到下一次本来就需要实机的时机一起验证，并在交付说明里写明哪些改动尚未实机验证。
 
 ---
 
@@ -150,7 +167,7 @@ flutter test
 - **下载任务只在内存**；进程死亡后不会自动续传。
 - **`enableAutoUpdate` 是死偏好**；启动时总会检查更新，真正生效的是 `includePrereleaseUpdates`。
 - **应用内更新没有签名/哈希校验**，且 Android 固定优先 arm64。不要在此基础上叠加更多“信任下载”的逻辑。
-- **分类页解析器有笔误**（`img"]`、`herf`）；修它时先补 fixtures。
+- **Goodreads 分类标题带版本后缀**（如 `(Paperback)`）；解析时会清理已知版本后缀，但保留 `(Series, #1)`。抓取 `shelf/show` 为空时（如 `title-challenge`）才回退旧 tag 页。
 - **`setCompleted` 会用空 position 覆盖进度**；内置阅读器已删除，应用内不再写阅读位置，但旧数据/备份仍可能包含。
 - **下载中心里进行中任务只在内存**，完成记录来自 `mybooks`；删除记录不删除本地文件。
 - **已完成记录：点行进入书籍详情，只有“打开”按钮调用外部阅读器**；不要合并这两个动作，也不要把提示写回“点书名直接阅读”。
@@ -158,6 +175,7 @@ flutter test
 - **macOS/iOS 通知不可用**；通知服务仅 Android 初始化。
 - **Linux 需要 WebKitGTK 4.1**；否则过盾/桌面 WebView 失败。
 - **可见过盾页必须可交互**：加载时显示设计的全屏加载态，加载完成后显示顶部“需要手动验证”提示并露出 WebView；不要用遮罩长期挡住验证页面。
+- **本机测速结果成为自动排序主键后**，较快的受保护节点可能排在未受保护节点前；手动模式仍可覆盖。
 - **`getPreference` 会抛异常**；不要假设返回 null。
 - **桌面数据库需要 FFI 初始化**；新增入口/测试时要先初始化。
 - **测试里的 `test/fixtures` 是真实页面快照**；改解析器前先看 fixture 结构。
@@ -168,9 +186,9 @@ flutter test
 
 - **加书源**：`SearchProviderId` → 实现 `SearchProvider` → 注册 `SearchManager` → SLUM 服务映射 → `routeBookDetail` → 详情下载分支 → ARB/设置开关 → 测试。
 - **加设置项**：`lib/state/state.dart` provider → `lib/main.dart` 读偏好并 override → `lib/ui/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
-- **加 l10n**：四个 ARB + `@description` → `flutter gen-l10n` → `AppLocalizations.of(context)`。
+- **加 l10n**：五份 ARB + `@description` → `flutter gen-l10n` → `AppLocalizations.of(context)`。
 - **改下载**：`DownloadManager` → `lib/services/download_target.dart` → `lib/ui/book_info_page.dart` → `download_manager_test`。
-- **改镜像**：`SlumCatalogue` / `InstanceManager` → `slum_catalogue_test` / `instance_manager_test` / `instances_page_test`。
+- **改镜像/本机测速**：`SlumCatalogue` / `InstanceManager` / `mirror_latency.dart` → `slum_catalogue_test` / `instance_manager_test` / `mirror_latency_*_test`；确认 24h 过期与自动排序。
 - **改更新**：`update_checker.dart` → `upgrade_detector`/What's New → 相关 widget 测试；注意 CI 产物命名约定。
 - **改发布**：`.github/workflows/build.yml` + `tool/update_scoop_manifest.py` + `bucket/openlibextended.json`；改产物名会破坏应用内更新识别。
 
@@ -182,19 +200,21 @@ flutter test
 - [ ] `flutter test` 通过；联网用例仍保持 skip。
 - [ ] 新增/修改的解析器有 fixture 测试。
 - [ ] 用户可见文案已进入五份 ARB 并重新生成。
+- [ ] 改导航/标签时，根页面与子标签的左右滑动均可用，且 200% 字体不溢出。
+- [ ] 改应用图标时已重新渲染 PNG 并运行 `dart run flutter_launcher_icons`，关于页同步。
 - [ ] 没有硬编码镜像 host、密钥、cookie。
 - [ ] 没有改动 `pubspec.yaml` 的发布版本号（除非用户明确要求）。
 - [ ] 没有随意升级钉死依赖。
 - [ ] 平台差异分支保留（Android/iOS/Windows/Linux）。
 - [ ] 如果改了下载/更新/镜像，已说明对现有用户的影响。
-- [ ] 如果是 UI 改动，已在目标平台实际运行验证，或在交付说明中明确未验证。
+- [ ] 如果是 UI 改动：实机验证按批次安排（不需要每次改完立即验证）；尚未验证的在交付说明中写明。
 
 ---
 
 ## 9. 文档与协作
 
 - 产品/架构/流程：`HANDOVER.md`。
-- 全站 UI 原型：`design/ui_prototype.html`；页面改版先更新原型，再按原型实现。
+- 全站 UI 原型：`design/ui_prototype.html`（21 屏）+ `design/swiss_grid_spec.md`；UI 改动按顶部流程执行。
 - 贡献流程：`CONTRIBUTING.md`（不要修改 README 等信息文件，除非用户明确要求修错别字）。
 - 用户常见问题：`FAQ.md`。
 - 安装/平台依赖：`SETUP.md`。

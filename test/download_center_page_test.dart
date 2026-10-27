@@ -222,6 +222,15 @@ void main() {
     expect(find.text('打开'), findsOneWidget);
     expect(find.text('已完成'), findsWidgets);
 
+    // The status chip and the open button read as one control group:
+    // same height, not one tall pill next to a shorter button.
+    final status = tester
+        .getSize(find.byKey(const ValueKey('completed-status-pill')));
+    final open =
+        tester.getSize(find.byKey(const ValueKey('completed-open-button')));
+    expect(status.height, 36);
+    expect(open.height, status.height);
+
     await disposePage(tester);
   });
 
@@ -259,6 +268,40 @@ void main() {
     await tester.tap(find.text('同时移除文件'));
     await tester.pump();
     expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+
+    await disposePage(tester);
+  });
+
+  testWidgets('completed list drops the stats row and the hint',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(app(completed: [
+      CompletedDownload(
+        book: MyBook(
+          id: 'book-1',
+          title: '已完成的书',
+          author: '作者',
+          thumbnail: null,
+          link: 'https://example.com/book',
+          publisher: null,
+          info: null,
+          format: 'epub',
+          description: null,
+          fileName: 'book.epub',
+        ),
+        sizeBytes: 2 * 1024 * 1024,
+        modifiedAt: DateTime.now(),
+      ),
+    ]));
+    await tester.pump();
+
+    // The 0 / 1 / 0 counters and the "tap a title" hint are both gone.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('点书名看详情 · 点打开用外部阅读器'), findsNothing);
 
     await disposePage(tester);
   });

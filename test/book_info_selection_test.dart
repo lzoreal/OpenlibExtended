@@ -12,19 +12,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/services/book_detail_source.dart';
 import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/components/book_info_widget.dart';
 
-class _FakeBookData {
+class _FakeBookData implements BookDetailSource {
+  @override
   final String? format = 'epub';
+  @override
   final String md5 = '7b2e2c05501894b229e309e39ec0d05d';
+  @override
   final String link =
       'https://annas-archive.gl/md5/7b2e2c05501894b229e309e39ec0d05d';
+  @override
   final String title = 'Structure of Scientific Revolutions';
+  @override
   final String author = 'Thomas S. Kuhn';
+  @override
   final String publisher = 'University of Chicago Press';
+  @override
   final String info = 'English [en], EPUB, 1.5MB, 2012';
+  @override
   final String thumbnail = '';
+  @override
   final String description =
       'A book about paradigm shifts in science and how they reshape whole fields.';
 }

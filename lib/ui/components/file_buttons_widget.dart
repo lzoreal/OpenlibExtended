@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_file/open_file.dart';
 
 // Project imports:
+import 'package:openlib/services/book_format.dart';
 import 'package:openlib/services/files.dart' show getFilePath;
 import 'package:openlib/ui/components/detail_bottom_bar.dart';
 import 'package:openlib/ui/components/delete_dialog_widget.dart';
@@ -87,11 +88,7 @@ Future<void> openBookExternally({
     return;
   }
 
-  final mime = switch (format.toLowerCase()) {
-    'pdf' => 'application/pdf',
-    'epub' => 'application/epub+zip',
-    _ => null,
-  };
+  final mime = bookFormatMimeType(format);
   try {
     await OpenFile.open(path, linuxByProcess: true, type: mime);
   } catch (_) {

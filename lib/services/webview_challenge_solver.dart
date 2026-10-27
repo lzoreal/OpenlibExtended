@@ -56,6 +56,157 @@ class WebviewChallengeSolver {
   /// imports. Registered by the app shell at startup.
   static Future<String?> Function(String url)? visibleSolverFallback;
 
+  /// URLs currently waiting on an invisible solve, so the UI can offer the
+  /// verification page right away instead of letting the user watch a
+  /// spinner for the whole headless timeout.
+  static final ValueNotifier<List<String>> pendingChallenges =
+      ValueNotifier(const []);
+
+  static void _addPending(String url) {
+    if (pendingChallenges.value.contains(url)) return;
+    pendingChallenges.value = [...pendingChallenges.value, url];
+  }
+
+  static void _removePending(String url) {
+    if (!pendingChallenges.value.contains(url)) return;
+    pendingChallenges.value =
+        pendingChallenges.value.where((value) => value != url).toList();
+  }
+
+  /// Hosts whose headless attempt already failed: the invisible webview
+  /// cannot pass these, so later challenges skip straight to the visible
+  /// page. The first attempt still runs the full timeout.
+  static const Duration _headlessRetryAfter = Duration(minutes: 30);
+  static final Map<String, DateTime> _headlessFailures = {};
+
+  /// Solved browser sessions kept alive per host, so a later search on the
+  /// same site reuses the clearance instead of verifying again. The list
+  /// is trimmed to the newest [_maxSessions].
+  static const int _maxSessions = 2;
+  static final Map<String, _SolvedSession> _sessions = {};
+
+  @visibleForTesting
+  static void clearHeadlessFailures() => _headlessFailures.clear();
+
+  @visibleForTesting
+  static void clearPendingChallenges() => pendingChallenges.value = const [];
+
+  @visibleForTesting
+  static int get sessionCount => _sessions.length;
+
+  @visibleForTesting
+  static Future<void> clearSessions() async {
+    final sessions = _sessions.values.toList();
+    _sessions.clear();
+    for (final session in sessions) {
+      await session.dispose();
+    }
+  }
+
+  static bool _headlessRecentlyFailed(String url) {
+    final host = Uri.tryParse(url)?.host ?? url;
+    final at = _headlessFailures[host];
+    if (at == null) return false;
+    if (DateTime.now().difference(at) > _headlessRetryAfter) {
+      _headlessFailures.remove(host);
+      return false;
+    }
+    return true;
+  }
+
+  /// Whether an invisible solve is worth attempting for [url]: skipped on
+  /// mobile for hosts whose invisible attempt already failed recently,
+  /// because repeating it only costs the user another full timeout.
+  @visibleForTesting
+  static bool shouldTryHeadless(String url) =>
+      guiEnabled &&
+      !(_isMobile && _headlessRecentlyFailed(url)) &&
+      (headlessEnabled || !_isMobile);
+
+  @visibleForTesting
+  static void debugRememberHeadlessFailure(String url) =>
+      _rememberHeadlessFailure(url);
+
+  static void _rememberHeadlessFailure(String url) {
+    _headlessFailures[Uri.tryParse(url)?.host ?? url] = DateTime.now();
+  }
+
+  /// Opens the visible verification page for [url] and resolves once the
+  /// user is done. Idempotent: a second tap while the page is already open
+  /// does nothing. The captured HTML lands in [ChallengeHtmlCache], which
+  /// is what unblocks the provider still waiting on this URL.
+  static Future<void> requestVisibleSolve(String url) async {
+    final fallback = visibleSolverFallback;
+    if (fallback == null || _visibleSolveInFlight.contains(url)) return;
+    _visibleSolveInFlight.add(url);
+    try {
+      final html = await fallback(url);
+      if (html != null) ChallengeHtmlCache.store(url, html);
+    } finally {
+      _visibleSolveInFlight.remove(url);
+      _removePending(url);
+    }
+  }
+
+  static final Set<String> _visibleSolveInFlight = {};
+
+  /// Fetches [url] through the already-cleared browser session of its host,
+  /// when one exists. This is what makes the second and later searches on
+  /// a gated site skip verification entirely. Null when there is no
+  /// session (or it is busy / the page is still gated), and callers then
+  /// fall back to the normal HTTP path.
+  static Future<String?> fetchWithSession(String url) async {
+    final host = Uri.tryParse(url)?.host;
+    if (host == null) return null;
+    final session = _sessions[host];
+    if (session == null || session.busy) return null;
+    session.busy = true;
+    try {
+      final controller = session.controller;
+      await controller.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+      final deadline = DateTime.now().add(const Duration(seconds: 20));
+      while (DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+        try {
+          final title = (await controller.getTitle()) ?? '';
+          if (title.isNotEmpty &&
+              !isChallengePage(title: title, bodySnippet: '')) {
+            final html = await _captureHtml(controller);
+            if (html != null && html.isNotEmpty) {
+              ChallengeHtmlCache.store(url, html);
+              return html;
+            }
+          }
+        } catch (_) {
+          // Keep polling until the deadline.
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      session.busy = false;
+    }
+  }
+
+  static void _keepSession(
+      String url, HeadlessInAppWebView webview, InAppWebViewController? controller) {
+    final host = Uri.tryParse(url)?.host;
+    if (host == null || controller == null) {
+      return;
+    }
+    final existing = _sessions.remove(host);
+    if (existing != null && !identical(existing.webview, webview)) {
+      existing.dispose();
+    }
+    _sessions[host] = _SolvedSession(host, webview, controller);
+    while (_sessions.length > _maxSessions) {
+      final oldest = _sessions.keys.first;
+      final dropped = _sessions.remove(oldest);
+      dropped?.dispose();
+    }
+  }
+
   /// Test seam for the mobile/desktop branch: when set, overrides the real
   /// platform check. Production never sets it.
   @visibleForTesting
@@ -113,12 +264,23 @@ class WebviewChallengeSolver {
     final effectiveTimeout = timeout ??
         (_isMobile ? const Duration(seconds: 60) : const Duration(minutes: 3));
 
-    final tryHeadless = guiEnabled && (headlessEnabled || !_isMobile);
+    // A host whose invisible attempt already failed goes straight to the
+    // visible page: repeating a solve that cannot pass only made the user
+    // wait the whole timeout again.
+    final tryHeadless = shouldTryHeadless(url);
     var html = tryHeadless
         ? (_isMobile
             ? await _solveHeadless(url, effectiveTimeout)
             : await _solveDesktopWindow(url, effectiveTimeout))
         : null;
+
+    if (tryHeadless) {
+      if (html == null && _isMobile) {
+        _rememberHeadlessFailure(url);
+      } else if (html != null) {
+        _headlessFailures.remove(Uri.tryParse(url)?.host ?? url);
+      }
+    }
 
     if (html == null && _isMobile && visibleSolverFallback != null) {
       _logger.info('Headless solve failed, using visible fallback',
@@ -149,6 +311,11 @@ class WebviewChallengeSolver {
 
   static Future<String?> _solveHeadless(String url, Duration timeout) async {
     HeadlessInAppWebView? headless;
+    InAppWebViewController? controller;
+    var keepSession = false;
+    // The UI offers the visible page while this runs; a solve done there
+    // lands in the cache and is picked up below.
+    _addPending(url);
     try {
       final completer = Completer<String?>();
       final controllerHolder = Completer<InAppWebViewController>();
@@ -195,9 +362,17 @@ class WebviewChallengeSolver {
 
       unawaited(headless.run());
       final deadline = DateTime.now().add(timeout);
-      InAppWebViewController? controller;
+      final session = headless;
       while (DateTime.now().isBefore(deadline)) {
         if (completer.isCompleted) break;
+        // Someone solved this URL elsewhere (the user tapping "verify now"
+        // in the results page): use that HTML instead of waiting out the
+        // deadline for a solve that already happened.
+        final cached = ChallengeHtmlCache.get(url);
+        if (cached != null) {
+          completer.complete(cached);
+          break;
+        }
         // Headless webviews can stop loading without an onLoadStop for the
         // final page; also poll the controller directly.
         try {
@@ -218,15 +393,26 @@ class WebviewChallengeSolver {
 
       // The only place the completer may complete with null: the deadline.
       if (!completer.isCompleted) completer.complete(null);
-      return await completer.future;
+      final html = await completer.future;
+      final solvedController = controller;
+      if (html != null && solvedController != null) {
+        // Keep this cleared webview alive: the next search on the same
+        // host can navigate it instead of verifying all over again.
+        _keepSession(url, session, solvedController);
+        keepSession = true;
+      }
+      return html;
     } catch (e, st) {
       _logger.error('Headless challenge solver failed',
           tag: 'ChallengeSolver', error: e, stackTrace: st);
       return null;
     } finally {
-      try {
-        await headless?.dispose();
-      } catch (_) {}
+      if (!keepSession) {
+        try {
+          await headless?.dispose();
+        } catch (_) {}
+      }
+      _removePending(url);
     }
   }
 
@@ -379,5 +565,22 @@ class WebviewChallengeSolver {
     } catch (_) {
       return null;
     }
+  }
+}
+
+/// A cleared invisible webview kept alive per host so later pages on the
+/// same site can be fetched through the same browser session.
+class _SolvedSession {
+  _SolvedSession(this.host, this.webview, this.controller);
+
+  final String host;
+  final HeadlessInAppWebView webview;
+  final InAppWebViewController controller;
+  bool busy = false;
+
+  Future<void> dispose() async {
+    try {
+      await webview.dispose();
+    } catch (_) {}
   }
 }

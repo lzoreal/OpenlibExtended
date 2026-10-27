@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 // Project imports:
+import 'package:openlib/services/book_format.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/state/state.dart'
     show myLibraryProvider;
@@ -147,7 +148,7 @@ Future<void> moveFilesToAndroidInternalStorage() async {
     final directoryExternal = await getExternalStorageDirectory();
     List<FileSystemEntity> files = Directory(directory.path).listSync();
     for (var element in files) {
-      if ((element.path.contains('pdf')) || element.path.contains('epub')) {
+      if (isSupportedBookFile(element.path)) {
         String fileName = element.path.split('/').last;
         File file = File(element.path);
         file.copySync('${directoryExternal!.path}/$fileName');
@@ -164,13 +165,9 @@ Future<void> moveLibraryFiles(String sourcePath, String destinationPath) async {
   final source = Directory(sourcePath);
   if (!await source.exists()) return;
 
-  // Allowed extensions for books
-  final allowedExtensions = ['.pdf', '.epub', '.cbr', '.cbz'];
-
   await for (final entity in source.list(recursive: false)) {
     if (entity is File) {
-      final path = entity.path.toLowerCase();
-      if (allowedExtensions.any((ext) => path.endsWith(ext))) {
+      if (isSupportedBookFile(entity.path)) {
         try {
           final fileName = entity.path.split(Platform.pathSeparator).last;
           final newPath = '$destinationPath${Platform.pathSeparator}$fileName';

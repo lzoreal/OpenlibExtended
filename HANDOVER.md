@@ -28,9 +28,9 @@ OpenlibExtended 是一个 Flutter 跨平台电子书客户端，从 Anna's Archi
 - **发现**：Trending（Goodreads + Penguin Random House + BookDigits 合并打乱）、28 个硬编码分类。
 - **详情与下载**：按 URL 路由到正确书源；LibGen 直链、Z-Library DiamWall 解挑战后取签名 CDN、WeLib slow_download 解析、Anna's Archive donation key 快速下载；多镜像回退。
 - **下载管理**：队列、暂停/继续/重试/取消、HTTP Range 断点续传、镜像间回退、瞬时错误退避、过期链接自动刷新、MD5 校验、系统通知、回到前台自动续传。
-- **下载中心**：进行中任务的聚合进度/速度/剩余时间、全部/进行中/已完成/失败筛选、批量暂停/继续；已完成记录点行进入书籍详情，点“打开”才交给外部阅读器；也可分享、在文件夹中显示（桌面）或删除记录（不删文件）。书库的标签、阅读状态、排序/筛选和磁盘同步入口已移除。
+- **下载中心**：进行中任务的聚合进度/速度/剩余时间、全部/进行中/已完成三个可滑动标签（失败归入已完成）、批量暂停/继续；已完成记录点行进入书籍详情，点“打开”才交给外部阅读器；也可分享、在文件夹中显示（桌面）或删除记录（不删文件）。书库的标签、阅读状态、排序/筛选和磁盘同步入口已移除。
 - **阅读**：仅通过外部阅读器打开 EPUB/PDF/CBR/CBZ；应用不再提供内置阅读入口。
-- **镜像管理**：唯一数据源 open-slum.org；自动排序/手动排序、逐镜像启停、DOWN 镜像永不尝试。
+- **镜像管理**：唯一数据源 open-slum.org；自动排序/手动排序、逐镜像启停、DOWN 镜像永不尝试；支持手动本机测速（只测已启用非 DOWN 节点），结果保留 24 小时并参与自动排序。
 - **反爬处理**：DDoS-Guard/Cloudflare 用 WebView 过盾并缓存 HTML；Z-Library DiamWall 用 SHA1 工作量证明在本地求解。
 - **其他**：JSON 备份/恢复、诊断日志导出、GitHub 更新检查与安装、首次引导、升级后 What's New、主题/字号/语言（en/de/es/fr/zh）。
 
@@ -38,7 +38,7 @@ OpenlibExtended 是一个 Flutter 跨平台电子书客户端，从 Anna's Archi
 
 | 平台 | 状态 | 说明 |
 |---|---|---|
-| Android | ✅ 主发布平台 | 通知、headless WebView、APK 内更新、TTS 可用 |
+| Android | ✅ 主发布平台 | 通知、headless WebView、APK 内更新 |
 | iOS | ⚠️ 未签名 IPA | 只能侧载；通知服务未初始化；更新实际装不上 |
 | Windows | ✅ 发布 | Inno Setup 安装包；桌面 WebView 过盾；Scoop 清单自动更新 |
 | Linux | ✅ 发布 | 需 WebKitGTK 4.1；后台 headless 抓镜像不可用，走可见 WebView 手动流程 |
@@ -175,8 +175,8 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 - **排版**：保留 Nunito，但映射到 MD3 角色：页面标题 `headlineMedium`，卡片标题 `titleSmall`，正文 `bodyMedium`，辅助信息 `bodySmall`，按钮/标签 `labelLarge`。
 - **形状**：卡片 20dp 圆角 + 极浅描边，输入/选项 16dp，对话框 28dp，按钮与选项卡胶囊形；页面横向内边距统一 16dp。
 - **页头**：一级页统一用 `PageHeader`（小标签 + 26dp 标题 + 可选右侧操作，**不显示副标题**）；列表内节标题用 `SectionHeader`（标题 + 可选说明/右侧提示）。
-- **选项卡**：设置页与 What's New 统一用 `PillTabs`（tonal 轨道 + 白色滑动胶囊），与首页热门/分类、下载筛选保持同一套选择动效。
-- **底栏**：四个标签为“发现 / 搜索 / 下载中心 / 设置”；首页标签使用 `l10n.homeTitle`，不要再改回“首页”。
+- **选项卡**：设置页、What's New、发现、搜索、下载中心统一用 `PillTabs + TabBarView`（tonal 轨道 + 白色滑动胶囊），页面和子标签都支持左右滑动；搜索/下载/设置的页头与标签固定，内容区独立滚动。根页面滑动只在页头/空白 chrome 区生效，内容区的横向手势属于内层子标签。
+- **底栏**：四个标签为“发现 / 搜索 / 下载中心 / 设置”；四页装在横向 `PageView` 中，滑动与底栏选中态同步；首页标签使用 `l10n.homeTitle`，不要再改回“首页”。
 - **设置分组**：搜索来源 / 外观 / 高级 / 关于四个 Tab；存储位置在“高级 → 通用”，不要放回外观。语言默认收起，点击后展开两/三列选项卡（原生语言名 + 选中勾），选择后自动收起；主题用带缩略预览的三张选项卡，字号用「Aa 预览 + A−/A+ + 滑杆」；不要再改回下拉框。
 - **全站原型**：`design/ui_prototype.html` 覆盖首页、搜索、结果、详情、下载中心、设置四个 Tab、镜像、分类、关于、What's New、引导与验证页；改版时先改原型再落代码。
 - **共享视觉组件**：`PageHeader`、`PillTabs`、`SectionHeader`、`EdgeFade`、`BookInfoWidget`、`ActiveDownloadsWidget`、`CustomErrorWidget`、`ShowDeleteDialog`。新增页面应复用它们，而不是另写一套卡片/按钮。
@@ -263,7 +263,8 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 
 **排序**（`InstanceManager` + `SlumCatalogue.sortAuto`）：
 
-- 自动模式：DOWN 永远最后且永不尝试；其余按保护难度 `none → diamwall → ddosGuard → cloudflare → unknown`，再按 SLUM 状态、延迟排序（`lib/services/slum_catalogue.dart:408-427`）。
+- 自动模式：DOWN 永远最后且永不尝试；有新鲜本机测速结果的节点优先，按本机延迟升序；未测节点按保护难度 `none → diamwall → ddosGuard → cloudflare → unknown`，再按 SLUM 状态、延迟排序（`lib/services/slum_catalogue.dart`）。
+- 本机测速：`lib/services/mirror_latency.dart` 只测启用且非 DOWN 节点，HEAD → GET 回退、TTFB、6s 超时、4 并发；`InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时。过期结果继续显示“已过期”，但排序回退 SLUM（`lib/services/instance_manager.dart`）。
 - 手动模式：用户排序优先，未排序的接在自动顺序后面（`lib/services/instance_manager.dart:183-214`）。
 - 用户可单独禁用镜像；`enabledUrls()` 同时过滤 DOWN、用户禁用、以及 `headlessOnly` 时不可无头解决的镜像（`lib/services/instance_manager.dart:223-233`）。
 
@@ -328,7 +329,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 | 下载/验证 | `showManualDownloadButton`、`backgroundVerification`、`donationKey` |
 | 更新/引导 | `onboardingCompleted`、`lastRunVersion`、`includePrereleaseUpdates`、`enableAutoUpdate`（写了但未读，见 §10） |
 | 通知 | `hasAskedNotificationPermission` |
-| 镜像 | `instance_auto_mode`、`instance_manual_order`、`instance_disabled_hosts`、`slum_catalogue_cache` |
+| 镜像 | `instance_auto_mode`、`instance_manual_order`、`instance_disabled_hosts`、`instance_local_latency`、`slum_catalogue_cache` |
 | 浏览器 | `browserOptions.userAgent`、`browserOptions.cookie`、`browserOptions.cookies_<domain>` |
 
 注意：`getPreference()` 会把能解析为整数的值返回为 `int`，否则返回 `String`；键不存在时**抛异常**，调用方普遍依赖 `.catchError` 兜底（`lib/services/database.dart:391-408`）。`savePreference()` 只接受 `bool/int/String`，bool 自动转 0/1（`:373-389`）。

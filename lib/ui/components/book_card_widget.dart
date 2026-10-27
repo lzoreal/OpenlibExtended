@@ -6,22 +6,35 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
+import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/services/book_format.dart';
 import 'package:openlib/state/state.dart'
-    show checkIdExists, languageCodeToDisplay, resultCoverProvider;
+    show
+        checkIdExists,
+        languageCodeToDisplay,
+        languageValues,
+        resultCoverProvider;
+import 'package:openlib/ui/components/language_names.dart';
 
-// Extract file type from book info string
-String? getFileType(String? info) {
-  if (info == null || info.isEmpty) return null;
-  final infoLower = info.toLowerCase();
-  if (infoLower.contains('pdf')) return "PDF";
-  if (infoLower.contains('epub')) return "Epub";
-  if (infoLower.contains('cbr')) return "Cbr";
-  if (infoLower.contains('cbz')) return "Cbz";
-  return null;
+/// Badge label for the format embedded in a result's info string.
+String? getFileType(String? info) => bookFormatLabel(detectBookFormat(info));
+
+/// Full language names as catalogs write them ("English", "Chinese")
+/// mapped to the same uppercase codes [languageCodeToDisplay] uses.
+final Map<String, String> _languageNameToDisplay = {
+  for (final entry in languageValues.entries)
+    if (entry.value.isNotEmpty) entry.key.toLowerCase(): entry.value.toUpperCase(),
+};
+
+String? _canonicalLanguage(String token) {
+  final value = token.trim().toLowerCase();
+  if (value.isEmpty) return null;
+  return languageCodeToDisplay[value] ?? _languageNameToDisplay[value];
 }
 
 // Extract language code from book info string
-// Info format typically: "[en], pdf, 5.2MB" or "English, pdf, 5.2MB"
+// Info format typically: "[en], pdf, 5.2MB", "English, pdf, 5.2MB" or
+// "English · EPUB · 2 MB" - catalogs disagree on both code and separator.
 String? getLanguage(String? info) {
   if (info == null || info.isEmpty) return null;
 
@@ -29,22 +42,13 @@ String? getLanguage(String? info) {
   final bracketMatch =
       RegExp(r'\[([a-z]{2})\]', caseSensitive: false).firstMatch(info);
   if (bracketMatch != null) {
-    final code = bracketMatch.group(1)?.toLowerCase();
-    if (code != null && languageCodeToDisplay.containsKey(code)) {
-      return languageCodeToDisplay[code];
-    }
+    final byBracket = _canonicalLanguage(bracketMatch.group(1) ?? '');
+    if (byBracket != null) return byBracket;
   }
 
-  // Try to find language code at start of info (common format: "en, pdf, ...")
-  final parts = info.split(',');
-  if (parts.isNotEmpty) {
-    final firstPart = parts[0].trim().toLowerCase();
-    if (languageCodeToDisplay.containsKey(firstPart)) {
-      return languageCodeToDisplay[firstPart];
-    }
-  }
-
-  return null;
+  // Otherwise the language leads the info string.
+  final firstPart = info.split(RegExp(r'[,·]')).first;
+  return _canonicalLanguage(firstPart);
 }
 
 /// Same-host Referer for libgen cover URLs, null for everything else.
@@ -90,6 +94,7 @@ class BookInfoCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
     final fileType = getFileType(info);
     final language = getLanguage(info);
 
@@ -211,7 +216,7 @@ class BookInfoCard extends ConsumerWidget {
                           ),
                         if (language != null)
                           _MetaBadge(
-                            label: language,
+                            label: localizedLanguageName(l10n, language),
                             background: scheme.tertiaryContainer,
                             foreground: scheme.onTertiaryContainer,
                           ),

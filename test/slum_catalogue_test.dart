@@ -6,10 +6,14 @@
 //   flutter test --run-skipped test/slum_catalogue_test.dart
 
 // Dart imports:
+import 'dart:async';
 import 'dart:io';
 
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
+
+// Package imports:
+import 'package:dio/dio.dart';
 
 // Project imports:
 import 'package:openlib/services/slum_catalogue.dart';
@@ -250,5 +254,45 @@ void main() {
             reason: '${site.url} must be an absolute URL');
       }
     }, skip: 'live network - run with --run-skipped');
+  });
+
+  test('a stale cache answers before the refresh finishes', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    var hold = false;
+    final release = Completer<void>();
+    server.listen((request) async {
+      if (hold) await release.future;
+      final page = request.uri.pathSegments.isEmpty
+          ? 'annas.html'
+          : request.uri.pathSegments.last;
+      final fixture = switch (page) {
+        'libgen.html' => 'slum_libgen.html',
+        'zlibrary.html' => 'slum_zlibrary.html',
+        'other.html' => 'slum_other.html',
+        _ => 'slum_annas.html',
+      };
+      request.response
+        ..headers.contentType = ContentType.html
+        ..write(_fixture(fixture));
+      await request.response.close();
+    });
+    final dio = Dio();
+    addTearDown(() => dio.close(force: true));
+    addTearDown(() => server.close(force: true));
+
+    final catalogue =
+        SlumCatalogue(dio: dio, baseUrl: 'http://127.0.0.1:${server.port}');
+    await catalogue.fetchAll(force: true);
+    catalogue.debugExpireCache();
+
+    hold = true;
+    // The refresh this call starts hangs on `release`; the stale list
+    // must come back anyway instead of waiting on open-slum.org.
+    final stale = await catalogue
+        .fetchAll()
+        .timeout(const Duration(seconds: 2));
+    expect(stale[MirrorService.zlibrary], isNotEmpty);
+
+    release.complete();
   });
 }

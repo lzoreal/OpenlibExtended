@@ -8,9 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
+import 'package:openlib/services/book_detail_source.dart';
 import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/components/book_card_widget.dart'
     show getFileType, getLanguage;
+import 'package:openlib/ui/components/language_names.dart';
 import 'package:openlib/ui/swiss_grid.dart';
 
 /// The URL the "open in site" button opens for a book.
@@ -71,10 +73,19 @@ String? sourceLabelForUrl(String? url, AppLocalizations l10n) {
 }
 
 class BookInfoWidget extends ConsumerWidget {
-  final dynamic data;
+  final BookDetailSource data;
   final String? source;
 
-  const BookInfoWidget({super.key, required this.data, this.source});
+  /// True while the detail page is still being fetched: the fields the
+  /// search result already knew are shown, the rest waits as skeletons.
+  final bool loading;
+
+  const BookInfoWidget({
+    super.key,
+    required this.data,
+    this.source,
+    this.loading = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -82,7 +93,7 @@ class BookInfoWidget extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     final aaBaseUrl = ref.watch(annaArchiveBaseUrlProvider).valueOrNull;
-    final link = (data.link ?? '').toString();
+    final link = data.link;
     final sourceName = (source?.trim().isNotEmpty ?? false)
         ? source!
         : sourceLabelForUrl(link, l10n);
@@ -93,19 +104,20 @@ class BookInfoWidget extends ConsumerWidget {
         ? (link.isEmpty ? null : link)
         : openInSiteUrl(
             link: link,
-            md5: (data.md5 ?? '').toString(),
+            md5: data.md5 ?? '',
             annaArchiveBaseUrl: aaBaseUrl,
           );
-    final thumbnail = (data.thumbnail ?? '').toString();
-    final rawDescription = (data.description ?? '').toString().trim();
+    final thumbnail = data.thumbnail ?? '';
+    final rawDescription = (data.description ?? '').trim();
     final description = rawDescription.length < 3
         ? l10n.noDescriptionAvailable
         : rawDescription;
-    final info = (data.info ?? '').toString();
+    final info = data.info ?? '';
     final isbn = _isbnFromInfo(info);
-    final format =
-        ((data.format ?? getFileType(info)) ?? '').toString().toUpperCase();
-    final language = getLanguage(info) ?? '';
+    final format = (data.format ?? getFileType(info) ?? '').toUpperCase();
+    final languageCode = getLanguage(info);
+    final language =
+        languageCode == null ? '' : localizedLanguageName(l10n, languageCode);
     final year = RegExp(r'\b(?:19|20)\d{2}\b')
             .firstMatch('$info ${data.publisher ?? ''}')
             ?.group(0) ??
@@ -115,8 +127,8 @@ class BookInfoWidget extends ConsumerWidget {
                 .firstMatch(info)
                 ?.group(0) ??
             '';
-    final publisher = (data.publisher ?? '').toString().trim();
-    final author = (data.author ?? '').toString().trim();
+    final publisher = (data.publisher ?? '').trim();
+    final author = (data.author ?? '').trim();
     final byline = [
       author.isEmpty ? l10n.unknown : author,
       if (publisher.isNotEmpty) publisher,
@@ -272,12 +284,15 @@ class BookInfoWidget extends ConsumerWidget {
                         title: l10n.descriptionLabel,
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        description,
-                        style: SwissText.caption.copyWith(
-                          color: scheme.onSurfaceVariant,
+                      if (loading)
+                        const _DescriptionSkeleton()
+                      else
+                        Text(
+                          description,
+                          style: SwissText.caption.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -334,6 +349,37 @@ class BookInfoWidget extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DescriptionSkeleton extends StatelessWidget {
+  const _DescriptionSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget line(double widthFactor) => FractionallySizedBox(
+          widthFactor: widthFactor,
+          alignment: AlignmentDirectional.centerStart,
+          child: Container(
+            height: 12,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        );
+    return Column(
+      key: const ValueKey('detail-description-skeleton'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        line(1),
+        const SizedBox(height: 8),
+        line(0.86),
+        const SizedBox(height: 8),
+        line(0.54),
+      ],
     );
   }
 }

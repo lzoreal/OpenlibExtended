@@ -192,7 +192,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backgroundVerification => '后台完成验证';
 
   @override
-  String get backgroundVerificationHint => '无感完成 DDoS 验证。部分设备可能失败，可关闭后在可见窗口中验证';
+  String get backgroundVerificationHint =>
+      '无感完成 DDoS 验证。部分设备可能失败，关闭后会立即弹出可见验证页';
 
   @override
   String get backgroundVerificationFix =>
@@ -1731,9 +1732,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadCenterQueueMemory => '队列为内存态';
 
   @override
-  String get downloadCenterCompletedHint => '点书名看详情 · 点打开用外部阅读器';
-
-  @override
   String get downloadCenterRemoveNote => '移除记录时可勾选同时移除本地文件；队列仅存在内存中，进程退出后不续传。';
 
   @override
@@ -1952,4 +1950,103 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get verificationPageInstructions => '请在下方完成验证，应用会自动继续。';
+
+  @override
+  String get challengeNeedsVerification => '需要手动验证，验证通过后会自动继续检索';
+
+  @override
+  String get challengeVerifyNow => '去验证';
+
+  @override
+  String get languageNameEn => '英语';
+
+  @override
+  String get languageNameEs => '西班牙语';
+
+  @override
+  String get languageNameFr => '法语';
+
+  @override
+  String get languageNameDe => '德语';
+
+  @override
+  String get languageNameIt => '意大利语';
+
+  @override
+  String get languageNamePt => '葡萄牙语';
+
+  @override
+  String get languageNameRu => '俄语';
+
+  @override
+  String get languageNameZh => '中文';
+
+  @override
+  String get languageNameJa => '日语';
+
+  @override
+  String get languageNameKo => '韩语';
+
+  @override
+  String get languageNameAr => '阿拉伯语';
+
+  @override
+  String get languageNameHi => '印地语';
+
+  @override
+  String get languageNameMl => '马拉雅拉姆语';
+
+  @override
+  String get languageNameNl => '荷兰语';
+
+  @override
+  String get languageNamePl => '波兰语';
+
+  @override
+  String get languageNameTr => '土耳其语';
+
+  @override
+  String get languageNameSv => '瑞典语';
+
+  @override
+  String get languageNameId => '印尼语';
+
+  @override
+  String get languageNameVi => '越南语';
+
+  @override
+  String get languageNameCs => '捷克语';
+
+  @override
+  String get languageNameEl => '希腊语';
+
+  @override
+  String get languageNameRo => '罗马尼亚语';
+
+  @override
+  String get languageNameHu => '匈牙利语';
+
+  @override
+  String get languageNameUk => '乌克兰语';
+
+  @override
+  String get languageNameHe => '希伯来语';
+
+  @override
+  String get languageNameTh => '泰语';
+
+  @override
+  String get languageNameFa => '波斯语';
+
+  @override
+  String get languageNameBn => '孟加拉语';
+
+  @override
+  String get languageNameFi => '芬兰语';
+
+  @override
+  String get languageNameNo => '挪威语';
+
+  @override
+  String get languageNameDa => '丹麦语';
 }
