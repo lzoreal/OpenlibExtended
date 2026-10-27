@@ -7,6 +7,7 @@ import 'dart:io';
 
 // Package imports:
 import 'package:dio/dio.dart';
+import 'package:sqflite/sqflite.dart' show DatabaseException;
 
 // Project imports:
 import 'package:openlib/services/logger.dart';
@@ -24,9 +25,15 @@ enum NetworkErrorType {
   unknown,
 }
 
-/// Provider-specific failures that need their own wording rather than the
-/// generic per-type network message.
-enum NetworkErrorKind { generic, bookNotFound, bookDetailsUnavailable }
+/// Failures that need their own wording rather than the generic per-type
+/// network message.
+enum NetworkErrorKind {
+  generic,
+  bookNotFound,
+  bookDetailsUnavailable,
+  parseFailure,
+  storageFailure,
+}
 
 // Holds parsed error info with user-friendly message and solution
 class NetworkError implements Exception {
@@ -115,14 +122,7 @@ class NetworkError implements Exception {
       return await _diagnoseTimeoutError(error, logger, targetHost);
     }
 
-    // Default unknown error
-    return NetworkError(
-      type: NetworkErrorType.unknown,
-      userMessage: "Something went wrong",
-      solution:
-          "Please try again. If the problem persists, try restarting the app.",
-      technicalDetails: error.toString(),
-    );
+    return _classifyAppError(error);
   }
 
   // Synchronous version for backward compatibility
@@ -193,14 +193,56 @@ class NetworkError implements Exception {
       );
     }
 
-    // Default unknown error
+    return _classifyAppError(error);
+  }
+
+  /// Non-network failures: what the user can act on depends on whether the
+  /// catalog returned junk, local storage broke, or something unexpected hit.
+  static NetworkError _classifyAppError(dynamic error) {
+    final details = _describeError(error);
+
+    if (error is FormatException ||
+        error is TypeError ||
+        error is StateError ||
+        error is RangeError) {
+      return NetworkError(
+        kind: NetworkErrorKind.parseFailure,
+        type: NetworkErrorType.unknown,
+        userMessage: "Could not read the returned data",
+        solution:
+            "The source returned data the app could not read. Switch source or mirror and try again. If it keeps happening, open Diagnostics and share the logs.",
+        technicalDetails: details,
+      );
+    }
+
+    if (error is FileSystemException || error is DatabaseException) {
+      return NetworkError(
+        kind: NetworkErrorKind.storageFailure,
+        type: NetworkErrorType.unknown,
+        userMessage: "Local storage operation failed",
+        solution:
+            "Check free space and storage permissions, then try again. If it keeps happening, open Diagnostics and share the logs.",
+        technicalDetails: details,
+      );
+    }
+
     return NetworkError(
       type: NetworkErrorType.unknown,
       userMessage: "Something went wrong",
       solution:
-          "Please try again. If the problem persists, try restarting the app.",
-      technicalDetails: error.toString(),
+          "Please try again. If it persists, open Diagnostics and share the logs.",
+      technicalDetails: details,
     );
+  }
+
+  /// Dart's `toString()` usually already carries the public type
+  /// ("Exception: ...", "FormatException: ..."), so prefixing runtimeType
+  /// again would read "_Exception: Exception: ...".
+  static String _describeError(dynamic error) {
+    final text = error.toString();
+    final type = error.runtimeType.toString();
+    final publicType = type.startsWith('_') ? type.substring(1) : type;
+    return text.contains(publicType) ? text : '$type: $text';
   }
 
   // Diagnose timeout errors with connectivity checks

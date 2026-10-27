@@ -1,6 +1,19 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
+import 'package:sqflite/sqflite.dart' show DatabaseException;
 import 'package:openlib/services/network_error.dart';
+
+class _TestDatabaseException extends DatabaseException {
+  _TestDatabaseException() : super('disk I/O error');
+
+  @override
+  Object? get result => null;
+
+  @override
+  int? getResultCode() => null;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -84,6 +97,63 @@ void main() {
 
       final networkError = NetworkError.fromException(dioException);
       expect(networkError.type, equals(NetworkErrorType.timeout));
+    });
+  });
+
+  group('non-network app errors', () {
+    test('FormatException is a parse failure that keeps its message', () {
+      final error = NetworkError.fromException(
+          const FormatException('Unexpected end of input'));
+
+      expect(error.kind, NetworkErrorKind.parseFailure);
+      expect(error.type, NetworkErrorType.unknown);
+      expect(error.solution.toLowerCase(), isNot(contains('restart')));
+      expect(error.technicalDetails,
+          'FormatException: Unexpected end of input');
+    });
+
+    test('TypeError and StateError classify as parse failures', () {
+      Object typeError = Exception('not a TypeError');
+      dynamic value = 'not an int';
+      try {
+        value as int;
+      } catch (error) {
+        typeError = error;
+      }
+
+      expect(NetworkError.fromException(typeError).kind,
+          NetworkErrorKind.parseFailure);
+      expect(NetworkError.fromException(StateError('bad shape')).kind,
+          NetworkErrorKind.parseFailure);
+      expect(NetworkError.fromException(RangeError.range(3, 0, 2)).kind,
+          NetworkErrorKind.parseFailure);
+    });
+
+    test('FileSystemException classifies as a storage failure', () {
+      final error = NetworkError.fromException(
+          const FileSystemException('Cannot write file', '/books/a.epub'));
+
+      expect(error.kind, NetworkErrorKind.storageFailure);
+      expect(error.type, NetworkErrorType.unknown);
+      expect(error.technicalDetails, contains('FileSystemException'));
+      expect(error.technicalDetails, contains('/books/a.epub'));
+    });
+
+    test('DatabaseException classifies as a storage failure', () {
+      final error =
+          NetworkError.fromException(_TestDatabaseException());
+
+      expect(error.kind, NetworkErrorKind.storageFailure);
+      expect(error.technicalDetails, contains('disk I/O error'));
+    });
+
+    test('unknown app errors no longer tell the user to restart', () {
+      final error = NetworkError.fromException(Exception('boom'));
+
+      expect(error.kind, NetworkErrorKind.generic);
+      expect(error.type, NetworkErrorType.unknown);
+      expect(error.solution.toLowerCase(), isNot(contains('restart')));
+      expect(error.technicalDetails, 'Exception: boom');
     });
   });
 }

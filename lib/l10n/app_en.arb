@@ -676,7 +676,7 @@
   "@selectFolder": {
     "description": "Storage folder picker button"
   },
-  "storageScanNote": "We'll only look for PDF/EPUB files in this folder. No recursive scanning of subfolders.",
+  "storageScanNote": "We'll only look for supported ebook files in this folder. No recursive scanning of subfolders.",
   "@storageScanNote": {
     "description": "Storage folder explanation"
   },
@@ -1683,13 +1683,54 @@
   "@networkErrorDnsSolution": {
     "description": "Localized network error title or solution: The site could not be reached. Your ISP may be blocking it. Try a VPN or change DNS to 1.1.1.1 / 8.8"
   },
+  "networkErrorParseTitle": "Could not read the book source data",
+  "@networkErrorParseTitle": {
+    "description": "Error title when the catalog returned HTML the app could not parse"
+  },
+  "networkErrorParseSolution": "The source returned a page the app could not read. Switch to another source or mirror and try again. If it keeps happening, open Diagnostics and share the logs.",
+  "@networkErrorParseSolution": {
+    "description": "Suggested action for an unreadable catalog response"
+  },
+  "networkErrorStorageTitle": "Local storage operation failed",
+  "@networkErrorStorageTitle": {
+    "description": "Error title for database or file system failures"
+  },
+  "networkErrorStorageSolution": "Check free space and storage permissions, then try again. If it keeps happening, open Diagnostics and share the logs.",
+  "@networkErrorStorageSolution": {
+    "description": "Suggested action for local database or file failures"
+  },
   "networkErrorUnknownTitle": "Something went wrong",
   "@networkErrorUnknownTitle": {
     "description": "Localized network error title or solution: Something went wrong"
   },
-  "networkErrorUnknownSolution": "Please try again. If the problem persists, restart the app.",
+  "networkErrorUnknownSolution": "Please try again. If it persists, open Diagnostics and share the logs.",
   "@networkErrorUnknownSolution": {
-    "description": "Localized network error title or solution: Please try again. If the problem persists, restart the app."
+    "description": "Generic error solution; points at diagnostics instead of restarting"
+  },
+  "errorDiagnostics": "Diagnostics",
+  "@errorDiagnostics": {
+    "description": "Button and dialog title for error diagnostics"
+  },
+  "errorCopyDiagnostics": "Copy diagnostics",
+  "@errorCopyDiagnostics": {
+    "description": "Button that copies the current error diagnostics"
+  },
+  "errorLocation": "Location: {location}",
+  "@errorLocation": {
+    "description": "Where the error happened, e.g. search results or book details",
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "errorStackTrace": "Stack trace",
+  "@errorStackTrace": {
+    "description": "Label for the captured stack trace"
+  },
+  "errorEnvironment": "Environment",
+  "@errorEnvironment": {
+    "description": "Label for app version, platform and time in diagnostics"
   },
   "updatePermissionTitle": "Permission Required",
   "@updatePermissionTitle": {

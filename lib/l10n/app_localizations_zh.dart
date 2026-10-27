@@ -496,7 +496,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get selectFolder => '选择文件夹';
 
   @override
-  String get storageScanNote => '我们只会在此文件夹中查找 PDF/EPUB 文件，不会递归扫描子文件夹。';
+  String get storageScanNote => '我们只会在此文件夹中查找支持的电子书文件，不会递归扫描子文件夹。';
 
   @override
   String get automaticUpdates => '自动更新';
@@ -1231,10 +1231,40 @@ class AppLocalizationsZh extends AppLocalizations {
       '无法访问该网站，可能被网络运营商屏蔽。请尝试 VPN，或将 DNS 改为 1.1.1.1 / 8.8.8.8。';
 
   @override
+  String get networkErrorParseTitle => '无法解析书源数据';
+
+  @override
+  String get networkErrorParseSolution =>
+      '书源返回了应用无法识别的页面。请切换到其他书源或镜像后重试；若持续出现，请打开诊断详情并分享日志。';
+
+  @override
+  String get networkErrorStorageTitle => '本地存储操作失败';
+
+  @override
+  String get networkErrorStorageSolution => '请检查存储空间与权限后重试；若持续出现，请打开诊断详情并分享日志。';
+
+  @override
   String get networkErrorUnknownTitle => '出现问题';
 
   @override
-  String get networkErrorUnknownSolution => '请重试。如果问题仍然存在，请重启应用。';
+  String get networkErrorUnknownSolution => '请重试。若持续出现，请打开诊断详情并分享日志。';
+
+  @override
+  String get errorDiagnostics => '诊断详情';
+
+  @override
+  String get errorCopyDiagnostics => '复制诊断信息';
+
+  @override
+  String errorLocation(String location) {
+    return '位置：$location';
+  }
+
+  @override
+  String get errorStackTrace => '堆栈';
+
+  @override
+  String get errorEnvironment => '环境';
 
   @override
   String get updatePermissionTitle => '需要权限';

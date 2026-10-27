@@ -506,7 +506,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageScanNote =>
-      'We\'ll only look for PDF/EPUB files in this folder. No recursive scanning of subfolders.';
+      'We\'ll only look for supported ebook files in this folder. No recursive scanning of subfolders.';
 
   @override
   String get automaticUpdates => 'Automatic Updates';
@@ -1296,11 +1296,42 @@ class AppLocalizationsEn extends AppLocalizations {
       'The site could not be reached. Your ISP may be blocking it. Try a VPN or change DNS to 1.1.1.1 / 8.8.8.8.';
 
   @override
+  String get networkErrorParseTitle => 'Could not read the book source data';
+
+  @override
+  String get networkErrorParseSolution =>
+      'The source returned a page the app could not read. Switch to another source or mirror and try again. If it keeps happening, open Diagnostics and share the logs.';
+
+  @override
+  String get networkErrorStorageTitle => 'Local storage operation failed';
+
+  @override
+  String get networkErrorStorageSolution =>
+      'Check free space and storage permissions, then try again. If it keeps happening, open Diagnostics and share the logs.';
+
+  @override
   String get networkErrorUnknownTitle => 'Something went wrong';
 
   @override
   String get networkErrorUnknownSolution =>
-      'Please try again. If the problem persists, restart the app.';
+      'Please try again. If it persists, open Diagnostics and share the logs.';
+
+  @override
+  String get errorDiagnostics => 'Diagnostics';
+
+  @override
+  String get errorCopyDiagnostics => 'Copy diagnostics';
+
+  @override
+  String errorLocation(String location) {
+    return 'Location: $location';
+  }
+
+  @override
+  String get errorStackTrace => 'Stack trace';
+
+  @override
+  String get errorEnvironment => 'Environment';
 
   @override
   String get updatePermissionTitle => 'Permission Required';

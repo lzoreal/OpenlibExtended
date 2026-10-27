@@ -436,10 +436,14 @@ class _ResultPageState extends ConsumerState<ResultPage> {
             );
           },
           error: (error, stackTrace) {
+            final source = _selectedSource;
             return CustomErrorWidget(
               error: error,
               stackTrace: stackTrace,
               onRefresh: _retryPageOne,
+              contextLabel: l10n.results,
+              contextDetails: 'query=${widget.searchQuery}'
+                  '${source == null ? '' : ' · source=${source.name}'}',
             );
           },
           loading: () => _LoadingResults(source: widget.source),

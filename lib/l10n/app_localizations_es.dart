@@ -514,7 +514,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get storageScanNote =>
-      'Solo buscaremos archivos PDF/EPUB en esta carpeta. No se escanean subcarpetas.';
+      'Solo buscaremos archivos de libros electrónicos compatibles en esta carpeta. No se escanean subcarpetas.';
 
   @override
   String get automaticUpdates => 'Actualizaciones automáticas';
@@ -1310,11 +1310,43 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo llegar al sitio. Tu proveedor puede estar bloqueándolo. Prueba una VPN o cambia el DNS a 1.1.1.1 / 8.8.8.8.';
 
   @override
+  String get networkErrorParseTitle =>
+      'No se pudieron leer los datos de la fuente';
+
+  @override
+  String get networkErrorParseSolution =>
+      'La fuente devolvió una página que la aplicación no pudo leer. Cambia de fuente o de espejo e inténtalo de nuevo. Si el problema continúa, abre el diagnóstico y comparte los registros.';
+
+  @override
+  String get networkErrorStorageTitle => 'Error en el almacenamiento local';
+
+  @override
+  String get networkErrorStorageSolution =>
+      'Comprueba el espacio libre y los permisos de almacenamiento y vuelve a intentarlo. Si el problema continúa, abre el diagnóstico y comparte los registros.';
+
+  @override
   String get networkErrorUnknownTitle => 'Algo salió mal';
 
   @override
   String get networkErrorUnknownSolution =>
-      'Inténtalo de nuevo. Si el problema continúa, reinicia la app.';
+      'Inténtalo de nuevo. Si el problema continúa, abre el diagnóstico y comparte los registros.';
+
+  @override
+  String get errorDiagnostics => 'Diagnóstico';
+
+  @override
+  String get errorCopyDiagnostics => 'Copiar diagnóstico';
+
+  @override
+  String errorLocation(String location) {
+    return 'Ubicación: $location';
+  }
+
+  @override
+  String get errorStackTrace => 'Pila de llamadas';
+
+  @override
+  String get errorEnvironment => 'Entorno';
 
   @override
   String get updatePermissionTitle => 'Permiso necesario';

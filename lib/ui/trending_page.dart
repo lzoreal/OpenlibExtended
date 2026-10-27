@@ -75,10 +75,11 @@ class TrendingPage extends ConsumerWidget {
           ],
         );
       },
-      error: (error, _) {
+      error: (error, stackTrace) {
         return CustomErrorWidget(
           error: error,
-          stackTrace: StackTrace.empty,
+          stackTrace: stackTrace,
+          contextLabel: l10n.trending,
           onRefresh: () {
             // ignore: unused_result
             ref.refresh(getTrendingBooks);

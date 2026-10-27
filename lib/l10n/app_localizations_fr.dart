@@ -516,7 +516,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get storageScanNote =>
-      'Nous ne chercherons que des fichiers PDF/EPUB dans ce dossier. Aucun scan récursif des sous-dossiers.';
+      'Nous ne chercherons que des fichiers de livres compatibles dans ce dossier. Aucun scan récursif des sous-dossiers.';
 
   @override
   String get automaticUpdates => 'Mises à jour automatiques';
@@ -1314,11 +1314,43 @@ class AppLocalizationsFr extends AppLocalizations {
       'Le site est injoignable. Votre fournisseur d’accès le bloque peut-être. Essayez un VPN ou changez le DNS pour 1.1.1.1 / 8.8.8.8.';
 
   @override
+  String get networkErrorParseTitle =>
+      'Impossible de lire les données de la source';
+
+  @override
+  String get networkErrorParseSolution =>
+      'La source a renvoyé une page que l’application n’a pas pu lire. Changez de source ou de miroir et réessayez. Si le problème persiste, ouvrez les diagnostics et partagez les journaux.';
+
+  @override
+  String get networkErrorStorageTitle => 'Opération de stockage local échouée';
+
+  @override
+  String get networkErrorStorageSolution =>
+      'Vérifiez l’espace libre et les autorisations de stockage, puis réessayez. Si le problème persiste, ouvrez les diagnostics et partagez les journaux.';
+
+  @override
   String get networkErrorUnknownTitle => 'Une erreur est survenue';
 
   @override
   String get networkErrorUnknownSolution =>
-      'Veuillez réessayer. Si le problème persiste, redémarrez l’application.';
+      'Veuillez réessayer. Si le problème persiste, ouvrez les diagnostics et partagez les journaux.';
+
+  @override
+  String get errorDiagnostics => 'Diagnostics';
+
+  @override
+  String get errorCopyDiagnostics => 'Copier les diagnostics';
+
+  @override
+  String errorLocation(String location) {
+    return 'Emplacement : $location';
+  }
+
+  @override
+  String get errorStackTrace => 'Pile d’appels';
+
+  @override
+  String get errorEnvironment => 'Environnement';
 
   @override
   String get updatePermissionTitle => 'Autorisation requise';

@@ -515,7 +515,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get storageScanNote =>
-      'Wir durchsuchen diesen Ordner nur nach PDF-/EPUB-Dateien. Unterordner werden nicht eingescannt.';
+      'Wir durchsuchen diesen Ordner nur nach unterstützten E-Book-Dateien. Unterordner werden nicht eingescannt.';
 
   @override
   String get automaticUpdates => 'Automatische Updates';
@@ -1312,11 +1312,44 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Website ist nicht erreichbar. Möglicherweise blockiert dein Anbieter sie. Versuche ein VPN oder ändere den DNS auf 1.1.1.1 / 8.8.8.8.';
 
   @override
+  String get networkErrorParseTitle =>
+      'Buchquellendaten konnten nicht gelesen werden';
+
+  @override
+  String get networkErrorParseSolution =>
+      'Die Quelle hat eine Seite zurückgegeben, die die App nicht lesen konnte. Wechsle die Quelle oder den Mirror und versuche es erneut. Wenn das Problem bleibt, öffne die Diagnose und teile die Protokolle.';
+
+  @override
+  String get networkErrorStorageTitle =>
+      'Lokaler Speicherzugriff fehlgeschlagen';
+
+  @override
+  String get networkErrorStorageSolution =>
+      'Prüfe freien Speicher und Speicherberechtigungen und versuche es erneut. Wenn das Problem bleibt, öffne die Diagnose und teile die Protokolle.';
+
+  @override
   String get networkErrorUnknownTitle => 'Etwas ist schiefgelaufen';
 
   @override
   String get networkErrorUnknownSolution =>
-      'Bitte versuche es erneut. Wenn das Problem bleibt, starte die App neu.';
+      'Bitte versuche es erneut. Wenn das Problem bleibt, öffne die Diagnose und teile die Protokolle.';
+
+  @override
+  String get errorDiagnostics => 'Diagnose';
+
+  @override
+  String get errorCopyDiagnostics => 'Diagnose kopieren';
+
+  @override
+  String errorLocation(String location) {
+    return 'Ort: $location';
+  }
+
+  @override
+  String get errorStackTrace => 'Stack-Trace';
+
+  @override
+  String get errorEnvironment => 'Umgebung';
 
   @override
   String get updatePermissionTitle => 'Berechtigung erforderlich';

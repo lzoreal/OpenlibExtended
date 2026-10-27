@@ -1,6 +1,9 @@
 // User-friendly error display widget with solutions
 // Handles network errors, Cloudflare blocks, connectivity issues
 
+// Dart imports:
+import 'dart:io';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +11,7 @@ import 'package:openlib/l10n/app_localizations.dart';
 
 // Package imports:
 import 'package:flutter_svg/svg.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
@@ -21,6 +25,8 @@ String _networkErrorTitle(AppLocalizations l10n, NetworkError error) {
     NetworkErrorKind.bookNotFound => l10n.networkErrorBookNotFoundTitle,
     NetworkErrorKind.bookDetailsUnavailable =>
       l10n.networkErrorBookDetailsUnavailableTitle,
+    NetworkErrorKind.parseFailure => l10n.networkErrorParseTitle,
+    NetworkErrorKind.storageFailure => l10n.networkErrorStorageTitle,
     NetworkErrorKind.generic => switch (error.type) {
         NetworkErrorType.noInternet => l10n.networkErrorNoInternetTitle,
         NetworkErrorType.cloudflareBlock => l10n.networkErrorCloudflareTitle,
@@ -41,6 +47,8 @@ String _networkErrorSolution(AppLocalizations l10n, NetworkError error) {
     NetworkErrorKind.bookNotFound => l10n.networkErrorBookNotFoundSolution,
     NetworkErrorKind.bookDetailsUnavailable =>
       l10n.networkErrorBookDetailsUnavailableSolution,
+    NetworkErrorKind.parseFailure => l10n.networkErrorParseSolution,
+    NetworkErrorKind.storageFailure => l10n.networkErrorStorageSolution,
     NetworkErrorKind.generic => switch (error.type) {
         NetworkErrorType.noInternet => l10n.networkErrorNoInternetSolution,
         NetworkErrorType.cloudflareBlock => l10n.networkErrorCloudflareSolution,
@@ -61,11 +69,19 @@ class CustomErrorWidget extends StatelessWidget {
   final StackTrace stackTrace;
   final VoidCallback? onRefresh;
 
+  /// Page or action where the failure happened, shown in diagnostics.
+  final String? contextLabel;
+
+  /// Technical context such as the search query or failing URL.
+  final String? contextDetails;
+
   CustomErrorWidget({
     super.key,
     required this.error,
     required this.stackTrace,
     this.onRefresh,
+    this.contextLabel,
+    this.contextDetails,
   }) {
     // Log the error for debugging
     final logger = AppLogger();
@@ -97,9 +113,8 @@ class CustomErrorWidget extends StatelessWidget {
             _buildSolutionCard(context, networkError),
             const SizedBox(height: 24),
             if (onRefresh != null) _buildRefreshButton(context),
-            const SizedBox(height: 16),
-            if (networkError.rawResponseBody != null)
-              _buildShowDetailsButton(context, networkError),
+            const SizedBox(height: 8),
+            _buildDiagnosticsButton(context),
             if (networkError.type == NetworkErrorType.cloudflareBlock)
               _buildOpenBrowserButton(context),
             const SizedBox(height: 20),
@@ -330,14 +345,13 @@ class CustomErrorWidget extends StatelessWidget {
     );
   }
 
-  // Build show details button for advanced users
-  Widget _buildShowDetailsButton(
-      BuildContext context, NetworkError networkError) {
+  Widget _buildDiagnosticsButton(BuildContext context) {
     return Center(
       child: TextButton.icon(
-        onPressed: () => _showDetailsDialog(context, networkError),
+        key: const ValueKey('error-diagnostics'),
+        onPressed: () => _showDiagnostics(context),
         icon: const Icon(Icons.info_outline_rounded, size: 18),
-        label: Text(AppLocalizations.of(context).showBlockedContent),
+        label: Text(AppLocalizations.of(context).errorDiagnostics),
       ),
     );
   }
@@ -477,79 +491,174 @@ class CustomErrorWidget extends StatelessWidget {
     }
   }
 
-  // Show dialog with raw response for debugging
-  void _showDetailsDialog(BuildContext context, NetworkError networkError) {
-    showDialog(
+  Future<void> _showDiagnostics(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final networkError = _parseError(error);
+    final location = contextLabel == null
+        ? null
+        : '${l10n.errorLocation(contextLabel!)}'
+            '${contextDetails == null ? '' : ' · $contextDetails'}';
+    final details = networkError.technicalDetails ?? networkError.userMessage;
+    final stack = _formatStackTrace(stackTrace);
+    final environment = await _diagnosticsEnvironment();
+    final rawBody = networkError.rawResponseBody;
+
+    final report = StringBuffer()
+      ..writeln('OpenlibExtended diagnostics')
+      ..writeln(environment);
+    if (location != null) report.writeln(location);
+    report
+      ..writeln(l10n.errorLabel(details))
+      ..writeln('${l10n.errorStackTrace}:')
+      ..writeln(stack.isEmpty ? '-' : stack);
+    if (rawBody != null) {
+      report
+        ..writeln('${l10n.blockedPageContent}:')
+        ..writeln(_formatResponseBody(rawBody));
+    }
+    final reportText = report.toString();
+
+    if (!context.mounted) return;
+    await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Row(
           children: [
-            const Icon(Icons.code_rounded, size: 24),
+            const Icon(Icons.troubleshoot_rounded, size: 24),
             const SizedBox(width: 8),
-            Text(AppLocalizations.of(context).blockedPageContent),
+            Flexible(child: Text(l10n.errorDiagnostics)),
           ],
         ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (networkError.technicalDetails != null) ...[
-                  Text(
-                    AppLocalizations.of(context)
-                        .errorLabel(networkError.technicalDetails!),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      height: 1.429,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SelectableText(
-                    _formatResponseBody(networkError.rawResponseBody ??
-                        AppLocalizations.of(context).errorNoContent),
-                    style: const TextStyle(
-                      fontFamily: "monospace",
-                      fontSize: 11,
-                      height: 1.455,
-                    ),
-                  ),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (location != null) ...[
+              Text(
+                location,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  height: 1.4,
                 ),
-              ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            Text(
+              l10n.errorLabel(details),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                height: 1.429,
+              ),
             ),
-          ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.errorStackTrace,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              stack.isEmpty ? '-' : stack,
+              style: const TextStyle(
+                fontFamily: "monospace",
+                fontSize: 11,
+                height: 1.455,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.errorEnvironment,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(environment, style: const TextStyle(fontSize: 12)),
+            if (rawBody != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                l10n.blockedPageContent,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _formatResponseBody(rawBody),
+                style: const TextStyle(
+                  fontFamily: "monospace",
+                  fontSize: 11,
+                  height: 1.455,
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
-          TextButton(
+          TextButton.icon(
+            onPressed: () => _shareLogs(context, l10n),
+            icon: const Icon(Icons.ios_share_rounded, size: 18),
+            label: Text(l10n.exportLogs),
+          ),
+          TextButton.icon(
             onPressed: () {
-              Clipboard.setData(ClipboardData(
-                text: networkError.rawResponseBody ?? "",
-              ));
+              Clipboard.setData(ClipboardData(text: reportText));
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content:
-                        Text(AppLocalizations.of(context).copiedToClipboard)),
+                SnackBar(content: Text(l10n.copiedToClipboard)),
               );
             },
-            child: Text(AppLocalizations.of(context).copy),
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: Text(l10n.errorCopyDiagnostics),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(AppLocalizations.of(context).close),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.close),
           ),
         ],
       ),
     );
+  }
+
+  Future<String> _diagnosticsEnvironment() async {
+    var version = 'unknown';
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final build = info.buildNumber.isEmpty ? '' : '+${info.buildNumber}';
+      version = '${info.version}$build';
+    } catch (_) {
+      // PackageInfo is unavailable in tests and some unsupported hosts.
+    }
+    return 'App $version · ${Platform.operatingSystem} '
+        '${Platform.operatingSystemVersion} · '
+        '${DateTime.now().toIso8601String()}';
+  }
+
+  String _formatStackTrace(StackTrace stackTrace) {
+    return stackTrace.toString().trim().split('\n').take(12).join('\n');
+  }
+
+  Future<void> _shareLogs(BuildContext context, AppLocalizations l10n) async {
+    try {
+      await AppLogger().exportLogs(
+        saveDialogTitle: l10n.exportLogs,
+        shareSubject: l10n.appLogsShareSubject,
+        shareText:
+            l10n.appLogsShareText(AppLogger.logRetentionDuration.inMinutes),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.failedExportLogs('$e'))),
+        );
+      }
+    }
   }
 
   // Format response body for display

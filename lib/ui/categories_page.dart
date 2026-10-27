@@ -557,10 +557,13 @@ class CategoryListingPage extends ConsumerWidget {
               ],
             );
           },
-          error: (error, _) {
+          error: (error, stackTrace) {
             return CustomErrorWidget(
               error: error,
-              stackTrace: StackTrace.empty,
+              stackTrace: stackTrace,
+              contextLabel: AppLocalizations.of(context).genres,
+              contextDetails: '$title · $url',
+              onRefresh: () => ref.invalidate(getSubCategoryTypeList(url)),
             );
           },
           loading: () {

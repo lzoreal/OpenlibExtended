@@ -214,7 +214,7 @@ flutter test
 ## 9. 文档与协作
 
 - 产品/架构/流程：`HANDOVER.md`。
-- 全站 UI 原型：`design/ui_prototype.html`（21 屏）+ `design/swiss_grid_spec.md`；UI 改动按顶部流程执行。
+- 全站 UI 原型：`design/ui_prototype.html`（23 屏）+ `design/swiss_grid_spec.md`；UI 改动按顶部流程执行。
 - 贡献流程：`CONTRIBUTING.md`（不要修改 README 等信息文件，除非用户明确要求修错别字）。
 - 用户常见问题：`FAQ.md`。
 - 安装/平台依赖：`SETUP.md`。

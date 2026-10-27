@@ -1019,7 +1019,7 @@ abstract class AppLocalizations {
   /// Storage folder explanation
   ///
   /// In en, this message translates to:
-  /// **'We\'ll only look for PDF/EPUB files in this folder. No recursive scanning of subfolders.'**
+  /// **'We\'ll only look for supported ebook files in this folder. No recursive scanning of subfolders.'**
   String get storageScanNote;
 
   /// Onboarding updates page heading
@@ -2429,17 +2429,71 @@ abstract class AppLocalizations {
   /// **'The site could not be reached. Your ISP may be blocking it. Try a VPN or change DNS to 1.1.1.1 / 8.8.8.8.'**
   String get networkErrorDnsSolution;
 
+  /// Error title when the catalog returned HTML the app could not parse
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the book source data'**
+  String get networkErrorParseTitle;
+
+  /// Suggested action for an unreadable catalog response
+  ///
+  /// In en, this message translates to:
+  /// **'The source returned a page the app could not read. Switch to another source or mirror and try again. If it keeps happening, open Diagnostics and share the logs.'**
+  String get networkErrorParseSolution;
+
+  /// Error title for database or file system failures
+  ///
+  /// In en, this message translates to:
+  /// **'Local storage operation failed'**
+  String get networkErrorStorageTitle;
+
+  /// Suggested action for local database or file failures
+  ///
+  /// In en, this message translates to:
+  /// **'Check free space and storage permissions, then try again. If it keeps happening, open Diagnostics and share the logs.'**
+  String get networkErrorStorageSolution;
+
   /// Localized network error title or solution: Something went wrong
   ///
   /// In en, this message translates to:
   /// **'Something went wrong'**
   String get networkErrorUnknownTitle;
 
-  /// Localized network error title or solution: Please try again. If the problem persists, restart the app.
+  /// Generic error solution; points at diagnostics instead of restarting
   ///
   /// In en, this message translates to:
-  /// **'Please try again. If the problem persists, restart the app.'**
+  /// **'Please try again. If it persists, open Diagnostics and share the logs.'**
   String get networkErrorUnknownSolution;
+
+  /// Button and dialog title for error diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get errorDiagnostics;
+
+  /// Button that copies the current error diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostics'**
+  String get errorCopyDiagnostics;
+
+  /// Where the error happened, e.g. search results or book details
+  ///
+  /// In en, this message translates to:
+  /// **'Location: {location}'**
+  String errorLocation(String location);
+
+  /// Label for the captured stack trace
+  ///
+  /// In en, this message translates to:
+  /// **'Stack trace'**
+  String get errorStackTrace;
+
+  /// Label for app version, platform and time in diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Environment'**
+  String get errorEnvironment;
 
   /// Localized update/install dialog text: Permission Required
   ///

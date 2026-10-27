@@ -72,6 +72,8 @@ class BookPage extends StatelessWidget {
               child: CustomErrorWidget(
                 error: snapshot.error!,
                 stackTrace: snapshot.stackTrace ?? StackTrace.empty,
+                contextLabel: l10n.bookDetailsTitle,
+                contextDetails: 'id=$id',
               ),
             ),
           );

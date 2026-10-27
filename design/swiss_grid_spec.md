@@ -1,6 +1,6 @@
 # Swiss Grid 规格 · OpenlibExtended 全站界面原型
 
-> 依据 `design/ui_prototype.html`（21 屏）整理，所有数值都是 Flutter 可直接表达的逻辑像素（dp）。
+> 依据 `design/ui_prototype.html`（23 屏）整理，所有数值都是 Flutter 可直接表达的逻辑像素（dp）。
 > 打开原型按 **G**，或访问 `ui_prototype.html#grid`，可在任一屏上叠加 1:1 网格线。
 
 ---

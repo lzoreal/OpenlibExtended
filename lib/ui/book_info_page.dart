@@ -62,7 +62,9 @@ class BookInfoPage extends ConsumerWidget {
             maxWidth: 840,
             child: CustomErrorWidget(
               error: bookInfo.error!,
-              stackTrace: StackTrace.empty,
+              stackTrace: bookInfo.stackTrace ?? StackTrace.empty,
+              contextLabel: l10n.bookDetailsTitle,
+              contextDetails: 'url=$url',
               onRefresh: () {
                 ref.invalidate(bookInfoProvider(url));
               },
