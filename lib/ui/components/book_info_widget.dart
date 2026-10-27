@@ -9,6 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
 import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
+import 'package:openlib/ui/components/book_card_widget.dart'
+    show getFileType, getLanguage;
+import 'package:openlib/ui/swiss_grid.dart';
 
 /// The URL the "open in site" button opens for a book.
 ///
@@ -31,193 +34,281 @@ String? openInSiteUrl({
   return link.isEmpty ? null : link;
 }
 
-class BookInfoWidget extends ConsumerWidget {
-  final Widget child;
-  final dynamic data;
+/// Best-effort source label for a stored book whose search-result tag was
+/// never persisted.
+String? sourceLabelForUrl(String? url, AppLocalizations l10n) {
+  if (url == null || url.isEmpty) return null;
+  final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
+  if (host.contains('welib')) return 'WeLib';
+  if (url.contains('ads.php?md5=') ||
+      host.contains('libgen') ||
+      host.contains('lgli')) {
+    return l10n.sourceLibgen;
+  }
+  if (url.contains('/book/') ||
+      host.contains('z-lib') ||
+      host.contains('zlibrary') ||
+      host.contains('1lib') ||
+      host.contains('artificial')) {
+    return l10n.sourceZlib;
+  }
+  if (host.contains('annas-archive')) return l10n.sourceAnnas;
+  return host.isEmpty ? null : host;
+}
 
-  const BookInfoWidget({super.key, required this.child, required this.data});
+class BookInfoWidget extends ConsumerWidget {
+  final dynamic data;
+  final String? source;
+
+  const BookInfoWidget({super.key, required this.data, this.source});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // The Anna's Archive base URL comes from the catalogue provider, so
-    // build() starts no I/O of its own (that used to leave pending timers
-    // in widget tests) and a test can stub the resolved mirror. It is only
-    // used for books that really have an md5; Z-Library books open on
-    // their own page instead (see [openInSiteUrl]).
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
     final aaBaseUrl = ref.watch(annaArchiveBaseUrlProvider).valueOrNull;
-    final siteUrl = openInSiteUrl(
-      link: (data.link ?? '').toString(),
-      md5: (data.md5 ?? '').toString(),
-      annaArchiveBaseUrl: aaBaseUrl,
-    );
-    String description = data.description.toString().length < 3
-        ? "No Description available"
-        : data.description.toString();
-    // SelectionArea makes title, author, info and description copyable.
-    // The container must not be selectable itself, or taps on buttons in
-    // the child slot stop working.
+    final link = (data.link ?? '').toString();
+    final sourceName = (source?.trim().isNotEmpty ?? false)
+        ? source!
+        : sourceLabelForUrl(link, l10n);
+    final opensAtSource = sourceName != null &&
+        sourceName != l10n.sourceAnnas &&
+        !sourceName.toLowerCase().contains('anna');
+    final siteUrl = opensAtSource
+        ? (link.isEmpty ? null : link)
+        : openInSiteUrl(
+            link: link,
+            md5: (data.md5 ?? '').toString(),
+            annaArchiveBaseUrl: aaBaseUrl,
+          );
+    final thumbnail = (data.thumbnail ?? '').toString();
+    final rawDescription = (data.description ?? '').toString().trim();
+    final description = rawDescription.length < 3
+        ? l10n.noDescriptionAvailable
+        : rawDescription;
+    final info = (data.info ?? '').toString();
+    final format =
+        ((data.format ?? getFileType(info)) ?? '').toString().toUpperCase();
+    final language = getLanguage(info) ?? '';
+    final year = RegExp(r'\b(?:19|20)\d{2}\b')
+            .firstMatch('$info ${data.publisher ?? ''}')
+            ?.group(0) ??
+        '';
+    final fileSize =
+        RegExp(r'\b\d+(?:\.\d+)?\s*(?:KB|MB|GB)\b', caseSensitive: false)
+                .firstMatch(info)
+                ?.group(0) ??
+            '';
+    final publisher = (data.publisher ?? '').toString().trim();
+    final author = (data.author ?? '').toString().trim();
+    final byline = [
+      author.isEmpty ? l10n.unknown : author,
+      if (publisher.isNotEmpty) publisher,
+    ].join(' · ');
+
+    Future<void> openSite() async {
+      if (siteUrl == null) return;
+      if (await canLaunchUrl(Uri.parse(siteUrl))) {
+        await launchUrl(Uri.parse(siteUrl),
+            mode: LaunchMode.externalApplication);
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.couldNotOpenLink)),
+        );
+      }
+    }
+
     return SelectionArea(
       child: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
         child: Padding(
-          padding: const EdgeInsets.only(left: 15, right: 15, top: 10),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(
-                width: double.infinity,
-                height: 30,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    key: const ValueKey('detail-cover'),
+                    width: 112,
+                    height: 168,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(SwissRadius.field),
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.shadow.withValues(alpha: 0.15),
+                          blurRadius: 32,
+                          offset: const Offset(0, 16),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(SwissRadius.field),
+                      child: CachedNetworkImage(
+                        imageUrl: thumbnail,
+                        fit: BoxFit.cover,
+                        httpHeaders: thumbnail.contains('libgen')
+                            ? <String, String>{'Referer': link}
+                            : null,
+                        placeholder: (context, url) => _DetailCoverFallback(
+                          scheme: scheme,
+                          title: data.title,
+                        ),
+                        errorWidget: (context, url, error) =>
+                            _DetailCoverFallback(
+                          scheme: scheme,
+                          title: data.title,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            data.title,
+                            key: const ValueKey('detail-title'),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: SwissText.subtitle.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: scheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            byline,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: SwissText.caption.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              if (format.isNotEmpty)
+                                _Stamp(label: format, accent: true),
+                              if (language.isNotEmpty) _Stamp(label: language),
+                              if (fileSize.isNotEmpty) _Stamp(label: fileSize),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Center(
-                child: CachedNetworkImage(
-                  height: 230,
-                  width: 170,
-                  imageUrl: data.thumbnail,
-                  // libgen.li serves /covers/ only with an ads.php
-                  // Referer; the book page itself is a valid one.
-                  httpHeaders: data.thumbnail.contains('libgen')
-                      ? {'Referer': data.link}
-                      : null,
-                  imageBuilder: (context, imageProvider) => Container(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.all(Radius.circular(10)),
-                      image: DecorationImage(
-                        image: imageProvider,
-                        fit: BoxFit.fill,
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _CardHead(
+                        icon: Icons.description_outlined,
+                        title: l10n.fileInfoTitle,
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      _InfoRow(
+                        label: l10n.languageSetting,
+                        value: language.isEmpty ? '—' : language,
+                        first: true,
+                      ),
+                      _InfoRow(
+                        label: l10n.publishedYearLabel,
+                        value: year.isEmpty ? '—' : year,
+                      ),
+                      _InfoRow(
+                        label: l10n.fileSizeLabel,
+                        value: fileSize.isEmpty ? '—' : fileSize,
+                      ),
+                      _InfoRow(
+                        label: l10n.sourceLabel,
+                        value: sourceName ?? '—',
+                      ),
+                    ],
                   ),
-                  placeholder: (context, url) => Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: Colors.grey,
-                    ),
-                    height: 230,
-                    width: 170,
-                  ),
-                  errorWidget: (context, url, error) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: Colors.grey,
-                      ),
-                      height: 230,
-                      width: 170,
-                      child: const Center(
-                        child: Icon(Icons.image_rounded),
-                      ),
-                    );
-                  },
                 ),
               ),
-              // Title row with AA button inline
-              Padding(
-                padding: const EdgeInsets.only(top: 15, bottom: 0),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _CardHead(
+                        icon: Icons.notes_rounded,
+                        title: l10n.descriptionLabel,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        description,
+                        style: SwissText.caption.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(SwissRadius.card),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: scheme.primary,
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        data.title,
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w900,
-                          color: Theme.of(context).colorScheme.tertiary,
-                          letterSpacing: 0.5,
+                        l10n.sourceMirrorHint(sourceName ?? l10n.unknown),
+                        style: SwissText.micro.copyWith(
+                          color: scheme.onSurfaceVariant,
                         ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.open_in_new, size: 18),
-                      label: Text(AppLocalizations.of(context).openInSite,
-                          style: const TextStyle(fontSize: 13)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.tertiary,
-                        side: BorderSide(
-                            color: Theme.of(context).colorScheme.tertiary),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        visualDensity: VisualDensity.compact,
+                    if (siteUrl != null) ...[
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: openSite,
+                        style: TextButton.styleFrom(
+                          minimumSize: Size.zero,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 4,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          l10n.openAtSource,
+                          style: SwissText.micro.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                      onPressed: siteUrl == null
-                          ? null
-                          : () async {
-                              if (await canLaunchUrl(Uri.parse(siteUrl))) {
-                                await launchUrl(Uri.parse(siteUrl),
-                                    mode: LaunchMode.externalApplication);
-                              } else if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content:
-                                          Text('Could not open the link.')),
-                                );
-                              }
-                            },
-                    ),
+                    ],
                   ],
                 ),
               ),
-              _TopPaddedText(
-                text: data.publisher ?? "unknown",
-                fontSize: 15,
-                topPadding: 7,
-                color: Theme.of(context).textTheme.headlineMedium!.color!,
-                maxLines: 4,
-              ),
-              _TopPaddedText(
-                text: data.author ?? "unknown",
-                fontSize: 13,
-                topPadding: 7,
-                color: Theme.of(context).textTheme.headlineSmall!.color!,
-                maxLines: 3,
-              ),
-              _TopPaddedText(
-                text: data.info ?? "",
-                fontSize: 11,
-                topPadding: 9,
-                color: Theme.of(context)
-                    .textTheme
-                    .headlineSmall!
-                    .color!
-                    .withAlpha(155),
-                maxLines: 4,
-              ),
-              // child slot of page
-              child,
-              Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Description",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 7, bottom: 10),
-                    child: Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .tertiary
-                            .withAlpha(150),
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                  )
-                ],
-              )
             ],
           ),
         ),
@@ -226,34 +317,153 @@ class BookInfoWidget extends ConsumerWidget {
   }
 }
 
-class _TopPaddedText extends StatelessWidget {
-  final String text;
-  final double fontSize;
-  final double topPadding;
-  final Color color;
-  final int maxLines;
+class _Stamp extends StatelessWidget {
+  const _Stamp({required this.label, this.accent = false});
 
-  const _TopPaddedText(
-      {required this.text,
-      required this.fontSize,
-      required this.topPadding,
-      required this.color,
-      required this.maxLines});
+  final String label;
+  final bool accent;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(top: topPadding),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w900,
-          color: color,
-          letterSpacing: 0.5,
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: accent ? scheme.primaryContainer : scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(SwissRadius.pill),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: SwissText.micro.copyWith(
+            color: accent ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-        overflow: TextOverflow.ellipsis,
-        maxLines: maxLines,
+      ),
+    );
+  }
+}
+
+class _CardHead extends StatelessWidget {
+  const _CardHead({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(SwissRadius.sm),
+          ),
+          child: Icon(icon, size: 16, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: SwissText.bodyStrong.copyWith(color: scheme.onSurface),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    this.first = false,
+  });
+
+  final String label;
+  final String value;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          top: first
+              ? BorderSide.none
+              : BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.55),
+                ),
+        ),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 64,
+            child: Text(
+              label,
+              style: SwissText.micro.copyWith(color: scheme.outline),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: SwissText.caption.copyWith(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailCoverFallback extends StatelessWidget {
+  const _DetailCoverFallback({required this.scheme, required this.title});
+
+  final ColorScheme scheme;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primaryContainer,
+            scheme.surfaceContainerHighest,
+          ],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: Text(
+            title,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: SwissText.caption.copyWith(
+              color: scheme.onPrimaryContainer,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ),
     );
   }

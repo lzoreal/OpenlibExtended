@@ -13,9 +13,13 @@ import 'package:openlib/services/download_manager.dart';
 import 'package:openlib/services/platform_utils.dart';
 import 'package:openlib/services/share_book.dart';
 import 'package:openlib/ui/components/book_info_widget.dart';
+import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/components/detail_bottom_bar.dart';
 import 'package:openlib/ui/components/error_widget.dart';
 import 'package:openlib/ui/components/file_buttons_widget.dart';
+import 'package:openlib/ui/components/share_icon.dart';
 import 'package:openlib/ui/components/snack_bar_widget.dart';
+import 'package:openlib/ui/swiss_grid.dart';
 import 'package:openlib/ui/webview_page.dart';
 import 'package:openlib/state/state.dart'
     show
@@ -28,69 +32,74 @@ import 'package:openlib/state/state.dart'
         donationKeyProvider;
 
 class BookInfoPage extends ConsumerWidget {
-  const BookInfoPage({super.key, required this.url});
+  const BookInfoPage({super.key, required this.url, this.source});
 
   final String url;
+  final String? source;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final bookInfo = ref.watch(bookInfoProvider(url));
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(AppLocalizations.of(context).appTitle),
-        titleTextStyle: Theme.of(context).textTheme.displayLarge,
-        actions: [
-          bookInfo.maybeWhen(data: (data) {
-            return IconButton(
-              icon: Icon(
-                Icons.share_sharp,
-                color: Theme.of(context).colorScheme.tertiary,
+
+    return bookInfo.when(
+      skipLoadingOnRefresh: false,
+      data: (data) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.bookDetailsTitle),
+            actions: [
+              IconButton(
+                icon: ShareIcon(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                onPressed: () async {
+                  final outcome = await shareBook(
+                      data.title, data.link, data.thumbnail ?? '',
+                      format: data.format,
+                      message: l10n.shareBookMessage(data.title, data.link));
+                  if (context.mounted && outcome == ShareOutcome.pathCopied) {
+                    showSnackBar(
+                        context: context, message: l10n.copiedBookLink);
+                  }
+                },
               ),
-              iconSize: 19.0,
-              onPressed: () async {
-                final outcome = await shareBook(
-                    data.title, data.link, data.thumbnail ?? '',
-                    format: data.format);
-                if (context.mounted && outcome == ShareOutcome.pathCopied) {
-                  showSnackBar(
-                      context: context,
-                      message: AppLocalizations.of(context).copiedBookLink);
-                }
+            ],
+          ),
+          body: ContentWidth(
+            maxWidth: 840,
+            child: BookInfoWidget(data: data, source: source),
+          ),
+          bottomNavigationBar: ActionButtonWidget(data: data),
+        );
+      },
+      error: (err, _) {
+        return Scaffold(
+          appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
+          body: ContentWidth(
+            maxWidth: 840,
+            child: CustomErrorWidget(
+              error: err,
+              stackTrace: StackTrace.empty,
+              onRefresh: () {
+                ref.invalidate(bookInfoProvider(url));
               },
-            );
-          }, orElse: () {
-            return const SizedBox.shrink();
-          })
-        ],
-      ),
-      body: bookInfo.when(
-        skipLoadingOnRefresh: false,
-        data: (data) {
-          return BookInfoWidget(
-              data: data, child: ActionButtonWidget(data: data));
-        },
-        error: (err, _) {
-          return CustomErrorWidget(
-            error: err,
-            stackTrace: StackTrace.empty,
-            onRefresh: () {
-              ref.invalidate(bookInfoProvider(url));
-            },
-          );
-        },
-        loading: () {
-          return Center(
-              child: SizedBox(
-            width: 25,
-            height: 25,
-            child: CircularProgressIndicator(
-              color: Theme.of(context).colorScheme.secondary,
-              strokeCap: StrokeCap.round,
             ),
-          ));
-        },
-      ),
+          ),
+        );
+      },
+      loading: () {
+        return Scaffold(
+          appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
+          body: const Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -130,25 +139,12 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
         } else {
           final showManualButton = ref.watch(showManualDownloadButtonProvider);
 
-          return Padding(
-            padding: const EdgeInsets.only(top: 21, bottom: 21),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                // Button for "Add To My Library" (background download)
-                TextButton(
-                  style: TextButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.secondary,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
+          return DetailBottomBar(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
                   onPressed: () async {
+                    final l10n = AppLocalizations.of(context);
                     String? downloadUrl = widget.data.mirror;
                     bool isFastDownload = widget.data.isFastDownload;
 
@@ -205,11 +201,11 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                           isDirectLink = true;
                           isFastDownload = true;
                         } else {
-                          welibRefusal = resolved.refusal ??
-                              'WeLib did not offer a download link for this book.';
+                          welibRefusal =
+                              resolved.refusal ?? l10n.welibNoDownloadLink;
                         }
                       } catch (e) {
-                        welibRefusal = 'Could not read the WeLib download page.';
+                        welibRefusal = l10n.welibPageUnreadable;
                       }
                     }
 
@@ -283,8 +279,8 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
 
                           if (context.mounted) {
                             final message = isFastDownload
-                                ? 'Fast download started in background 🚀'
-                                : 'Download started in background';
+                                ? l10n.fastDownloadStarted
+                                : l10n.downloadStartedBackground;
                             showSnackBar(
                               context: context,
                               message: message,
@@ -319,15 +315,13 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                           // file URL only comes out of the public-server
                           // page captured above, so that page is used.
                           linkRefresher: isZlib
-                              ? (pageUrl) async =>
-                                  (await ZlibraryProvider()
-                                          .resolveBookDownload(pageUrl))
-                                      .url
+                              ? (pageUrl) async => (await ZlibraryProvider()
+                                      .resolveBookDownload(pageUrl))
+                                  .url
                               : welibPageUrl != null
-                                  ? (_) async =>
-                                      (await WelibProvider()
-                                              .resolveDownload(welibPageUrl))
-                                          .url
+                                  ? (_) async => (await WelibProvider()
+                                          .resolveDownload(welibPageUrl))
+                                      .url
                                   : null,
                         );
 
@@ -338,8 +332,8 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
 
                         if (context.mounted) {
                           final message = isFastDownload
-                              ? 'Fast download started in background 🚀'
-                              : 'Download started in background';
+                              ? l10n.fastDownloadStarted
+                              : l10n.downloadStartedBackground;
                           showSnackBar(
                             context: context,
                             message: message,
@@ -358,94 +352,85 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                       }
                     }
                   },
-                  child: Text(AppLocalizations.of(context).addToMyLibrary),
+                  icon: const Icon(Icons.download_rounded),
+                  label: Text(AppLocalizations.of(context).downloadThisBook),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    textStyle:
+                        SwissText.label.copyWith(fontWeight: FontWeight.w800),
+                  ),
                 ),
-                // Button for "Manual Download" (opens webview for captcha) - only shown if setting is enabled
-                if (showManualButton)
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      backgroundColor: Theme.of(context)
-                          .colorScheme
-                          .tertiary
-                          .withValues(alpha: 0.2),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    onPressed: () async {
-                      if (widget.data.mirror != null &&
-                          widget.data.mirror != '') {
-                        // Navigate to webview page
-                        final List<String>? mirrors = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (BuildContext context) =>
-                                Webview(url: widget.data.mirror!),
-                          ),
+              ),
+              // Button for "Manual Download" (opens webview for captcha) - only shown if setting is enabled
+              if (showManualButton) ...[
+                const SizedBox(width: 8),
+                IconButton.outlined(
+                  tooltip: AppLocalizations.of(context).manualDownloadAction,
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size(48, 48),
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant),
+                    shape: const CircleBorder(),
+                  ),
+                  onPressed: () async {
+                    if (widget.data.mirror != null &&
+                        widget.data.mirror != '') {
+                      // Navigate to webview page
+                      final List<String>? mirrors = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (BuildContext context) =>
+                              Webview(url: widget.data.mirror!),
+                        ),
+                      );
+
+                      if (mirrors != null &&
+                          mirrors.isNotEmpty &&
+                          context.mounted) {
+                        // Start download in background with fetched mirrors
+                        final downloadManager =
+                            ref.read(downloadManagerProvider);
+                        final task = DownloadTask(
+                          id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
+                          md5: widget.data.md5,
+                          title: widget.data.title,
+                          author: widget.data.author,
+                          thumbnail: widget.data.thumbnail,
+                          publisher: widget.data.publisher,
+                          info: widget.data.info,
+                          format: widget.data.format!,
+                          description: widget.data.description,
+                          link: widget.data.link,
+                          mirrors: mirrors, // Use manually fetched mirrors
                         );
 
-                        if (mirrors != null &&
-                            mirrors.isNotEmpty &&
-                            context.mounted) {
-                          // Start download in background with fetched mirrors
-                          final downloadManager =
-                              ref.read(downloadManagerProvider);
-                          final task = DownloadTask(
-                            id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
-                            md5: widget.data.md5,
-                            title: widget.data.title,
-                            author: widget.data.author,
-                            thumbnail: widget.data.thumbnail,
-                            publisher: widget.data.publisher,
-                            info: widget.data.info,
-                            format: widget.data.format!,
-                            description: widget.data.description,
-                            link: widget.data.link,
-                            mirrors: mirrors, // Use manually fetched mirrors
-                          );
+                        await downloadManager.addDownload(task);
 
-                          await downloadManager.addDownload(task);
-
-                          if (context.mounted) {
-                            showSnackBar(
-                              context: context,
-                              message: AppLocalizations.of(context)
-                                  .downloadStartedBackground,
-                            );
-                          }
-                          ref.invalidate(myLibraryProvider);
-                        }
-                      } else {
-                        showSnackBar(
+                        if (context.mounted) {
+                          showSnackBar(
                             context: context,
-                            message: AppLocalizations.of(context).noMirrors);
+                            message: AppLocalizations.of(context)
+                                .downloadStartedBackground,
+                          );
+                        }
+                        ref.invalidate(myLibraryProvider);
                       }
-                    },
-                    child: Text(
-                      'Manual Download',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.tertiary,
-                      ),
-                    ),
-                  )
+                    } else {
+                      showSnackBar(
+                          context: context,
+                          message: AppLocalizations.of(context).noMirrors);
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_browser_outlined),
+                ),
               ],
-            ),
+            ],
           );
         }
       },
-      error: (error, stackTrace) {
-        return Text(error.toString());
-      },
-      loading: () {
-        return CircularProgressIndicator(
-          color: Theme.of(context).colorScheme.secondary,
-          strokeCap: StrokeCap.round,
-        );
-      },
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      loading: () => const SizedBox.shrink(),
     );
   }
 }
-
