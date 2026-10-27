@@ -1,37 +1,42 @@
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
-import 'package:openlib/l10n/app_localizations.dart';
 
 // Package imports:
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 // Project imports:
+import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/annas_archieve.dart' show BookData;
+import 'package:openlib/services/database.dart';
+import 'package:openlib/services/search_manager.dart';
 import 'package:openlib/state/state.dart' as app_state;
 import 'package:openlib/ui/book_info_page.dart';
-import 'package:openlib/ui/components/book_card_widget.dart';
+import 'package:openlib/ui/components/book_card_widget.dart'
+    show getFileType, getLanguage;
+import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/error_widget.dart';
-import 'package:openlib/ui/components/page_title_widget.dart';
+import 'package:openlib/ui/components/inline_hint.dart';
+import 'package:openlib/ui/components/search_result_card.dart';
+import 'package:openlib/ui/components/search_source_meta.dart';
+import 'package:openlib/ui/components/source_journey_card.dart';
+import 'package:openlib/ui/swiss_grid.dart';
 
-// A constant for the 'No Results Found' text color for better theming/readability.
-const Color _kNoResultsTextColor = Color(0xFF4D4D4D);
-
-// Custom extension for String to add the missing capitalizeFirst method
-extension StringExtension on String {
-  String get capitalizeFirst {
-    if (isEmpty) return this;
-    return '${this[0].toUpperCase()}${substring(1)}';
-  }
-}
-
-/// Search results with pagination: the first page loads with the page,
-/// and scrolling near the bottom quietly fetches the next one and
-/// appends it. Anna's Archive serves 50 results per page.
+/// Search results across the enabled catalogs.
+///
+/// Page 1 queries every enabled source in parallel. The source card
+/// switches between the merged list and one catalog's list; deeper pages
+/// follow the currently selected view.
 class ResultPage extends ConsumerStatefulWidget {
-  const ResultPage({super.key, required this.searchQuery});
+  const ResultPage({super.key, required this.searchQuery, this.source});
 
   final String searchQuery;
+
+  /// The source view this route opens on. Every source is still queried;
+  /// null opens the merged list. The source card switches views in place.
+  final SearchProviderId? source;
 
   @override
   ConsumerState<ResultPage> createState() => _ResultPageState();
@@ -39,38 +44,76 @@ class ResultPage extends ConsumerStatefulWidget {
 
 class _ResultPageState extends ConsumerState<ResultPage> {
   final _scrollController = ScrollController();
-
-  /// Results accumulated across all loaded pages.
-  final List<BookData> _books = [];
-
-  /// Pages fully merged into [_books]; the next fetch starts at +1.
-  int _loadedPages = 0;
+  SearchManagerResult? _firstResult;
+  SearchProviderId? _selectedSource;
+  final Map<String, List<BookData>> _viewBooks = {};
+  final Map<String, Set<String>> _viewSeen = {};
+  final Map<String, int> _viewPages = {};
+  final Set<String> _viewEnded = {};
   bool _fetchingNextPage = false;
+  bool _retrying = false;
+  final Set<String> _formatFilters = {};
+  final Set<String> _languageFilters = {};
 
-  /// A page that returned nothing stops the pager - there is no page
-  /// after the last one, and endless empty fetches would spin forever.
-  bool _reachedEnd = false;
+  String _viewKey(SearchProviderId? source) => source?.name ?? 'all';
+
+  List<BookData> get _books =>
+      _viewBooks[_viewKey(_selectedSource)] ?? const <BookData>[];
+
+  app_state.SearchPageKey get _firstPageKey =>
+      app_state.SearchPageKey(widget.searchQuery, 1);
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    // Page 1 may resolve before the first build; merge it the moment it
-    // does. Once loaded, the pager owns accumulation from there.
     ref.listenManual(
-      app_state.searchProvider(app_state.SearchPageKey(widget.searchQuery, 1)),
+      app_state.initialSearchProvider(_firstPageKey),
       (previous, next) {
-        final books = next.valueOrNull;
-        if (books != null && _loadedPages == 0) {
-          setState(() {
-            _books.addAll(books);
-            _loadedPages = 1;
-            if (books.isEmpty) _reachedEnd = true;
-          });
-        }
+        final result = next.valueOrNull;
+        if (result == null) return;
+        _applyFirstResult(result);
       },
       fireImmediately: true,
     );
+  }
+
+  void _applyFirstResult(SearchManagerResult result) {
+    setState(() {
+      _firstResult = result;
+      _viewBooks.clear();
+      _viewSeen.clear();
+      _viewPages.clear();
+      _viewEnded.clear();
+      final previous = _selectedSource;
+      final routeSource = widget.source != null &&
+              result.sources.any((run) => run.id == widget.source)
+          ? widget.source
+          : null;
+      _selectedSource =
+          previous != null && result.sources.any((run) => run.id == previous)
+              ? previous
+              : routeSource;
+
+      void put(SearchProviderId? source, List<BookData> books) {
+        final key = _viewKey(source);
+        final copy = List<BookData>.of(books);
+        _viewBooks[key] = copy;
+        _viewSeen[key] = copy.map((book) => book.md5).toSet();
+        _viewPages[key] = 1;
+        if (copy.isEmpty) _viewEnded.add(key);
+      }
+
+      put(null, result.books);
+      for (final run in result.sources) {
+        final sourceBooks = result.booksBySource[run.id] ??
+            (run.id == result.resultSourceId
+                ? result.books
+                : const <BookData>[]);
+        put(run.id, sourceBooks);
+      }
+      _fetchingNextPage = false;
+    });
   }
 
   @override
@@ -81,224 +124,1494 @@ class _ResultPageState extends ConsumerState<ResultPage> {
 
   void _onScroll() {
     if (_scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 200 &&
+            _scrollController.position.maxScrollExtent - 240 &&
         !_fetchingNextPage &&
-        !_reachedEnd) {
+        !_viewEnded.contains(_viewKey(_selectedSource))) {
       _loadNextPage();
     }
   }
 
   Future<void> _loadNextPage() async {
-    if (!mounted) return;
+    if (!mounted || _fetchingNextPage) return;
+    final view = _selectedSource;
+    final key = _viewKey(view);
+    if (_viewEnded.contains(key)) return;
+    final nextPage = (_viewPages[key] ?? 1) + 1;
     setState(() => _fetchingNextPage = true);
+    try {
+      final result = await ref.read(app_state
+          .searchProvider(app_state.SearchPageKey(widget.searchQuery, nextPage,
+              source: view))
+          .future);
+      if (!mounted) return;
+      final pageBooks = view == null
+          ? result.books
+          : (result.booksBySource[view] ?? result.books);
+      setState(() {
+        final list = _viewBooks[key] ??= <BookData>[];
+        final seen = _viewSeen[key] ??= <String>{};
+        for (final book in pageBooks) {
+          if (seen.add(book.md5)) list.add(book);
+        }
+        _viewPages[key] = nextPage;
+        if (pageBooks.isEmpty) _viewEnded.add(key);
 
-    final page = _loadedPages + 1;
-    final nextPage = await ref.read(app_state
-        .searchProvider(app_state.SearchPageKey(widget.searchQuery, page))
-        .future);
+        // An "all sources" page contains every source's page too; keep
+        // the single-source caches in step so switching does not throw
+        // away pages already downloaded.
+        if (view == null) {
+          for (final entry in result.booksBySource.entries) {
+            final sourceKey = entry.key.name;
+            final sourceList = _viewBooks[sourceKey] ??= <BookData>[];
+            final sourceSeen = _viewSeen[sourceKey] ??= <String>{};
+            for (final book in entry.value) {
+              if (sourceSeen.add(book.md5)) sourceList.add(book);
+            }
+            _viewPages[sourceKey] = nextPage;
+            if (entry.value.isEmpty) _viewEnded.add(sourceKey);
+          }
+        }
+        _fetchingNextPage = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _fetchingNextPage = false);
+    }
+  }
 
-    if (!mounted) return;
+  void _retryPageOne() {
+    _resetLocalPager();
+    ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
+  }
+
+  Future<void> _pickSort() async {
+    final l10n = AppLocalizations.of(context);
+    final current = ref.read(app_state.selectedSortState);
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                child: Text(
+                  l10n.filterSortLabel,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              for (final value in app_state.sortValues.keys)
+                ListTile(
+                  title: Text(_sortLabel(l10n, value)),
+                  trailing: value == current
+                      ? Icon(Icons.check, color: theme.colorScheme.primary)
+                      : null,
+                  selected: value == current,
+                  onTap: () => Navigator.pop(context, value),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected == null || selected == current) return;
+    ref.read(app_state.selectedSortState.notifier).state = selected;
+    await MyLibraryDb.instance.savePreference('filterSort', selected);
+    _retryPageOne();
+  }
+
+  void _resetLocalPager() {
     setState(() {
-      if (nextPage.isEmpty) {
-        _reachedEnd = true;
-      } else {
-        _books.addAll(nextPage);
-        _loadedPages = page;
-      }
+      _viewBooks.clear();
+      _viewSeen.clear();
+      _viewPages.clear();
+      _viewEnded.clear();
+      _firstResult = null;
+      _fetchingNextPage = false;
+      _selectedSource = widget.source;
+    });
+  }
+
+  void _clearFiltersAndRetry() {
+    if (_retrying) return;
+    setState(() => _retrying = true);
+    _resetLocalPager();
+    ref.read(app_state.selectedTypeState.notifier).state = 'All';
+    ref.read(app_state.selectedSortState.notifier).state = 'Most Relevant';
+    ref.read(app_state.selectedFileTypeState.notifier).state = 'All';
+    ref.read(app_state.selectedLanguageState.notifier).state = 'All';
+    ref.read(app_state.selectedYearState.notifier).state = 'All';
+    ref.read(app_state.searchAuthorProvider.notifier).state = '';
+    ref.read(app_state.searchPublisherProvider.notifier).state = '';
+    ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
+    unawaited(_persistFilterDefaults());
+    if (mounted) setState(() => _retrying = false);
+  }
+
+  Future<void> _persistFilterDefaults() async {
+    try {
+      await Future.wait([
+        MyLibraryDb.instance.savePreference('filterType', 'All'),
+        MyLibraryDb.instance.savePreference('filterSort', 'Most Relevant'),
+        MyLibraryDb.instance.savePreference('filterFileType', 'All'),
+        MyLibraryDb.instance.savePreference('filterLanguage', 'All'),
+        MyLibraryDb.instance.savePreference('filterYear', 'All'),
+      ]);
+    } catch (_) {
+      // In-memory filters already reset; persistence is a convenience.
+    }
+  }
+
+  Future<void> _openSourceSheet(SearchManagerResult? result) async {
+    final enabled = ref.read(app_state.searchProviderToggles).valueOrNull ??
+        fallbackSearchSourceOrder.toSet();
+    final order = ref.read(app_state.searchSourceOrderProvider).valueOrNull ??
+        fallbackSearchSourceOrder;
+    final available = order
+        .where((source) => enabled.contains(source))
+        .toList(growable: false);
+    final selection = await showModalBottomSheet<_SourceSelection>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        return _SourcePickerSheet(
+          query: widget.searchQuery,
+          sources: available,
+          runs: result?.sources ?? const [],
+          currentSource: _selectedSource,
+        );
+      },
+    );
+    if (!mounted || selection == null) return;
+    _selectSource(selection.auto ? null : selection.source);
+  }
+
+  void _selectSource(SearchProviderId? source) {
+    if (_selectedSource == source) return;
+    setState(() {
+      _selectedSource = source;
       _fetchingNextPage = false;
     });
   }
 
+  void _openBook(BookData book) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BookInfoPage(url: book.link, source: book.source),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Page 1 is watched so a fresh query rebuilds everything; deeper
-    // pages are read on demand by the pager.
-    final firstPage = ref.watch(app_state
-        .searchProvider(app_state.SearchPageKey(widget.searchQuery, 1)));
-    final String capitalizedQuery = widget.searchQuery.capitalizeFirst;
+    final firstPage = ref.watch(app_state.initialSearchProvider(_firstPageKey));
+    final l10n = AppLocalizations.of(context);
+    final sortLabel = _sortLabel(l10n, ref.watch(app_state.selectedSortState));
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)
-            .resultsFor(capitalizedQuery)),
-        titleTextStyle: Theme.of(context)
-            .textTheme
-            .titleLarge
-            ?.copyWith(fontWeight: FontWeight.bold),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-      ),
-      body: firstPage.when(
-        data: (pageOne) {
-          if (_books.isNotEmpty) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: CustomScrollView(
-                controller: _scrollController,
-                slivers: <Widget>[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TitleText(AppLocalizations.of(context).results),
-                          if (_books.first.source != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                AppLocalizations.of(context).searchingOn(
-                                    _books.first.source!),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverList.builder(
-                    itemCount: _books.length,
-                    itemBuilder: (context, index) {
-                      final i = _books[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10.0),
-                        child: BookInfoCard(
-                          title: i.title,
-                          author: i.author ?? "unknown",
-                          publisher: i.publisher ?? "unknown",
-                          thumbnail: i.thumbnail ?? '',
-                          info: i.info ?? '',
-                          link: i.link,
-                          md5: i.md5,
-                          source: i.source,
-                          onClick: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (BuildContext context) {
-                                  return BookInfoPage(url: i.link);
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                  if (_fetchingNextPage || !_reachedEnd)
-                    const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          } else {
-            // No Results Found UI
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 200,
-                      height: 200,
-                      child: SvgPicture.asset(
-                        'assets/no_results.svg',
-                        width: 200,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    Text(
-                      AppLocalizations.of(context).noResultsFound,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _kNoResultsTextColor,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            );
-          }
-        },
-        error: (error, stackTrace) {
-          return CustomErrorWidget(
-            error: error,
-            stackTrace: stackTrace,
-            onRefresh: () {
-              setState(() {
-                _books.clear();
-                _loadedPages = 0;
-                _reachedEnd = false;
-              });
-              // ignore: unused_result
-              ref.refresh(app_state.searchProvider(
-                  app_state.SearchPageKey(widget.searchQuery, 1)));
-            },
-          );
-        },
-        loading: () {
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
+        automaticallyImplyLeading: false,
+        toolbarHeight: 60,
+        titleSpacing: 16,
+        title: ContentWidth(
+          maxWidth: 840,
+          child: Row(
             children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                    left: 10, right: 10, top: 10, bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TitleText(AppLocalizations.of(context).results),
-                    const SizedBox(height: 4),
-                    // The chain tries LibGen, then Z-Library, then
-                    // Anna's Archive - an empty page is not the end.
-                    Text(
-                      AppLocalizations.of(context).tryingNextSource,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+              IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                icon: const Icon(Icons.arrow_back_rounded, size: 19),
+                style: IconButton.styleFrom(
+                  fixedSize: const Size(34, 34),
+                  minimumSize: Size.zero,
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
+              const SizedBox(width: 8),
               Expanded(
-                child: Center(
-                  child: SizedBox(
-                    width: 25,
-                    height: 25,
-                    child: CircularProgressIndicator(
-                      color: Theme.of(context).colorScheme.secondary,
-                      strokeWidth: 3.0,
-                    ),
-                  ),
+                child: _QueryPill(
+                  query: widget.searchQuery,
+                  onTap: () => Navigator.of(context).maybePop(),
                 ),
               ),
             ],
-          );
-        },
+          ),
+        ),
+      ),
+      body: ContentWidth(
+        maxWidth: 840,
+        child: firstPage.when(
+          data: (pageOne) {
+            final result = _firstResult ?? pageOne;
+            final fallbackBooks = _selectedSource == null
+                ? pageOne.books
+                : (pageOne.booksBySource[_selectedSource] ??
+                    const <BookData>[]);
+            final books = _books.isNotEmpty ? _books : fallbackBooks;
+            if (books.isEmpty) {
+              return _EmptyResults(
+                query: widget.searchQuery,
+                result: result,
+                selectedSource: _selectedSource,
+                onSelectSource: _selectSource,
+                onModify: () => Navigator.of(context).maybePop(),
+                onClearFilters: _clearFiltersAndRetry,
+                retrying: _retrying,
+              );
+            }
+            return _successView(
+              result: result,
+              books: books,
+              sortLabel: sortLabel,
+            );
+          },
+          error: (error, stackTrace) {
+            return CustomErrorWidget(
+              error: error,
+              stackTrace: stackTrace,
+              onRefresh: _retryPageOne,
+            );
+          },
+          loading: () => _LoadingResults(source: widget.source),
+        ),
+      ),
+    );
+  }
+
+  Widget _successView({
+    required SearchManagerResult result,
+    required List<BookData> books,
+    required String sortLabel,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final allCount = _viewBooks[_viewKey(null)]?.length ?? result.books.length;
+
+    SearchSourceRun? selectedRun;
+    for (final run in result.sources) {
+      if (run.id == _selectedSource) {
+        selectedRun = run;
+        break;
+      }
+    }
+    final rightLabel =
+        selectedRun?.displayName ?? l10n.sourceCount(result.sources.length);
+
+    final pending = <String>[
+      for (final run in result.sources)
+        if (run.status == SearchSourceStatus.pending)
+          sourceShortLabel(l10n, run.id),
+    ];
+
+    final formats = <String>{
+      for (final book in books)
+        if (getFileType(book.info) != null)
+          getFileType(book.info)!.toUpperCase(),
+    }.toList()
+      ..sort((a, b) {
+        const order = ['EPUB', 'PDF'];
+        final aIndex = order.indexOf(a);
+        final bIndex = order.indexOf(b);
+        if (aIndex == -1 && bIndex == -1) return a.compareTo(b);
+        if (aIndex == -1) return 1;
+        if (bIndex == -1) return -1;
+        return aIndex.compareTo(bIndex);
+      });
+
+    final languages = <String>{
+      for (final book in books)
+        if (getLanguage(book.info) != null) getLanguage(book.info)!,
+    }.toList()
+      ..sort();
+
+    final visibleBooks = <BookData>[
+      for (final book in books)
+        if (_formatFilters.isEmpty ||
+            _formatFilters.contains(getFileType(book.info)?.toUpperCase()))
+          if (_languageFilters.isEmpty ||
+              _languageFilters.contains(getLanguage(book.info)))
+            book,
+    ];
+
+    String? otherSources;
+    if (_selectedSource != null) {
+      final parts = <String>[];
+      for (final run in result.sources) {
+        if (run.id == _selectedSource) continue;
+        final status = switch (run.status) {
+          SearchSourceStatus.pending => '…',
+          SearchSourceStatus.failed => l10n.sourceStatusFailed,
+          _ => '${run.resultCount}',
+        };
+        parts.add('${sourceShortLabel(l10n, run.id)} $status');
+      }
+      if (parts.isNotEmpty) {
+        otherSources = l10n.otherSources(parts.join(' · '));
+      }
+    }
+
+    final filterChips = <Widget>[
+      FilterChip(
+        selected: true,
+        showCheckmark: false,
+        avatar: Icon(
+          Icons.tune_rounded,
+          size: 16,
+          color: scheme.onPrimaryContainer,
+        ),
+        label: Text(
+          ref.watch(app_state.selectedSortState) == 'Most Relevant'
+              ? l10n.filterRelevance
+              : sortLabel,
+        ),
+        onSelected: (_) => _pickSort(),
+      ),
+      for (final format in formats)
+        FilterChip(
+          selected: _formatFilters.contains(format),
+          showCheckmark: false,
+          label: Text(format),
+          onSelected: (value) {
+            setState(() {
+              if (value) {
+                _formatFilters.add(format);
+              } else {
+                _formatFilters.remove(format);
+              }
+            });
+          },
+        ),
+      for (final language in languages.take(3))
+        FilterChip(
+          selected: _languageFilters.contains(language),
+          showCheckmark: false,
+          label: Text(language),
+          onSelected: (value) {
+            setState(() {
+              if (value) {
+                _languageFilters.add(language);
+              } else {
+                _languageFilters.remove(language);
+              }
+            });
+          },
+        ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ResultsHeading(
+                  count: visibleBooks.length,
+                  rightLabel: rightLabel,
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: () => _openSourceSheet(result),
+                  child: SourceJourneyCard(
+                    sources: result.sources,
+                    selectedSource: _selectedSource,
+                    onSelect: _selectSource,
+                    totalCount: allCount,
+                  ),
+                ),
+                if (pending.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  InlineHint(
+                    icon: Icons.refresh_rounded,
+                    message: pending.length == 1
+                        ? l10n.sourceStillSearching(pending.first)
+                        : l10n.sourceStillSearching(pending.join(' · ')),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: filterChips,
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+          if (visibleBooks.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Column(
+                  children: [
+                    Text(
+                      l10n.noResultsFound,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _formatFilters.clear();
+                          _languageFilters.clear();
+                        });
+                      },
+                      child: Text(l10n.clearFiltersRetry),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverToBoxAdapter(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(SwissRadius.card),
+                  border: Border.all(color: scheme.outlineVariant),
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.shadow.withValues(alpha: 0.05),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (var index = 0;
+                        index < visibleBooks.length;
+                        index++) ...[
+                      _resultRow(result, visibleBooks[index], l10n),
+                      if (index < visibleBooks.length - 1)
+                        Divider(
+                          height: 1,
+                          color: scheme.outlineVariant.withValues(alpha: 0.55),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          if (otherSources != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: InlineHint(
+                  icon: Icons.public,
+                  message: otherSources,
+                ),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: _PaginationFooter(
+              fetching: _fetchingNextPage,
+              reachedEnd: _viewEnded.contains(_viewKey(_selectedSource)),
+              label: l10n.loadMoreResults,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _resultRow(
+    SearchManagerResult result,
+    BookData book,
+    AppLocalizations l10n,
+  ) {
+    final sourceId = _sourceIdFor(result, book);
+    return SearchResultCard(
+      title: book.title,
+      author: book.author ?? '',
+      thumbnail: book.thumbnail,
+      info: book.info,
+      link: book.link,
+      md5: book.md5,
+      sourceLabel:
+          sourceId == null ? book.source : sourceShortLabel(l10n, sourceId),
+      onClick: () => _openBook(book),
+    );
+  }
+
+  SearchProviderId? _sourceIdFor(SearchManagerResult result, BookData book) {
+    for (final run in result.sources) {
+      if (run.displayName == book.source) return run.id;
+    }
+    return _selectedSource;
+  }
+
+  String _sortLabel(AppLocalizations l10n, String value) {
+    return switch (value) {
+      'Newest' => l10n.sortNewest,
+      'Oldest' => l10n.sortOldest,
+      'Largest' => l10n.sortLargest,
+      'Smallest' => l10n.sortSmallest,
+      _ => l10n.sortMostRelevant,
+    };
+  }
+}
+
+class _QueryPill extends StatelessWidget {
+  const _QueryPill({required this.query, required this.onTap});
+
+  final String query;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final shape = StadiumBorder(
+      side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.7)),
+    );
+    return Material(
+      color: scheme.surface,
+      shape: shape,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: shape,
+        child: SizedBox(
+          height: 40,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(Icons.search_rounded, size: 16, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    query,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SwissText.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: scheme.outline,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultsHeading extends StatelessWidget {
+  const _ResultsHeading({required this.count, required this.rightLabel});
+
+  final int count;
+  final String rightLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(
+          child: Text(
+            l10n.resultsCount(count),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SwissText.headline.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          rightLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: SwissText.micro.copyWith(color: scheme.outline),
+        ),
+      ],
+    );
+  }
+}
+
+class _PaginationFooter extends StatelessWidget {
+  const _PaginationFooter({
+    required this.fetching,
+    required this.reachedEnd,
+    required this.label,
+  });
+
+  final bool fetching;
+  final bool reachedEnd;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    if (reachedEnd && !fetching) return const SizedBox(height: 12);
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: fetching
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: scheme.primary,
+                ),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: scheme.outline,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: SwissText.micro.copyWith(color: scheme.outline),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _LoadingResults extends ConsumerWidget {
+  const _LoadingResults({required this.source});
+
+  final SearchProviderId? source;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final enabled = ref.watch(app_state.searchProviderToggles).valueOrNull ??
+        fallbackSearchSourceOrder.toSet();
+    final order = ref.watch(app_state.searchSourceOrderProvider).valueOrNull ??
+        fallbackSearchSourceOrder;
+    final chain =
+        source != null ? [source!] : order.where(enabled.contains).toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      l10n.searchingTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: SwissText.headline.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              source == null
+                  ? l10n.sourceCount(chain.length)
+                  : sourceLabel(l10n, source!),
+              style: SwissText.micro.copyWith(color: scheme.outline),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _LoadingSourcePill(
+              label: l10n.searchSourceAuto,
+              selected: true,
+            ),
+            for (final id in chain)
+              _LoadingSourcePill(
+                label: id == SearchProviderId.zlibrary
+                    ? l10n.sourceZlibShort
+                    : sourceShortLabel(l10n, id),
+                selected: false,
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        InlineHint(
+          icon: Icons.refresh_rounded,
+          message: l10n.searchSourceAutoHint,
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilterChip(
+              selected: true,
+              showCheckmark: false,
+              avatar: Icon(
+                Icons.tune_rounded,
+                size: 16,
+                color: scheme.onPrimaryContainer,
+              ),
+              label: Text(l10n.filterRelevance),
+              onSelected: (_) {},
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(SwissRadius.card),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var i = 0; i < 4; i++) ...[
+                const _SkeletonRow(),
+                if (i < 3)
+                  Divider(
+                    height: 1,
+                    color: scheme.outlineVariant.withValues(alpha: 0.55),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LoadingSourcePill extends StatelessWidget {
+  const _LoadingSourcePill({required this.label, required this.selected});
+
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      color: selected ? scheme.primary : scheme.surface,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: selected ? Colors.transparent : scheme.outlineVariant,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: 32,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: selected ? scheme.onPrimary : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: selected
+                      ? null
+                      : Border.all(color: scheme.outline, width: 1.5),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: SwissText.micro.copyWith(
+                  color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '…',
+                style: SwissText.badge.copyWith(
+                  color: selected
+                      ? scheme.onPrimary.withValues(alpha: 0.72)
+                      : scheme.outline,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonRow extends StatelessWidget {
+  const _SkeletonRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fill = scheme.surfaceContainerHigh;
+    Widget line(double width, double height) => Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(height / 2),
+          ),
+        );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        height: 80,
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 80,
+              decoration: BoxDecoration(
+                color: fill,
+                borderRadius: BorderRadius.circular(SwissRadius.sm),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  line(double.infinity, 12),
+                  const SizedBox(height: 8),
+                  line(150, 8),
+                  const SizedBox(height: 8),
+                  line(110, 8),
+                  const Spacer(),
+                  line(96, 8),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyResults extends StatelessWidget {
+  const _EmptyResults({
+    required this.query,
+    required this.result,
+    required this.selectedSource,
+    required this.onSelectSource,
+    required this.onModify,
+    required this.onClearFilters,
+    required this.retrying,
+  });
+
+  final String query;
+  final SearchManagerResult result;
+  final SearchProviderId? selectedSource;
+  final ValueChanged<SearchProviderId?> onSelectSource;
+  final VoidCallback onModify;
+  final VoidCallback onClearFilters;
+  final bool retrying;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final responded = result.sources
+        .where((run) =>
+            run.status != SearchSourceStatus.pending &&
+            run.status != SearchSourceStatus.skipped)
+        .length;
+    final failed = result.sources
+        .where((run) => run.status == SearchSourceStatus.failed)
+        .length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        _ResultsHeading(
+          count: 0,
+          rightLabel: selectedSource != null
+              ? sourceLabel(l10n, selectedSource!)
+              : l10n.sourcesResponded(responded),
+        ),
+        if (result.sources.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SourceJourneyCard(
+            sources: result.sources,
+            selectedSource: selectedSource,
+            onSelect: onSelectSource,
+            totalCount: 0,
+          ),
+        ],
+        const SizedBox(height: 30),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Column(
+              children: [
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: Icon(
+                    Icons.search_rounded,
+                    size: 38,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  l10n.noResultsFor(query),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  l10n.noResultsSourcesBody,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 11.5,
+                    height: 1.7,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                FilledButton.tonalIcon(
+                  onPressed: onModify,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: Text(l10n.searchAgain),
+                ),
+                TextButton(
+                  onPressed: retrying ? null : onClearFilters,
+                  child: retrying
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(l10n.clearFiltersRetry),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 28),
+        if (result.sources.isNotEmpty)
+          _SourceStatusCard(
+            sources: result.sources,
+            responded: responded,
+            failed: failed,
+          ),
+      ],
+    );
+  }
+}
+
+class _SourceStatusCard extends StatelessWidget {
+  const _SourceStatusCard({
+    required this.sources,
+    required this.responded,
+    required this.failed,
+  });
+
+  final List<SearchSourceRun> sources;
+  final int responded;
+  final int failed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  size: 19,
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.sourceStatusTitle,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.sourceStatusSummary(responded, failed),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          for (var index = 0; index < sources.length; index++) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.55),
+              ),
+            _SourceStatusRow(run: sources[index]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceStatusRow extends StatelessWidget {
+  const _SourceStatusRow({required this.run});
+
+  final SearchSourceRun run;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final label = run.id == SearchProviderId.annasArchive
+        ? l10n.sourceAnnasShort
+        : sourceLabel(l10n, run.id);
+    final (status, color) = switch (run.status) {
+      SearchSourceStatus.failed => (l10n.sourceTimedOut, scheme.error),
+      SearchSourceStatus.pending => (
+          l10n.sourceStatusSearching,
+          scheme.outline,
+        ),
+      SearchSourceStatus.skipped => (
+          l10n.sourceStatusUntried,
+          scheme.outline,
+        ),
+      _ => (l10n.sourceResponded(run.resultCount), scheme.secondary),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.outline,
+                fontSize: 11.5,
+              ),
+            ),
+          ),
+          Text(
+            status,
+            textAlign: TextAlign.right,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceSelection {
+  const _SourceSelection.auto()
+      : source = null,
+        auto = true;
+
+  const _SourceSelection.source(this.source) : auto = false;
+
+  final SearchProviderId? source;
+  final bool auto;
+}
+
+class _SourcePickerSheet extends StatelessWidget {
+  const _SourcePickerSheet({
+    required this.query,
+    required this.sources,
+    required this.runs,
+    required this.currentSource,
+  });
+
+  final String query;
+  final List<SearchProviderId> sources;
+  final List<SearchSourceRun> runs;
+  final SearchProviderId? currentSource;
+
+  SearchSourceRun? _runFor(SearchProviderId id) {
+    return runs.where((run) => run.id == id).firstOrNull;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.sourceSheetTitle,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          l10n.sourceSheetSubtitle(query),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip:
+                        MaterialLocalizations.of(context).closeButtonTooltip,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: scheme.surfaceContainerHigh,
+                      foregroundColor: scheme.onSurfaceVariant,
+                      fixedSize: const Size(28, 28),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    _SourceOptionRow(
+                      selected: currentSource == null,
+                      leading: _AutoSourceIcon(scheme: scheme),
+                      title: l10n.sourceAutoRecommended,
+                      subtitle: l10n.searchSourceAutoHint,
+                      onTap: () => Navigator.of(context)
+                          .pop(const _SourceSelection.auto()),
+                    ),
+                    for (final source in sources)
+                      _SourceOptionRow(
+                        selected: currentSource == source,
+                        leading: _SourceMarkBox(
+                          scheme: scheme,
+                          id: source,
+                        ),
+                        title: sourceLabel(l10n, source),
+                        subtitle: _runLabel(l10n, _runFor(source)),
+                        failed: _runFor(source)?.status ==
+                            SearchSourceStatus.failed,
+                        onTap: () => Navigator.of(context)
+                            .pop(_SourceSelection.source(source)),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.only(top: 9),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: scheme.outlineVariant.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 12, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        l10n.sourceSheetNote,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 9,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _runLabel(AppLocalizations l10n, SearchSourceRun? run) {
+    if (run == null) return l10n.sourceStatusUntried;
+    return switch (run.status) {
+      SearchSourceStatus.pending => l10n.sourceStatusSearching,
+      SearchSourceStatus.hit ||
+      SearchSourceStatus.empty =>
+        l10n.sourceResultCount(run.resultCount),
+      SearchSourceStatus.failed => l10n.sourceStatusFailed,
+      SearchSourceStatus.skipped => l10n.sourceStatusUntried,
+    };
+  }
+}
+
+class _SourceOptionRow extends StatelessWidget {
+  const _SourceOptionRow({
+    required this.selected,
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.failed = false,
+  });
+
+  final bool selected;
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool failed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: selected ? scheme.primaryContainer : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: selected ? scheme.primary : Colors.transparent,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+            child: Row(
+              children: [
+                leading,
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: selected
+                                    ? scheme.onPrimaryContainer
+                                    : scheme.onSurface,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: failed
+                              ? scheme.tertiary
+                              : (selected
+                                  ? scheme.onPrimaryContainer
+                                  : scheme.onSurfaceVariant),
+                          fontSize: 8.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 16,
+                  height: 16,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? scheme.primary : Colors.transparent,
+                    border: Border.all(
+                      color: selected ? scheme.primary : scheme.outlineVariant,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: selected
+                      ? Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: scheme.onPrimary,
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AutoSourceIcon extends StatelessWidget {
+  const _AutoSourceIcon({required this.scheme});
+
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.auto_awesome, size: 14, color: scheme.primary),
+    );
+  }
+}
+
+class _SourceMarkBox extends StatelessWidget {
+  const _SourceMarkBox({required this.scheme, required this.id});
+
+  final ColorScheme scheme;
+  final SearchProviderId id;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        sourceMark(id),
+        style: TextStyle(
+          color: scheme.onSurfaceVariant,
+          fontSize: 7.5,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
