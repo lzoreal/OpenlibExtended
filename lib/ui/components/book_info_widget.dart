@@ -328,13 +328,16 @@ class _Stamp extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Container(
+      key: const ValueKey('detail-stamp'),
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: accent ? scheme.primaryContainer : scheme.surfaceContainer,
         borderRadius: BorderRadius.circular(SwissRadius.pill),
       ),
-      child: Center(
+      child: Align(
+        alignment: Alignment.center,
+        widthFactor: 1,
         child: Text(
           label,
           style: SwissText.micro.copyWith(

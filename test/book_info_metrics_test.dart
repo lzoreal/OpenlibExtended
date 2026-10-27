@@ -47,5 +47,9 @@ void main() {
     expect(title.style!.fontSize, 16);
     expect(title.style!.height, closeTo(24 / 16, 0.0001));
     expect(title.style!.fontWeight, FontWeight.w800);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('detail-stamp'))).width,
+      lessThan(160),
+    );
   });
 }

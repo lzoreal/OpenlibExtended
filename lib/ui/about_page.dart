@@ -182,7 +182,9 @@ class _AboutChip extends StatelessWidget {
         color: scheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(SwissRadius.pill),
       ),
-      child: Center(
+      child: Align(
+        alignment: Alignment.center,
+        widthFactor: 1,
         child: Text(
           label,
           style: SwissText.micro.copyWith(
