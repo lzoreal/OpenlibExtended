@@ -3,12 +3,10 @@ import 'dart:io' show Platform;
 
 // Flutter imports:
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart'; // <-- REQUIRED
 
 // Package imports:
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:openlib/ui/home_page.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
@@ -21,7 +19,10 @@ import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 import 'package:openlib/services/update_checker.dart';
 import 'package:openlib/services/upgrade_detector.dart';
-import 'package:openlib/ui/mylibrary_page.dart';
+import 'package:openlib/ui/components/bottom_nav_bar.dart';
+import 'package:openlib/ui/components/content_width.dart';
+import 'package:openlib/ui/download_center_page.dart';
+import 'package:openlib/ui/motion.dart';
 import 'package:openlib/ui/search_page.dart';
 import 'package:openlib/ui/settings_page.dart';
 import 'package:openlib/ui/themes.dart';
@@ -38,11 +39,10 @@ import 'package:openlib/state/state.dart'
     show
         ThemeModeNotifier,
         selectedIndexProvider,
+        activeDownloadsProvider,
         themeModeProvider,
         fontSizeScaleProvider,
         localeOverrideProvider,
-        openPdfWithExternalAppProvider,
-        openEpubWithExternalAppProvider,
         showManualDownloadButtonProvider,
         backgroundVerificationProvider,
         userAgentProvider,
@@ -86,20 +86,6 @@ void main(List<String> args) async {
   } catch (e) {
     fontSizeScale = 1.0;
   }
-
-  bool openPdfwithExternalapp = await dataBase
-              .getPreference('openPdfwithExternalApp')
-              .catchError((e) => null) ==
-          0
-      ? false
-      : true;
-
-  bool openEpubwithExternalapp = await dataBase
-              .getPreference('openEpubwithExternalApp')
-              .catchError((e) => null) ==
-          0
-      ? false
-      : true;
 
   bool showManualDownloadButton = await dataBase
               .getPreference('showManualDownloadButton')
@@ -149,15 +135,19 @@ void main(List<String> args) async {
 
   // Load saved language override; empty or unknown values follow the
   // system locale.
-  final savedLocaleCode = await dataBase
-          .getPreference('locale')
-          .catchError((e) => '') as String? ??
-      '';
+  final savedLocaleCode =
+      await dataBase.getPreference('locale').catchError((e) => '') as String? ??
+          '';
   Locale? startLocale;
   final supported = AppLocalizations.supportedLocales;
   for (final locale in supported) {
     if (locale.languageCode == savedLocaleCode) startLocale = locale;
   }
+
+  // Download notifications are posted by a service without a BuildContext;
+  // give it the same locale the UI will resolve to.
+  DownloadManager().setLocale(
+      startLocale ?? WidgetsBinding.instance.platformDispatcher.locale);
 
   // Check onboarding status
   bool onboardingCompleted = await dataBase
@@ -200,10 +190,6 @@ void main(List<String> args) async {
             .overrideWith((ref) => ThemeModeNotifier(startThemeMode)),
         fontSizeScaleProvider.overrideWith((ref) => fontSizeScale),
         localeOverrideProvider.overrideWith((ref) => startLocale),
-        openPdfWithExternalAppProvider
-            .overrideWith((ref) => openPdfwithExternalapp),
-        openEpubWithExternalAppProvider
-            .overrideWith((ref) => openEpubwithExternalapp),
         showManualDownloadButtonProvider
             .overrideWith((ref) => showManualDownloadButton),
         backgroundVerificationProvider
@@ -303,11 +289,9 @@ class _MainScreenState extends ConsumerState<MainScreen>
   static const List<Widget> _widgetOptions = <Widget>[
     HomePage(),
     SearchPage(),
-    MyLibraryPage(),
+    DownloadCenterPage(),
     SettingsPage(),
   ];
-
-  bool _showExpandedHeader = true; // <-- ONLY new state
 
   @override
   void initState() {
@@ -402,7 +386,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
             AppLocalizations.of(context).enableNotifications,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.secondary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           content: Text(
@@ -445,7 +429,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 AppLocalizations.of(context).enable,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -455,85 +439,40 @@ class _MainScreenState extends ConsumerState<MainScreen>
     );
   }
 
+  void _selectTab(int index) {
+    ref.read(selectedIndexProvider.notifier).state = index;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final selectedIndex = ref.watch(selectedIndexProvider);
-    final l10n = AppLocalizations.of(context);
-
-    // Calculate proper header height including status bar on mobile
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-    final expandedHeaderHeight = PlatformUtils.isMobile
-        ? kToolbarHeight + statusBarHeight
-        : kToolbarHeight;
+    final downloadCount = (ref.watch(activeDownloadsProvider).valueOrNull ??
+            const <String, DownloadTask>{})
+        .values
+        .where((task) =>
+            task.status != DownloadStatus.completed &&
+            task.status != DownloadStatus.cancelled)
+        .length;
 
     return Scaffold(
-      body: NotificationListener<UserScrollNotification>(
-        onNotification: (notification) {
-          if (notification.direction == ScrollDirection.reverse &&
-              _showExpandedHeader) {
-            setState(() => _showExpandedHeader = false);
-          } else if (notification.direction == ScrollDirection.forward &&
-              !_showExpandedHeader) {
-            setState(() => _showExpandedHeader = true);
-          }
-          return false;
-        },
-        child: Column(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: _showExpandedHeader ? expandedHeaderHeight : 0,
-              child: AppBar(
-                toolbarHeight: kToolbarHeight,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                title: Text(l10n.appTitle),
-                titleTextStyle: Theme.of(context).textTheme.displayLarge,
-              ),
-            ),
-            Expanded(
+      body: SafeArea(
+        bottom: false,
+        child: ContentWidth(
+          child: AnimatedSwitcher(
+            duration: kPageSwitchDuration,
+            switchInCurve: kPageSwitchCurve,
+            switchOutCurve: Curves.easeIn,
+            child: KeyedSubtree(
+              key: ValueKey(selectedIndex),
               child: _widgetOptions.elementAt(selectedIndex),
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          // Allow bottom bar to be light in light mode
-          color: isDarkMode ? const Color(0xFF141414) : Colors.white,
-          child: GNav(
-            backgroundColor:
-                isDarkMode ? const Color(0xFF141414) : Colors.white,
-            haptic: true,
-            tabBorderRadius: 50,
-            tabActiveBorder: Border.all(
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            tabMargin: const EdgeInsets.fromLTRB(13, 12, 13, 12),
-            curve: Curves.fastLinearToSlowEaseIn,
-            duration: const Duration(milliseconds: 250),
-            gap: 8,
-            // Icons adapted for light/dark mode
-            color: isDarkMode ? Colors.white : Colors.black,
-            activeColor: Colors.white,
-            iconSize: 20,
-            tabBackgroundColor: Theme.of(context).colorScheme.secondary,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            tabs: [
-              GButton(
-                  icon: Icons.trending_up, text: l10n.navHome),
-              GButton(icon: Icons.search, text: l10n.navSearch),
-              GButton(
-                  icon: Icons.collections_bookmark,
-                  text: l10n.navMyLibrary), // Shortened text
-              GButton(icon: Icons.settings, text: l10n.navSettings),
-            ],
-            selectedIndex: selectedIndex,
-            onTabChange: (index) {
-              ref.read(selectedIndexProvider.notifier).state = index;
-            },
           ),
         ),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: selectedIndex,
+        onSelected: _selectTab,
+        downloadCount: downloadCount,
       ),
     );
   }
