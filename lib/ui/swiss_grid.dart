@@ -92,7 +92,8 @@ class GridMetrics {
   /// Width of the layout area, i.e. `LayoutBuilder`'s `maxWidth`.
   final double width;
 
-  double get column => (width -
+  double get column =>
+      (width -
           SwissGrid.margin * 2 -
           SwissGrid.gutter * (SwissGrid.columns - 1)) /
       SwissGrid.columns;
