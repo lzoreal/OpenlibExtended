@@ -188,7 +188,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 ### 5.1 搜索
 
-入口：首屏 `initialSearchProvider`（`lib/state/state.dart`）→ `SearchManager.watch()` 流式返回；分页走 `searchProvider` → `SearchManager.search()`（`lib/services/search_manager.dart`）。
+入口：首屏 `initialSearchProvider`（`lib/state/state.dart`）→ `SearchManager.watch()` 流式返回；分页走 `searchProvider` → `SearchManager.search()`（`lib/data/services/search_manager.dart`）。
 
 实际行为（重要）：
 
@@ -212,13 +212,13 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 | 作者/出版社 | ✅ `author:"…"` | ✅ `columns[]` | ❌ | ❌ |
 | 分页 | ✅ | ✅ | ✅ | ✅ |
 
-实现位置：AA `lib/services/annas_archieve.dart:612-687`；LibGen `lib/services/search_manager.dart:256-335`；Z-Library `lib/services/search_manager.dart:399-470`；WeLib `lib/services/search_manager.dart:900-983`。
+实现位置：AA `lib/data/services/annas_archieve.dart:612-687`；LibGen `lib/data/services/search_manager.dart:256-335`；Z-Library `lib/data/services/search_manager.dart:399-470`；WeLib `lib/data/services/search_manager.dart:900-983`。
 
 每页搜索结果用 `SearchPageKey(query, page)` 作为 provider family key 缓存（`lib/state/state.dart:385-433`）；结果页滚动到距底部 200px 加载下一页（`lib/ui/results_page.dart:82-110`）。
 
 ### 5.2 详情路由
 
-`routeBookDetail()`（`lib/services/book_detail_routing.dart:34-54`）按以下优先级决定由谁处理详情页：
+`routeBookDetail()`（`lib/data/services/book_detail_routing.dart:34-54`）按以下优先级决定由谁处理详情页：
 
 1. URL 含 `ads.php?md5=` → LibGen。
 2. URL 的 host 命中 open-slum.org 目录中的某个书源 → 对应书源。
@@ -235,10 +235,10 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 2. **Z-Library**：先 `resolveBookDownload()` 重新解析 `/dl/<id>`，处理 DiamWall、302 签名 CDN、204 死链；拿不到时保留镜像给出的拒绝原因（每日限额/需登录）。
 3. **WeLib**：`resolveDownload()` 解析 `a.js-partner-download-link` 或 `/fast_download`、`/auto_download`；保留 slow_download 页面用于过期后重新解析。
 4. **Anna's Archive**：若配置了 donation key，调用 `getFastDownloadUrl()` 获取直接下载地址。
-5. `chooseDownloadTarget()` 决定最终目标：只要拿到可用 URL 就用 URL；镜像明确拒绝且无 URL 时才显示拒绝原因（`lib/services/download_target.dart:38-47`）。
+5. `chooseDownloadTarget()` 决定最终目标：只要拿到可用 URL 就用 URL；镜像明确拒绝且无 URL 时才显示拒绝原因（`lib/data/services/download_target.dart:38-47`）。
 6. Linux 且非快速链接：打开可见 WebView 页抓镜像后入队（`lib/ui/book_info_page.dart:249-294`）；其他平台交给 `DownloadManager` 后台抓镜像。
 
-下载状态机（`lib/services/download_manager.dart:16-26`）：
+下载状态机（`lib/data/services/download_manager.dart:16-26`）：
 
 ```text
 queued → fetchingMirrors → downloadingMirrors → downloading → verifying → completed
@@ -247,7 +247,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 
 关键机制：
 
-- **镜像排序**：HTTPS/CDN 优先，IPFS 最后；丢弃已知死域名（`lib/services/download_manager.dart:190-204`）。
+- **镜像排序**：HTTPS/CDN 优先，IPFS 最后；丢弃已知死域名（`lib/data/services/download_manager.dart:190-204`）。
 - **同书去重**：同一 `md5` 只允许一个进行中的任务，避免写同一文件互相破坏（`:241-264`）。
 - **断点续传**：文件已存在则发 `Range: bytes=N-`；服务端忽略 Range 返回 200 时截断重下；416 视为已完成（`:781-899`）。
 - **重试**：429/500/502/503/504/超时/连接错误在同一镜像上退避重试，最多 3 次；403 等永久错误直接换镜像（`:227-236,654-732`）。
@@ -255,28 +255,28 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 - **完成**：校验 MD5（`:206-221`）→ 写入 `mybooks` → 状态 completed → 30 秒后从活动列表移除（`:926-986`）。
 - **中断恢复**：回到前台时恢复 paused/failed 任务；failed 任务保留部分文件以 Range 续传（`:436-482`）。
 
-> 任务队列**只在内存**（`lib/services/download_manager.dart:144`），进程被杀后任务列表丢失，不会自动续传；只有进程存活期间的暂停/失败可恢复。
+> 任务队列**只在内存**（`lib/data/services/download_manager.dart:144`），进程被杀后任务列表丢失，不会自动续传；只有进程存活期间的暂停/失败可恢复。
 
 ### 5.4 镜像与反爬
 
-**镜像目录**：唯一硬编码 URL 是 `https://open-slum.org`（`lib/services/slum_catalogue.dart:166`）。四个页面分别提供 AA/LibGen/Z-Library/WeLib 镜像列表（`:171-177`），内存缓存 10 分钟并持久化到偏好 `slum_catalogue_cache`（`:188-190,434-475`）。SLUM 不可达且无缓存时返回空列表，应用报告“无镜像”，不会猜地址。
+**镜像目录**：唯一硬编码 URL 是 `https://open-slum.org`（`lib/data/services/slum_catalogue.dart:166`）。四个页面分别提供 AA/LibGen/Z-Library/WeLib 镜像列表（`:171-177`），内存缓存 10 分钟并持久化到偏好 `slum_catalogue_cache`（`:188-190,434-475`）。SLUM 不可达且无缓存时返回空列表，应用报告“无镜像”，不会猜地址。
 
 **排序**（`InstanceManager` + `SlumCatalogue.sortAuto`）：
 
-- 自动模式：DOWN 永远最后且永不尝试；有新鲜本机测速结果的节点优先，按本机延迟升序；未测节点按保护难度 `none → diamwall → ddosGuard → cloudflare → unknown`，再按 SLUM 状态、延迟排序（`lib/services/slum_catalogue.dart`）。
-- 本机测速：`lib/services/mirror_latency.dart` 只测启用且非 DOWN 节点，HEAD → GET 回退、TTFB、6s 超时、4 并发；`InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时。过期结果继续显示“已过期”，但排序回退 SLUM（`lib/services/instance_manager.dart`）。
-- 手动模式：用户排序优先，未排序的接在自动顺序后面（`lib/services/instance_manager.dart:183-214`）。
-- 用户可单独禁用镜像；`enabledUrls()` 同时过滤 DOWN、用户禁用、以及 `headlessOnly` 时不可无头解决的镜像（`lib/services/instance_manager.dart:223-233`）。
+- 自动模式：DOWN 永远最后且永不尝试；有新鲜本机测速结果的节点优先，按本机延迟升序；未测节点按保护难度 `none → diamwall → ddosGuard → cloudflare → unknown`，再按 SLUM 状态、延迟排序（`lib/data/services/slum_catalogue.dart`）。
+- 本机测速：`lib/data/services/mirror_latency.dart` 只测启用且非 DOWN 节点，HEAD → GET 回退、TTFB、6s 超时、4 并发；`InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时。过期结果继续显示“已过期”，但排序回退 SLUM（`lib/data/services/instance_manager.dart`）。
+- 手动模式：用户排序优先，未排序的接在自动顺序后面（`lib/data/services/instance_manager.dart:183-214`）。
+- 用户可单独禁用镜像；`enabledUrls()` 同时过滤 DOWN、用户禁用、以及 `headlessOnly` 时不可无头解决的镜像（`lib/data/services/instance_manager.dart:223-233`）。
 
 **过盾链**：
 
 - AA / WeLib 的 Cloudflare / DDoS-Guard：Dio 先抓，识别到挑战 → `WebviewChallengeSolver.fetchHtmlAfterChallenge()`。
-  - 移动：headless WebView 60 秒；失败回退到可见 `ChallengeSolverPage`（`lib/services/webview_challenge_solver.dart:102-128`）。
+  - 移动：headless WebView 60 秒；失败回退到可见 `ChallengeSolverPage`（`lib/data/services/webview_challenge_solver.dart:102-128`）。
   - 可见回退页：先显示全屏“正在验证访问权限”加载态（盾牌 + 进度），加载完成后切换为顶部“需要手动验证”提示 + 可交互 WebView；右上角刷新可重试（`lib/ui/challenge_solver_page.dart`）。
   - 桌面：`desktop_webview_window` 可见窗口 3 分钟（`:244-314`）。
-  - 成功后 HTML 存入 `ChallengeHtmlCache`，TTL 10 分钟（`lib/services/challenge_html_cache.dart:20-48`），后续解析直接命中缓存。
-- Z-Library DiamWall：解析 503 页面里的 seed，本地暴力 `SHA1(seed+i)` 求目标前缀，拿到 cookie 后重试（`lib/services/diamwall_solver.dart:41-111`）。
-- **cookie 不回灌 Dio**：DDoS 清除态绑定浏览器 TLS 指纹，存下来的 cookie 对纯 HTTP 客户端无效（`lib/services/ddos_protection_handler.dart:8-11`、`lib/services/annas_archieve.dart:286-288`）。
+  - 成功后 HTML 存入 `ChallengeHtmlCache`，TTL 10 分钟（`lib/data/services/challenge_html_cache.dart:20-48`），后续解析直接命中缓存。
+- Z-Library DiamWall：解析 503 页面里的 seed，本地暴力 `SHA1(seed+i)` 求目标前缀，拿到 cookie 后重试（`lib/data/services/diamwall_solver.dart:41-111`）。
+- **cookie 不回灌 Dio**：DDoS 清除态绑定浏览器 TLS 指纹，存下来的 cookie 对纯 HTTP 客户端无效（`lib/data/services/ddos_protection_handler.dart:8-11`、`lib/data/services/annas_archieve.dart:286-288`）。
 
 ### 5.5 阅读
 
@@ -292,13 +292,13 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 - 筛选：全部 / 进行中 / 已完成 / 失败；顶部支持全部暂停 / 全部继续。
 - 已完成行点击进入书籍详情，“打开”按钮才调用外部阅读器；也可分享、在文件夹中显示（桌面）或删除记录；删除记录不删除本地文件。
 - 已移除书库专属功能：标签、阅读状态筛选、9 种排序、书库搜索、磁盘同步入口。数据库 schema 与书籍详情保持不变（`bookposition` 表保留用于备份兼容）。
-- 存储位置在“设置 → 高级 → 通用”中；切换目录会移动 pdf/epub/cbr/cbz 文件（目标已存在则保留源文件），然后扫描导入（`lib/ui/settings_page.dart`、`lib/services/files.dart`）。
+- 存储位置在“设置 → 高级 → 通用”中；切换目录会移动 pdf/epub/cbr/cbz 文件（目标已存在则保留源文件），然后扫描导入（`lib/ui/settings_page.dart`、`lib/data/services/files.dart`）。
 
 ### 5.7 备份、更新、日志
 
-- 备份：导出 `preferences`、`mybooks`、`bookposition`、`browserOptions`、`booktags` 全表的 JSON（`format: openlib-backup` v1），不含书籍文件；恢复时单事务逐表删除+插入（`lib/services/backup_service.dart`）。
-- 更新：GitHub Releases API（`lzoreal/OpenlibExtended`）；比较版本、可选预发布；下载后 Android 三级安装回退（`open_file` → `apk_sideload` → `android_package_installer`），Windows/Linux 启动安装包（`lib/services/update_checker.dart:130-970`）。
-- 日志：内存环形队列（10000 条 / 2 小时），自动脱敏 authorization/cookie/token，正文截断 500 字符；设置页可导出分享（`lib/services/logger.dart`）。
+- 备份：导出 `preferences`、`mybooks`、`bookposition`、`browserOptions`、`booktags` 全表的 JSON（`format: openlib-backup` v1），不含书籍文件；恢复时单事务逐表删除+插入（`lib/data/services/backup_service.dart`）。
+- 更新：GitHub Releases API（`lzoreal/OpenlibExtended`）；比较版本、可选预发布；下载后 Android 三级安装回退（`open_file` → `apk_sideload` → `android_package_installer`），Windows/Linux 启动安装包（`lib/data/services/update_checker.dart:130-970`）。
+- 日志：内存环形队列（10000 条 / 2 小时），自动脱敏 authorization/cookie/token，正文截断 500 字符；设置页可导出分享（`lib/data/services/logger.dart`）。
 
 ---
 
@@ -306,7 +306,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 
 ### 6.1 SQLite schema v7
 
-定义在 `lib/services/database.dart:81-172`：
+定义在 `lib/data/services/database.dart:81-172`：
 
 | 表 | 主键 | 用途 |
 |---|---|---|
@@ -316,7 +316,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 | `browserOptions` | `name` | `userAgent`、`cookie`、按域 cookie |
 | `booktags` | `(bookId, tag)` | 旧书库标签（schema 保留兼容，UI 不再使用） |
 
-数据库位置：桌面 `getApplicationSupportDirectory()`，移动 `getDatabasesPath()`（`lib/services/database.dart:81-93`）。桌面需先初始化 FFI（`lib/main.dart:66-69`）。
+数据库位置：桌面 `getApplicationSupportDirectory()`，移动 `getDatabasesPath()`（`lib/data/services/database.dart:81-93`）。桌面需先初始化 FFI（`lib/main.dart:66-69`）。
 
 ### 6.2 偏好键
 
@@ -332,7 +332,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 | 镜像 | `instance_auto_mode`、`instance_manual_order`、`instance_disabled_hosts`、`instance_local_latency`、`slum_catalogue_cache` |
 | 浏览器 | `browserOptions.userAgent`、`browserOptions.cookie`、`browserOptions.cookies_<domain>` |
 
-注意：`getPreference()` 会把能解析为整数的值返回为 `int`，否则返回 `String`；键不存在时**抛异常**，调用方普遍依赖 `.catchError` 兜底（`lib/services/database.dart:391-408`）。`savePreference()` 只接受 `bool/int/String`，bool 自动转 0/1（`:373-389`）。
+注意：`getPreference()` 会把能解析为整数的值返回为 `int`，否则返回 `String`；键不存在时**抛异常**，调用方普遍依赖 `.catchError` 兜底（`lib/data/services/database.dart:391-408`）。`savePreference()` 只接受 `bool/int/String`，bool 自动转 0/1（`:373-389`）。
 
 ---
 
@@ -341,14 +341,14 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 | 能力 | Android | iOS | Windows | Linux | macOS |
 |---|---|---|---|---|---|
 | 内置 WebView | ✅ headless + 可见 | ✅ headless + 可见 | ✅ 桌面窗口 / headless 抓取 | ✅ 桌面窗口（需 WebKitGTK 4.1） | ✅ 桌面窗口 |
-| 后台 headless 抓镜像 | ✅ | ✅ | ✅（代码未禁用，依赖 WebView2） | ❌ 返回空，走手动 WebView（`lib/services/mirror_fetcher.dart:25-28`） | ✅（代码未禁用） |
+| 后台 headless 抓镜像 | ✅ | ✅ | ✅（代码未禁用，依赖 WebView2） | ❌ 返回空，走手动 WebView（`lib/data/services/mirror_fetcher.dart:25-28`） | ✅（代码未禁用） |
 | 下载通知 | ✅ | ❌ 服务仅 Android 初始化 | ❌ | ❌ | ❌ |
 | TTS | ✅ | ✅ | ❌ | ❌ | ❌ |
 | 外部 PDF/EPUB 阅读 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 应用内更新安装 | ✅ APK | ❌（打开 IPA 也无法安装） | ✅ EXE | ✅ AppImage | ❌ 未构建 |
 | 发布产物 | 通用/分 ABI APK | 未签名 IPA | Inno Setup EXE | AppImage + tar.gz | 无 |
 
-平台判断集中在 `lib/services/platform_utils.dart`；但过盾求解器还额外用 `WebviewChallengeSolver.isSupported`（移动或桌面，`lib/services/webview_challenge_solver.dart:38-39`）。
+平台判断集中在 `lib/data/services/platform_utils.dart`；但过盾求解器还额外用 `WebviewChallengeSolver.isSupported`（移动或桌面，`lib/data/services/webview_challenge_solver.dart:38-39`）。
 
 ---
 
@@ -402,25 +402,25 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 
 按影响排序，均可在代码中复核：
 
-1. **下载队列不持久化**：`_activeDownloads` 是内存 Map（`lib/services/download_manager.dart:144`），进程被杀后任务全丢；`resumeInterruptedDownloads()` 只能恢复仍在本进程内的 paused/failed 任务（`:436-459`）。Android 没有前台 Service，退后台可能被挂起。
-2. **应用内更新无完整性校验**：只检查文件存在且 ≥10240 字节，没有 SHA-256/签名校验（`lib/services/update_checker.dart:566-585`）；Android 更新还固定优先 arm64，不检查设备 ABI（`:310-314`）。
+1. **下载队列不持久化**：`_activeDownloads` 是内存 Map（`lib/data/services/download_manager.dart:144`），进程被杀后任务全丢；`resumeInterruptedDownloads()` 只能恢复仍在本进程内的 paused/failed 任务（`:436-459`）。Android 没有前台 Service，退后台可能被挂起。
+2. **应用内更新无完整性校验**：只检查文件存在且 ≥10240 字节，没有 SHA-256/签名校验（`lib/data/services/update_checker.dart:566-585`）；Android 更新还固定优先 arm64，不检查设备 ABI（`:310-314`）。
 3. **版本号双轨**：`pubspec.yaml:19` 是 1.0.11+14，发布版本由 CI 注入；本地构建、About 页、更新比较都可能受旧版本号影响。
 4. **“自动更新”开关无效**：Onboarding 写入 `enableAutoUpdate`（`lib/ui/onboarding/onboarding_page.dart:106`），但没有任何代码读取它；启动时总会检查更新（`lib/main.dart:357-367`）。真正生效的是 `includePrereleaseUpdates`。
 5. **搜索是并行聚合**：所有启用书源同时查询，按配置顺序合并并跨源去重；结果页用来源卡片切换单源视图。新增书源时不要把 UI 假设改回“顺序兜底、首个命中即停”。
-6. **Z-Library 下载 MD5 校验必然失败**：Z-Library 的 `md5` 字段实际是 `/book/<id>` 的书籍 id（`lib/services/search_manager.dart:511-514`），`_verifyFileCheckSum` 拿它和文件 MD5 比较必然不等（`lib/services/download_manager.dart:206-221`），完成通知可能显示 “checksum failed”，但文件仍会入库。
-7. **文件名清洗丢弃非 ASCII**：`removeSpecialChars` 删除所有非 ASCII（`lib/services/files.dart:24-31`），纯中文标题会退化为 md5 前 8 位；且文件名没有唯一后缀，同标题/同格式的书可能互相覆盖（`:17-108`）。
-8. **分类页解析器有明显笔误**：`img"]` 选择器与 `attributes['herf']`（应为 `href`）导致分类内容解析为空或抛错（`lib/services/goodreads.dart:40-44`）；分类列表本身是 28 个硬编码分类和远程封面。
+6. **Z-Library 下载 MD5 校验必然失败**：Z-Library 的 `md5` 字段实际是 `/book/<id>` 的书籍 id（`lib/data/services/search_manager.dart:511-514`），`_verifyFileCheckSum` 拿它和文件 MD5 比较必然不等（`lib/data/services/download_manager.dart:206-221`），完成通知可能显示 “checksum failed”，但文件仍会入库。
+7. **文件名清洗丢弃非 ASCII**：`removeSpecialChars` 删除所有非 ASCII（`lib/data/services/files.dart:24-31`），纯中文标题会退化为 md5 前 8 位；且文件名没有唯一后缀，同标题/同格式的书可能互相覆盖（`:17-108`）。
+8. **分类页解析器有明显笔误**：`img"]` 选择器与 `attributes['herf']`（应为 `href`）导致分类内容解析为空或抛错（`lib/data/services/goodreads.dart:40-44`）；分类列表本身是 28 个硬编码分类和远程封面。
 9. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`、用 `Platform` 分支（`lib/main.dart:2,59,66`），README 仍把 Web 列为 roadmap。
 10. **macOS 未进入发布流程**：有工程与 Podfile，但 CI 没有 macOS job，README Roadmap 仍列 “MacOs release”。
 11. **iOS 最低版本配置不一致**：Xcode 工程 deployment target 12.0，Podfile 强制 15.0（`ios/Podfile:8`）；CI 用 `nm` 检查 iOS 17-only Swift 符号作为回归护栏（`.github/workflows/build.yml:225-246`）。修改依赖/Pod 时要保持 Podfile 与工程一致。
-12. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/services/mirror_fetcher.dart:25-28`），详情页因此走可见 WebView 手动流程（`lib/ui/book_info_page.dart:249-294`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
-13. **通知能力仅 Android**：`DownloadNotificationService` 只在 Android 初始化；通知点击目前只 `debugPrint`，不会打开应用/任务（`lib/services/download_notification.dart:56-82`）。
+12. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/data/services/mirror_fetcher.dart:25-28`），详情页因此走可见 WebView 手动流程（`lib/ui/book_info_page.dart:249-294`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
+13. **通知能力仅 Android**：`DownloadNotificationService` 只在 Android 初始化；通知点击目前只 `debugPrint`，不会打开应用/任务（`lib/data/services/download_notification.dart:56-82`）。
 14. **备份不含书籍文件**：仅备份数据库表，换机后需自行迁移书籍目录。
 15. **本地化覆盖**：5 个语言、531 个 key，测试强制五份 ARB key 完全一致（`test/localization_test.dart:31-52`）；仍有少量硬编码英文（如设置页部分说明、实例页）。
 16. **依赖锁有明确原因，不要随意升级**：`html` 0.15.6、`permission_handler_android` 13.0.1、`sqlite3_flutter_libs` 0.5.42 都是为兼容当前 Flutter/插件而钉死的（`pubspec.yaml:39-92`）。
 17. **年份筛选硬编码到 2025**：`yearValues` 列表没有 2026（`lib/state/state.dart:128-147`），跨年后需要更新。
-18. **`MirrorFetcherService` 错误路径不释放 WebView**：超时/异常返回时没有 `dispose()`（`lib/services/mirror_fetcher.dart:95-112`），长期运行可能泄漏。
-19. **`setCompleted` 仍会清空阅读位置**：标记完成时以 `position: ''` 覆盖同一行（`lib/services/database.dart:314-320`）；内置阅读器已删除，应用内不再写入阅读位置，但旧数据/备份仍可能包含。
+18. **`MirrorFetcherService` 错误路径不释放 WebView**：超时/异常返回时没有 `dispose()`（`lib/data/services/mirror_fetcher.dart:95-112`），长期运行可能泄漏。
+19. **`setCompleted` 仍会清空阅读位置**：标记完成时以 `position: ''` 覆盖同一行（`lib/data/services/database.dart:314-320`）；内置阅读器已删除，应用内不再写入阅读位置，但旧数据/备份仍可能包含。
 
 ---
 
@@ -428,9 +428,9 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 
 ### 新增一个书源
 
-1. 在 `SearchProviderId` 增加枚举，并实现 `SearchProvider`（`lib/services/search_manager.dart:22-36`）。
+1. 在 `SearchProviderId` 增加枚举，并实现 `SearchProvider`（`lib/data/services/search_manager.dart:22-36`）。
 2. 在 `SearchManager` 默认 provider 列表注册；顺序决定合并优先级与默认视图。
-3. 在 `MirrorService` / SLUM 页面映射中确认镜像归属（`lib/services/slum_catalogue.dart:22-30,171-177`）。
+3. 在 `MirrorService` / SLUM 页面映射中确认镜像归属（`lib/data/services/slum_catalogue.dart:22-30,171-177`）。
 4. 在 `routeBookDetail` 中加入详情路由规则（优先用目录 host，其次 URL 形状）。
 5. 在 `lib/ui/book_info_page.dart` 增加下载目标解析分支，必要时实现 `linkRefresher`。
 6. 设置页书源开关、ARB 文案、解析器测试、下载测试。
@@ -471,19 +471,19 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 |---|---|
 | 启动、导航、主题 | `lib/main.dart` |
 | 所有全局状态/数据源 | `lib/state/state.dart` |
-| 搜索与书源 | `lib/services/search_manager.dart` |
-| Anna's Archive | `lib/services/annas_archieve.dart` |
-| 镜像目录 | `lib/services/slum_catalogue.dart`、`lib/services/instance_manager.dart` |
-| 下载 | `lib/services/download_manager.dart`、`lib/services/download_target.dart` |
-| 过盾 | `lib/services/webview_challenge_solver.dart`、`lib/services/diamwall_solver.dart` |
-| 数据库 | `lib/services/database.dart` |
-| 文件/目录/同步 | `lib/services/files.dart` |
+| 搜索与书源 | `lib/data/services/search_manager.dart` |
+| Anna's Archive | `lib/data/services/annas_archieve.dart` |
+| 镜像目录 | `lib/data/services/slum_catalogue.dart`、`lib/data/services/instance_manager.dart` |
+| 下载 | `lib/data/services/download_manager.dart`、`lib/data/services/download_target.dart` |
+| 过盾 | `lib/data/services/webview_challenge_solver.dart`、`lib/data/services/diamwall_solver.dart` |
+| 数据库 | `lib/data/services/database.dart` |
+| 文件/目录/同步 | `lib/data/services/files.dart` |
 | 详情页与下载按钮 | `lib/ui/book_info_page.dart` |
-| 下载中心 | `lib/ui/download_center_page.dart`、`lib/services/download_manager.dart` |
+| 下载中心 | `lib/ui/download_center_page.dart`、`lib/data/services/download_manager.dart` |
 | 搜索结果与来源切换 | `lib/ui/results_page.dart`、`lib/ui/components/source_journey_card.dart`、`lib/state/state.dart`（`initialSearchProvider`） |
 | 外部阅读入口 | `lib/ui/components/file_buttons_widget.dart` |
 | 设置 | `lib/ui/settings_page.dart` |
-| 更新 | `lib/services/update_checker.dart` |
+| 更新 | `lib/data/services/update_checker.dart` |
 | CI/发布 | `.github/workflows/build.yml`、`tool/update_scoop_manifest.py` |
 | 测试约定 | `test/*_test.dart`、`analysis_options.yaml` |
 
