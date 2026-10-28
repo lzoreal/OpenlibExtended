@@ -15,7 +15,7 @@ OpenlibExtended 是一个 Flutter 跨平台电子书客户端，从 Anna's Archi
 | Dart 包名 | `openlib`（`pubspec.yaml:1`） |
 | Android applicationId | `dev.wath.openlibextended`（`android/app/build.gradle:18,34`） |
 | 许可证 | AGPL-3.0 |
-| 状态管理 | ChangeNotifier ViewModel + get_it（W7 移除 Riverpod） |
+| 状态管理 | ChangeNotifier ViewModel + get_it（无 Riverpod） |
 | 网络 | Dio + `package:html` 解析 HTML |
 | 本地存储 | SQLite（`sqflite` / 桌面 `sqflite_common_ffi`） |
 | 阅读 | 仅外部阅读器（系统/第三方应用）；不包含内置阅读器与 TTS 依赖 |

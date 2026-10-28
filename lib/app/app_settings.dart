@@ -7,8 +7,8 @@ import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/database.dart';
 
-/// Startup values that used to be passed as ProviderScope overrides.
-/// Pages listen to this instead of receiving a fresh override list.
+/// Startup values shared by the shell and every page. Pages hold a
+/// ViewModel that listens to this instead of receiving override lists.
 class AppSettings extends ChangeNotifier {
   AppSettings({
     required this.themeMode,

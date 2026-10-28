@@ -15,7 +15,7 @@ import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/search_manager.dart';
-import 'package:openlib/state/results_pager.dart';
+import 'package:openlib/ui/features/results/view_models/results_pager.dart';
 import 'package:openlib/ui/core/filter_options.dart';
 import 'package:openlib/ui/core/components/book_card_widget.dart'
     show getFileType, getLanguage;

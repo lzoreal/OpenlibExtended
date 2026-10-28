@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 // Project imports:
 import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/models/search_result.dart';
-import 'package:openlib/state/results_pager.dart';
+import 'package:openlib/ui/features/results/view_models/results_pager.dart';
 
 List<BookData> _books(String tag, int page, int count) {
   return List.generate(

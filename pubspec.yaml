@@ -33,7 +33,6 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
-  flutter_riverpod: ^2.3.6
 
   dio: ^5.4.0
   # The scrapers build against the html 0.15.x DOM API; run every parser
