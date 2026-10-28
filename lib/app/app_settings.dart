@@ -20,6 +20,9 @@ class AppSettings extends ChangeNotifier {
     required this.userAgent,
     required this.cookie,
     required this.filters,
+    this.searchAuthor = '',
+    this.searchPublisher = '',
+    this.filtersEnabled = true,
   });
 
   ThemeMode themeMode;
@@ -31,6 +34,9 @@ class AppSettings extends ChangeNotifier {
   String userAgent;
   String cookie;
   SearchFilters filters;
+  String searchAuthor;
+  String searchPublisher;
+  bool filtersEnabled;
 
   static Future<AppSettings> load({
     required ThemeMode initialThemeMode,
@@ -135,6 +141,59 @@ class AppSettings extends ChangeNotifier {
 
   void setFilters(SearchFilters value) {
     filters = value;
+    notifyListeners();
+  }
+
+  void setFilter(SearchFilterKind kind, String value) {
+    final current = switch (kind) {
+      SearchFilterKind.type => filters.type,
+      SearchFilterKind.sort => filters.sort,
+      SearchFilterKind.fileType => filters.fileType,
+      SearchFilterKind.language => filters.language,
+      SearchFilterKind.year => filters.year,
+    };
+    if (current == value) return;
+    filters = switch (kind) {
+      SearchFilterKind.type => filters.copyWith(type: value),
+      SearchFilterKind.sort => filters.copyWith(sort: value),
+      SearchFilterKind.fileType => filters.copyWith(fileType: value),
+      SearchFilterKind.language => filters.copyWith(language: value),
+      SearchFilterKind.year => filters.copyWith(year: value),
+    };
+    notifyListeners();
+  }
+
+  void resetSearchFilters() {
+    const defaults = SearchFilters();
+    final unchanged = filters.type == defaults.type &&
+        filters.sort == defaults.sort &&
+        filters.fileType == defaults.fileType &&
+        filters.language == defaults.language &&
+        filters.year == defaults.year &&
+        searchAuthor.isEmpty &&
+        searchPublisher.isEmpty;
+    if (unchanged) return;
+    filters = defaults;
+    searchAuthor = '';
+    searchPublisher = '';
+    notifyListeners();
+  }
+
+  void setSearchAuthor(String value) {
+    if (searchAuthor == value) return;
+    searchAuthor = value;
+    notifyListeners();
+  }
+
+  void setSearchPublisher(String value) {
+    if (searchPublisher == value) return;
+    searchPublisher = value;
+    notifyListeners();
+  }
+
+  void setFiltersEnabled(bool value) {
+    if (filtersEnabled == value) return;
+    filtersEnabled = value;
     notifyListeners();
   }
 }

@@ -5,43 +5,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
+import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/search_filters.dart';
-import 'package:openlib/data/repositories/preferences_repository.dart';
-import 'package:openlib/data/services/google_suggest_api.dart';
-import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/models/trending_book_data.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
-import 'package:openlib/data/services/recent_searches.dart';
-import 'package:openlib/state/repository_providers.dart'
-    show mirrorRepositoryProvider;
+import 'package:openlib/data/services/mirror_latency_controller.dart';
 import 'package:openlib/state/state.dart'
-    show
-        enableFiltersState,
-        fileType,
-        getTrendingBooks,
-        languageValues,
-        mirrorLatencyProvider,
-        searchAuthorProvider,
-        searchProviderToggles,
-        searchSourceOrderProvider,
-        searchPublisherProvider,
-        searchQueryProvider,
-        selectedFileTypeState,
-        selectedIndexProvider,
-        selectedLanguageState,
-        selectedSortState,
-        selectedSourceState,
-        selectedTypeState,
-        selectedYearState,
-        shouldShowMirrorLatencyHint,
-        sortValues,
-        typeValues,
-        yearValues;
+    show fileType, languageValues, sortValues, typeValues, yearValues;
 import 'package:openlib/ui/core/components/active_downloads_widget.dart';
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
+import 'package:openlib/ui/features/search/view_models/search_view_model.dart';
 import 'package:openlib/ui/features/search/widgets/edge_fade.dart';
 import 'package:openlib/ui/core/components/inline_hint.dart';
 import 'package:openlib/ui/features/search/widgets/mirror_latency_hint.dart';
@@ -53,67 +27,65 @@ import 'package:openlib/ui/features/results/views/results_page.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
 import 'package:openlib/ui/core/components/snack_bar_widget.dart';
 
-final searchSuggestionProvider = StateProvider<List<String>>((ref) => []);
-final suggestionsLoadingProvider = StateProvider<bool>((ref) => false);
-final googleSuggestApiProvider =
-    Provider<GoogleSuggestApi>((ref) => GoogleSuggestApi());
-
 enum _SearchMode { suggestions, advanced }
 
-class SearchPage extends ConsumerStatefulWidget {
-  const SearchPage({super.key});
+class SearchPage extends StatefulWidget {
+  const SearchPage({super.key, this.viewModel, this.onManageSources});
+
+  /// Tests inject their own instance; the app resolves the shared one.
+  final SearchViewModel? viewModel;
+  final VoidCallback? onManageSources;
 
   @override
-  ConsumerState<SearchPage> createState() => _SearchPageState();
+  State<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends ConsumerState<SearchPage>
+class _SearchPageState extends State<SearchPage>
     with SingleTickerProviderStateMixin {
-  Timer? _debounce;
+  late final SearchViewModel _vm;
+  late final bool _ownsVm;
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
   late final TabController _modeController;
-  int _suggestionRequest = 0;
   _SearchMode _mode = _SearchMode.suggestions;
   bool _mirrorTestStarting = false;
 
   @override
   void initState() {
     super.initState();
+    _vm = widget.viewModel ?? getIt<SearchViewModel>();
+    _ownsVm = widget.viewModel == null;
     _modeController = TabController(
       length: _SearchMode.values.length,
       vsync: this,
       initialIndex: _mode.index,
     );
     _modeController.addListener(_syncMode);
-    _searchController =
-        TextEditingController(text: ref.read(searchQueryProvider));
+    _searchController = TextEditingController(text: _vm.query);
     _searchFocusNode = FocusNode();
-    unawaited(ref.read(mirrorLatencyProvider.notifier).load());
-    ref.listenManual(searchQueryProvider, (previous, next) {
-      if (_searchController.text != next) {
-        _searchController.text = next;
-        _searchController.selection =
-            TextSelection.fromPosition(TextPosition(offset: next.length));
-      }
-    });
+    _vm.addListener(_syncController);
+    unawaited(_vm.load());
+  }
+
+  // The search bar owns the caret while typing, so only adopt the query when
+  // something else (submit, clear, restore) changed it.
+  void _syncController() {
+    final query = _vm.query;
+    if (_searchController.text == query) return;
+    _searchController.text = query;
+    _searchController.selection =
+        TextSelection.fromPosition(TextPosition(offset: query.length));
   }
 
   Future<void> _runMirrorLatencyTest() async {
-    if (_mirrorTestStarting || ref.read(mirrorLatencyProvider).testing) {
+    if (_mirrorTestStarting || _vm.mirrorLatency.testing) {
       return;
     }
     _mirrorTestStarting = true;
 
     final l10n = AppLocalizations.of(context);
     try {
-      final repository = ref.read(mirrorRepositoryProvider);
-      final views = <InstanceView>[];
-      for (final service in MirrorService.values) {
-        views.addAll(await repository.instances(service));
-      }
-
-      final result = await ref.read(mirrorLatencyProvider.notifier).test(views);
+      final result = await _vm.testMirrorLatency();
       if (!mounted) return;
       final message = result.total == 0
           ? l10n.mirrorLatencyNoTargets
@@ -145,65 +117,23 @@ class _SearchPageState extends ConsumerState<SearchPage>
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _suggestionRequest++;
+    _vm.removeListener(_syncController);
+    if (_ownsVm) {
+      _vm.dispose();
+    }
     _modeController.dispose();
     _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchSuggestions(String query) async {
-    final clean = query.trim();
-    if (clean.isEmpty) return;
-    final request = ++_suggestionRequest;
-    ref.read(suggestionsLoadingProvider.notifier).state = true;
-    final real =
-        await ref.read(googleSuggestApiProvider).fetchSuggestions(clean);
-    if (!mounted || request != _suggestionRequest) return;
-    final cleaned = real
-        .where((suggestion) =>
-            suggestion != 'Suggestion Error' &&
-            suggestion != 'Network Error' &&
-            suggestion.trim().isNotEmpty)
-        .toSet()
-        .toList(growable: false);
-    ref.read(searchSuggestionProvider.notifier).state = cleaned;
-    ref.read(suggestionsLoadingProvider.notifier).state = false;
-  }
-
-  void _scheduleSuggestions(String value, {bool immediate = false}) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    if (value.trim().isEmpty) {
-      _suggestionRequest++;
-      ref.read(searchSuggestionProvider.notifier).state = [];
-      ref.read(suggestionsLoadingProvider.notifier).state = false;
-      return;
-    }
-    if (immediate) {
-      unawaited(_fetchSuggestions(value));
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 420), () {
-      unawaited(_fetchSuggestions(value));
-    });
-  }
-
   void _onSearchQueryChanged(String value) {
-    ref.read(searchQueryProvider.notifier).state = value;
-    if (value.trim().isEmpty) {
-      _scheduleSuggestions('');
-    } else {
-      // Drop suggestions from the previous query before the new ones arrive.
-      ref.read(searchSuggestionProvider.notifier).state = [];
-      _scheduleSuggestions(value);
-    }
+    _vm.updateQuery(value);
   }
 
   void _clearQuery() {
     _searchController.clear();
-    ref.read(searchQueryProvider.notifier).state = '';
-    _scheduleSuggestions('');
+    _vm.clearQuery();
     _searchFocusNode.requestFocus();
   }
 
@@ -218,9 +148,10 @@ class _SearchPageState extends ConsumerState<SearchPage>
     }
   }
 
-  void _submit([String? value]) {
-    final query = (value ?? ref.read(searchQueryProvider))!.trim();
-    if (query.isEmpty) {
+  Future<void> _submit([String? value]) async {
+    final query = await _vm.prepareSearch(value);
+    if (!mounted) return;
+    if (query == null) {
       showSnackBar(
           context: context,
           message: AppLocalizations.of(context).searchEmptyQuery);
@@ -230,22 +161,13 @@ class _SearchPageState extends ConsumerState<SearchPage>
       _searchFocusNode.requestFocus();
       return;
     }
-    _debounce?.cancel();
-    _suggestionRequest++;
-    _searchController.text = query;
-    _searchController.selection =
-        TextSelection.fromPosition(TextPosition(offset: query.length));
-    ref.read(searchQueryProvider.notifier).state = query;
-    ref.read(recentSearchesProvider.notifier).record(query);
-    ref.read(enableFiltersState.notifier).state = true;
+    _syncController();
     _searchFocusNode.unfocus();
 
-    final selected = ref.read(selectedSourceState);
-    final enabled = ref.read(searchProviderToggles).valueOrNull;
-    final source =
-        selected != null && (enabled == null || enabled.contains(selected))
-            ? selected
-            : null;
+    final selected = _vm.selectedSource;
+    final source = selected != null && _vm.enabledProviders.contains(selected)
+        ? selected
+        : null;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -254,191 +176,171 @@ class _SearchPageState extends ConsumerState<SearchPage>
     );
   }
 
-  Future<void> _persistFilterDefaults() async {
-    try {
-      await PreferencesRepository().resetSearchFilters();
-    } catch (_) {
-      // The in-memory filters are already reset; persistence is best-effort.
-    }
-  }
-
   void _resetFilters() {
-    ref.read(selectedTypeState.notifier).state = 'All';
-    ref.read(selectedSortState.notifier).state = 'Most Relevant';
-    ref.read(selectedFileTypeState.notifier).state = 'All';
-    ref.read(selectedLanguageState.notifier).state = 'All';
-    ref.read(selectedYearState.notifier).state = 'All';
-    ref.read(searchAuthorProvider.notifier).state = '';
-    ref.read(searchPublisherProvider.notifier).state = '';
-    unawaited(_persistFilterDefaults());
+    _vm.resetFilters();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    final query = ref.watch(searchQueryProvider);
-    final author = ref.watch(searchAuthorProvider);
-    final publisher = ref.watch(searchPublisherProvider);
-    final type = ref.watch(selectedTypeState);
-    final sort = ref.watch(selectedSortState);
-    final fileTypeValue = ref.watch(selectedFileTypeState);
-    final language = ref.watch(selectedLanguageState);
-    final year = ref.watch(selectedYearState);
-    final advancedCount = [
-      author.isNotEmpty,
-      publisher.isNotEmpty,
-      type != 'All',
-      sort != 'Most Relevant',
-      fileTypeValue != 'All',
-      language != 'All',
-      year != 'All',
-    ].where((active) => active).length;
+    return ListenableBuilder(
+      listenable: _vm,
+      builder: (context, _) {
+        final theme = Theme.of(context);
+        final l10n = AppLocalizations.of(context);
+        final query = _vm.query;
+        final advancedCount = _vm.advancedFilterCount;
 
-    return ContentWidth(
-      maxWidth: 840,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                PageHeader(
-                  eyebrow: l10n.searchEyebrow,
-                  title: l10n.navSearch,
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-                ),
-                const ActiveDownloadsWidget(),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            theme.colorScheme.primary.withValues(alpha: 0.08),
-                        spreadRadius: 3,
+        return ContentWidth(
+          maxWidth: 840,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PageHeader(
+                      eyebrow: l10n.searchEyebrow,
+                      title: l10n.navSearch,
+                      padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+                    ),
+                    const ActiveDownloadsWidget(),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.08),
+                            spreadRadius: 3,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: SearchBar(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    hintText: l10n.homeSearchHint,
-                    backgroundColor:
-                        WidgetStatePropertyAll(theme.colorScheme.surface),
-                    shape: WidgetStatePropertyAll(
-                      StadiumBorder(
-                        side: BorderSide(
-                          color: theme.colorScheme.primary,
-                          width: 1.5,
+                      child: SearchBar(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        hintText: l10n.homeSearchHint,
+                        backgroundColor:
+                            WidgetStatePropertyAll(theme.colorScheme.surface),
+                        shape: WidgetStatePropertyAll(
+                          StadiumBorder(
+                            side: BorderSide(
+                              color: theme.colorScheme.primary,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    constraints: const BoxConstraints(
-                      minHeight: 52,
-                      maxHeight: 52,
-                    ),
-                    padding: const WidgetStatePropertyAll(
-                      EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    textStyle: WidgetStatePropertyAll(SwissText.body),
-                    hintStyle: WidgetStatePropertyAll(
-                      SwissText.caption.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    leading: const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.search_rounded),
-                    ),
-                    trailing: [
-                      if (query.isNotEmpty)
-                        IconButton(
-                          tooltip: l10n.clearSearch,
-                          onPressed: _clearQuery,
-                          icon: Icon(
-                            Icons.close_rounded,
-                            size: 18,
+                        constraints: const BoxConstraints(
+                          minHeight: 52,
+                          maxHeight: 52,
+                        ),
+                        padding: const WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        textStyle: WidgetStatePropertyAll(SwissText.body),
+                        hintStyle: WidgetStatePropertyAll(
+                          SwissText.caption.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
-                          style: IconButton.styleFrom(
-                            backgroundColor:
-                                theme.colorScheme.surfaceContainerHigh,
-                            fixedSize: const Size(32, 32),
-                            minimumSize: Size.zero,
-                            padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
                         ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 3, right: 2),
-                        child: IconButton(
-                          tooltip: l10n.navSearch,
-                          onPressed: _submit,
-                          icon:
-                              const Icon(Icons.arrow_forward_rounded, size: 18),
-                          style: IconButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: theme.colorScheme.onPrimary,
-                            fixedSize: const Size(32, 32),
-                            minimumSize: Size.zero,
-                            padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
+                        leading: const Padding(
+                          padding: EdgeInsets.only(left: 4),
+                          child: Icon(Icons.search_rounded),
                         ),
+                        trailing: [
+                          if (query.isNotEmpty)
+                            IconButton(
+                              tooltip: l10n.clearSearch,
+                              onPressed: _clearQuery,
+                              icon: Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    theme.colorScheme.surfaceContainerHigh,
+                                fixedSize: const Size(32, 32),
+                                minimumSize: Size.zero,
+                                padding: EdgeInsets.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 3, right: 2),
+                            child: IconButton(
+                              tooltip: l10n.navSearch,
+                              onPressed: _submit,
+                              icon: const Icon(Icons.arrow_forward_rounded,
+                                  size: 18),
+                              style: IconButton.styleFrom(
+                                backgroundColor: theme.colorScheme.primary,
+                                foregroundColor: theme.colorScheme.onPrimary,
+                                fixedSize: const Size(32, 32),
+                                minimumSize: Size.zero,
+                                padding: EdgeInsets.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: _onSearchQueryChanged,
+                        onSubmitted: (_) => _submit(),
                       ),
-                    ],
-                    onChanged: _onSearchQueryChanged,
-                    onSubmitted: (_) => _submit(),
-                  ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-          PillTabs(
-            controller: _modeController,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            tabs: [
-              Tab(text: l10n.searchSuggestionsTitle),
-              Tab(
-                text: advancedCount > 0
-                    ? '${l10n.advancedSearch} ($advancedCount)'
-                    : l10n.advancedSearch,
+              ),
+              PillTabs(
+                controller: _modeController,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                tabs: [
+                  Tab(text: l10n.searchSuggestionsTitle),
+                  Tab(
+                    text: advancedCount > 0
+                        ? '${l10n.advancedSearch} ($advancedCount)'
+                        : l10n.advancedSearch,
+                  ),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _modeController,
+                  children: [
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                      children: [
+                        _SuggestionsTab(
+                          vm: _vm,
+                          onSearch: (value) => _submit(value),
+                          onTestMirrors: () =>
+                              unawaited(_runMirrorLatencyTest()),
+                          onManageSources: widget.onManageSources,
+                        ),
+                      ],
+                    ),
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                      children: [
+                        _AdvancedSearchTab(
+                          vm: _vm,
+                          onApply: () => _submit(),
+                          onReset: _resetFilters,
+                          onManageSources: widget.onManageSources,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _modeController,
-              children: [
-                ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                  children: [
-                    _SuggestionsTab(
-                      query: query,
-                      onSearch: (value) => _submit(value),
-                      onTestMirrors: () =>
-                          unawaited(_runMirrorLatencyTest()),
-                    ),
-                  ],
-                ),
-                ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                  children: [
-                    _AdvancedSearchTab(
-                      onApply: () => _submit(),
-                      onReset: _resetFilters,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -753,30 +655,32 @@ class _FilterSectionLabel extends StatelessWidget {
   }
 }
 
-class _AdvancedSearchTab extends ConsumerStatefulWidget {
+class _AdvancedSearchTab extends StatefulWidget {
   const _AdvancedSearchTab({
+    required this.vm,
     required this.onApply,
     required this.onReset,
+    required this.onManageSources,
   });
 
+  final SearchViewModel vm;
   final VoidCallback onApply;
   final VoidCallback onReset;
+  final VoidCallback? onManageSources;
 
   @override
-  ConsumerState<_AdvancedSearchTab> createState() => _AdvancedSearchTabState();
+  State<_AdvancedSearchTab> createState() => _AdvancedSearchTabState();
 }
 
-class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
+class _AdvancedSearchTabState extends State<_AdvancedSearchTab> {
   late final TextEditingController _authorController;
   late final TextEditingController _publisherController;
 
   @override
   void initState() {
     super.initState();
-    _authorController =
-        TextEditingController(text: ref.read(searchAuthorProvider));
-    _publisherController =
-        TextEditingController(text: ref.read(searchPublisherProvider));
+    _authorController = TextEditingController(text: widget.vm.author);
+    _publisherController = TextEditingController(text: widget.vm.publisher);
   }
 
   @override
@@ -792,13 +696,11 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
       context: context,
       title: l10n.filterTypeLabel,
       options: typeValues.keys.toList(),
-      value: ref.read(selectedTypeState),
+      value: widget.vm.filters.type,
       display: (value) => _typeFilterLabel(l10n, value),
     );
     if (selected == null) return;
-    ref.read(selectedTypeState.notifier).state = selected;
-    await PreferencesRepository()
-        .saveSearchFilter(SearchFilterKind.type, selected);
+    widget.vm.setFilter(SearchFilterKind.type, selected);
   }
 
   Future<void> _pickYear() async {
@@ -807,13 +709,11 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
       context: context,
       title: l10n.filterYearLabel,
       options: yearValues,
-      value: ref.read(selectedYearState),
+      value: widget.vm.filters.year,
       display: (value) => _yearFilterLabel(l10n, value),
     );
     if (selected == null) return;
-    ref.read(selectedYearState.notifier).state = selected;
-    await PreferencesRepository()
-        .saveSearchFilter(SearchFilterKind.year, selected);
+    widget.vm.setFilter(SearchFilterKind.year, selected);
   }
 
   Future<void> _pickLanguage() async {
@@ -822,13 +722,11 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
       context: context,
       title: l10n.languageSetting,
       options: languageValues.keys.toList(),
-      value: ref.read(selectedLanguageState),
+      value: widget.vm.filters.language,
       display: (value) => _languageFilterLabel(l10n, value),
     );
     if (selected == null) return;
-    ref.read(selectedLanguageState.notifier).state = selected;
-    await PreferencesRepository()
-        .saveSearchFilter(SearchFilterKind.language, selected);
+    widget.vm.setFilter(SearchFilterKind.language, selected);
   }
 
   void _reset() {
@@ -842,11 +740,12 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final typeValue = ref.watch(selectedTypeState);
-    final sortValue = ref.watch(selectedSortState);
-    final fileTypeValue = ref.watch(selectedFileTypeState);
-    final languageValue = ref.watch(selectedLanguageState);
-    final yearValue = ref.watch(selectedYearState);
+    final filters = widget.vm.filters;
+    final typeValue = filters.type;
+    final sortValue = filters.sort;
+    final fileTypeValue = filters.fileType;
+    final languageValue = filters.language;
+    final yearValue = filters.year;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -862,7 +761,11 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _SearchSourceSelector(horizontal: true),
+              _SearchSourceSelector(
+                vm: widget.vm,
+                horizontal: true,
+                onManageSources: widget.onManageSources,
+              ),
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 16),
@@ -881,9 +784,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                             controller: _authorController,
                             label: l10n.author,
                             hint: l10n.anyValue,
-                            onChanged: (value) => ref
-                                .read(searchAuthorProvider.notifier)
-                                .state = value.trim(),
+                            onChanged: (value) =>
+                                widget.vm.setAuthor(value.trim()),
                           ),
                         ),
                       ),
@@ -895,9 +797,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                             controller: _publisherController,
                             label: l10n.publisher,
                             hint: l10n.anyValue,
-                            onChanged: (value) => ref
-                                .read(searchPublisherProvider.notifier)
-                                .state = value.trim(),
+                            onChanged: (value) =>
+                                widget.vm.setPublisher(value.trim()),
                           ),
                         ),
                       ),
@@ -967,9 +868,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                       label: _fileTypeFilterLabel(l10n, value),
                       selected: fileTypeValue == value,
                       onTap: () {
-                        ref.read(selectedFileTypeState.notifier).state = value;
-                        PreferencesRepository().saveSearchFilter(
-                            SearchFilterKind.fileType, value);
+                        widget.vm.setFilter(SearchFilterKind.fileType, value);
                       },
                     ),
                 ],
@@ -986,9 +885,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                       label: _sortFilterLabel(l10n, value),
                       selected: sortValue == value,
                       onTap: () {
-                        ref.read(selectedSortState.notifier).state = value;
-                        PreferencesRepository()
-                            .saveSearchFilter(SearchFilterKind.sort, value);
+                        widget.vm.setFilter(SearchFilterKind.sort, value);
                       },
                     ),
                 ],
@@ -1028,67 +925,71 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
   }
 }
 
-class _SuggestionsTab extends ConsumerWidget {
+class _SuggestionsTab extends StatelessWidget {
   const _SuggestionsTab({
-    required this.query,
+    required this.vm,
     required this.onSearch,
     required this.onTestMirrors,
+    required this.onManageSources,
   });
 
-  final String query;
+  final SearchViewModel vm;
   final ValueChanged<String> onSearch;
   final VoidCallback onTestMirrors;
+  final VoidCallback? onManageSources;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final trimmed = query.trim();
+    final trimmed = vm.query.trim();
     if (trimmed.isEmpty) {
       final showLatencyHint = shouldShowMirrorLatencyHint(
-        ref.watch(mirrorLatencyProvider),
+        vm.mirrorLatency,
         DateTime.now(),
       );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _SearchSourceSelector(),
+          _SearchSourceSelector(
+            vm: vm,
+            onManageSources: onManageSources,
+          ),
           if (showLatencyHint) ...[
             const SizedBox(height: 12),
             MirrorLatencyHint(
               show: true,
-              testing: ref.watch(mirrorLatencyProvider).testing,
+              testing: vm.mirrorLatency.testing,
               onTest: onTestMirrors,
             ),
           ],
-          _RecentSearchesSection(onSearch: onSearch),
-          _TryTheseSection(onSearch: onSearch),
+          _RecentSearchesSection(vm: vm, onSearch: onSearch),
+          _TryTheseSection(trending: vm.trending, onSearch: onSearch),
           const SizedBox(height: 16),
           InlineHint(message: l10n.searchSupportHint),
         ],
       );
     }
-    return _InlineSuggestions(query: trimmed, onSearch: onSearch);
+    return _InlineSuggestions(vm: vm, onSearch: onSearch);
   }
 }
 
-class _InlineSuggestions extends ConsumerWidget {
-  const _InlineSuggestions({required this.query, required this.onSearch});
+class _InlineSuggestions extends StatelessWidget {
+  const _InlineSuggestions({required this.vm, required this.onSearch});
 
-  final String query;
+  final SearchViewModel vm;
   final ValueChanged<String> onSearch;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final suggestions = ref.watch(searchSuggestionProvider);
-    final loading = ref.watch(suggestionsLoadingProvider);
-    final selected = ref.watch(selectedSourceState);
-    final enabled = ref.watch(searchProviderToggles).valueOrNull ??
-        fallbackSearchSourceOrder.toSet();
-    final order = ref.watch(searchSourceOrderProvider).valueOrNull ??
-        fallbackSearchSourceOrder;
+    final query = vm.query.trim();
+    final suggestions = vm.suggestions;
+    final loading = vm.suggestionsLoading;
+    final selected = vm.selectedSource;
+    final enabled = vm.enabledProviders;
+    final order = vm.sourceOrder;
     final chain = order
         .where((source) => enabled.contains(source))
         .toList(growable: false);
@@ -1401,17 +1302,18 @@ class _InlineSearchAction extends StatelessWidget {
   }
 }
 
-class _RecentSearchesSection extends ConsumerWidget {
-  const _RecentSearchesSection({required this.onSearch});
+class _RecentSearchesSection extends StatelessWidget {
+  const _RecentSearchesSection({required this.vm, required this.onSearch});
 
+  final SearchViewModel vm;
   final ValueChanged<String> onSearch;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final recents = ref.watch(recentSearchesProvider).take(3).toList();
+    final recents = vm.recentSearches.take(3).toList();
     if (recents.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -1421,7 +1323,7 @@ class _RecentSearchesSection extends ConsumerWidget {
           title: l10n.recentSearchesTitle,
           padding: const EdgeInsets.fromLTRB(4, 16, 4, 4),
           action: TextButton(
-            onPressed: () => ref.read(recentSearchesProvider.notifier).clear(),
+            onPressed: vm.clearRecents,
             style: TextButton.styleFrom(
               minimumSize: Size.zero,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -1442,9 +1344,7 @@ class _RecentSearchesSection extends ConsumerWidget {
             subtitle: l10n.searchAllSourcesLabel,
             removeTooltip: l10n.removeRecentSearch(recents[index]),
             onTap: () => onSearch(recents[index]),
-            onRemove: () => ref
-                .read(recentSearchesProvider.notifier)
-                .remove(recents[index]),
+            onRemove: () => vm.removeRecent(recents[index]),
           ),
           if (index < recents.length - 1)
             Divider(
@@ -1523,17 +1423,17 @@ class _RecentSearchRow extends StatelessWidget {
   }
 }
 
-class _TryTheseSection extends ConsumerWidget {
-  const _TryTheseSection({required this.onSearch});
+class _TryTheseSection extends StatelessWidget {
+  const _TryTheseSection({required this.trending, required this.onSearch});
 
+  final List<TrendingBookData> trending;
   final ValueChanged<String> onSearch;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final trending = ref.watch(getTrendingBooks).valueOrNull ?? const [];
     final suggestions = <String>[];
     for (final book in trending) {
       final title = book.title?.trim();
@@ -1626,120 +1526,113 @@ class _QueryChip extends StatelessWidget {
   }
 }
 
-class _SearchSourceSelector extends ConsumerWidget {
-  const _SearchSourceSelector({this.horizontal = false});
+class _SearchSourceSelector extends StatelessWidget {
+  const _SearchSourceSelector({
+    required this.vm,
+    this.onManageSources,
+    this.horizontal = false,
+  });
 
+  final SearchViewModel vm;
+  final VoidCallback? onManageSources;
   final bool horizontal;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final enabled = ref.watch(searchProviderToggles);
-    final order = ref.watch(searchSourceOrderProvider).valueOrNull ??
-        fallbackSearchSourceOrder;
-    final selected = ref.watch(selectedSourceState);
+    if (!vm.sourcesLoaded) return const SizedBox.shrink();
 
-    return enabled.when(
-      data: (enabledIds) {
-        final effective =
-            selected != null && enabledIds.contains(selected) ? selected : null;
-        final sources = order
-            .where((source) => enabledIds.contains(source))
-            .toList(growable: false);
+    final selected = vm.selectedSource;
+    final effective =
+        selected != null && vm.enabledProviders.contains(selected)
+            ? selected
+            : null;
+    final sources = vm.sourceOrder
+        .where((source) => vm.enabledProviders.contains(source))
+        .toList(growable: false);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.searchSourcesTitle,
-                    style: SwissText.micro.copyWith(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.66,
-                    ),
-                  ),
+            Expanded(
+              child: Text(
+                l10n.searchSourcesTitle,
+                style: SwissText.micro.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.66,
                 ),
-                TextButton(
-                  onPressed: () {
-                    ref.read(selectedIndexProvider.notifier).state = 3;
-                  },
-                  style: TextButton.styleFrom(
-                    minimumSize: Size.zero,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    l10n.settingsManage,
-                    style: SwissText.micro.copyWith(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 8),
-            if (horizontal)
-              EdgeFade(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _SourceChoiceChip(
-                        mark: l10n.sourceMarkAll,
-                        label: l10n.searchSourceAuto,
-                        selected: effective == null,
-                        onTap: () =>
-                            ref.read(selectedSourceState.notifier).state = null,
-                      ),
-                      for (final source in sources) ...[
-                        const SizedBox(width: 8),
-                        _SourceChoiceChip(
-                          mark: sourceMark(source),
-                          label: sourceShortLabel(l10n, source),
-                          selected: effective == source,
-                          onTap: () => ref
-                              .read(selectedSourceState.notifier)
-                              .state = source,
-                        ),
-                      ],
-                    ],
-                  ),
+            TextButton(
+              onPressed: () => onManageSources?.call(),
+              style: TextButton.styleFrom(
+                minimumSize: Size.zero,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                l10n.settingsManage,
+                style: SwissText.micro.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (horizontal)
+          EdgeFade(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
                 children: [
                   _SourceChoiceChip(
                     mark: l10n.sourceMarkAll,
                     label: l10n.searchSourceAuto,
                     selected: effective == null,
-                    onTap: () =>
-                        ref.read(selectedSourceState.notifier).state = null,
+                    onTap: () => vm.selectSource(null),
                   ),
-                  for (final source in sources)
+                  for (final source in sources) ...[
+                    const SizedBox(width: 8),
                     _SourceChoiceChip(
                       mark: sourceMark(source),
                       label: sourceShortLabel(l10n, source),
                       selected: effective == source,
-                      onTap: () =>
-                          ref.read(selectedSourceState.notifier).state = source,
+                      onTap: () => vm.selectSource(source),
                     ),
+                  ],
                 ],
               ),
-          ],
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _SourceChoiceChip(
+                mark: l10n.sourceMarkAll,
+                label: l10n.searchSourceAuto,
+                selected: effective == null,
+                onTap: () => vm.selectSource(null),
+              ),
+              for (final source in sources)
+                _SourceChoiceChip(
+                  mark: sourceMark(source),
+                  label: sourceShortLabel(l10n, source),
+                  selected: effective == source,
+                  onTap: () => vm.selectSource(source),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

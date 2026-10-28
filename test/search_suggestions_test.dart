@@ -8,49 +8,30 @@ import 'package:flutter_test/flutter_test.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/search_result.dart';
-import 'package:openlib/data/repositories/mirror_repository.dart';
-import 'package:openlib/data/services/google_suggest_api.dart';
-import 'package:openlib/data/services/instance_manager.dart';
-import 'package:openlib/data/services/preference_store.dart';
-import 'package:openlib/data/services/recent_searches.dart';
-import 'package:openlib/state/repository_providers.dart'
-    show mirrorRepositoryProvider;
-import 'package:openlib/state/state.dart';
+import 'package:openlib/data/services/download_manager.dart' show DownloadTask;
+import 'package:openlib/state/state.dart'
+    show activeDownloadsProvider, searchProvider;
 import 'package:openlib/ui/features/results/views/results_page.dart';
+import 'package:openlib/ui/features/search/view_models/search_view_model.dart';
 import 'package:openlib/ui/features/search/views/search_page.dart';
 
-class _FakeSuggestions extends GoogleSuggestApi {
-  _FakeSuggestions(this.values);
-
-  final List<String> values;
-
-  @override
-  Future<List<String>> fetchSuggestions(String query) async => values;
-}
-
-class _MemoryRecentStore implements RecentSearchStore {
-  _MemoryRecentStore([List<String> initial = const []])
-      : stored = List<String>.of(initial);
-
-  List<String> stored;
-
-  @override
-  Future<List<String>> load() async => List<String>.of(stored);
-
-  @override
-  Future<void> save(List<String> searches) async {
-    stored = List<String>.of(searches);
-  }
-}
+import 'helpers/search_test_support.dart';
 
 void main() {
-  late _MemoryRecentStore recentStore;
+  late TestRecentStore recentStore;
+  late SearchViewModel viewModel;
 
   setUp(() {
-    recentStore = _MemoryRecentStore(['Dune', 'Emma']);
+    recentStore = TestRecentStore(['Dune', 'Emma']);
   });
 
   Future<void> pumpSearch(WidgetTester tester) async {
+    // Build the view model inside the test body: futures created in setUp
+    // run in the outer zone, so `prepareSearch` would never resume here.
+    viewModel = testSearchViewModel(
+      recentStore: recentStore,
+      suggestionsApi: TestSuggestions(['三体 全集', '三体 动画']),
+    );
     tester.view.physicalSize = const Size(1200, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -59,22 +40,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          // The page resolves its mirrors through DI; tests do not run initDi.
-          mirrorRepositoryProvider.overrideWithValue(MirrorRepository(
-            manager: InstanceManager.forTest(store: MemoryPreferenceStore()),
-          )),
-          recentSearchesProvider.overrideWith(
-            (ref) => RecentSearchesNotifier(store: recentStore),
+          ...testSearchOverrides(viewModel: viewModel),
+          activeDownloadsProvider.overrideWith(
+            (ref) => Stream.value(const <String, DownloadTask>{}),
           ),
-          googleSuggestApiProvider.overrideWithValue(
-            _FakeSuggestions(['三体 全集', '三体 动画']),
-          ),
-          searchProviderToggles.overrideWith((ref) async => {
-                SearchProviderId.libgen,
-                SearchProviderId.zlibrary,
-                SearchProviderId.welib,
-                SearchProviderId.annasArchive,
-              }),
           searchProvider.overrideWith(
             (ref, key) async => const SearchManagerResult(
               books: [],
@@ -86,7 +55,7 @@ void main() {
           locale: const Locale('zh'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: SearchPage()),
+          home: Scaffold(body: SearchPage(viewModel: viewModel)),
         ),
       ),
     );

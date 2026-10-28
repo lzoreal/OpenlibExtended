@@ -10,7 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/data/models/book_data.dart';
+import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
@@ -80,6 +82,22 @@ SearchManagerResult multiSourcePage(int page) {
 }
 
 void main() {
+  // The results page reads its sort/filter state through AppSettings now;
+  // writes land on the same instance.
+  Override appSettingsOverride() => appSettingsProvider.overrideWith(
+        (ref) => AppSettings(
+          themeMode: ThemeMode.system,
+          fontSizeScale: 1.0,
+          locale: null,
+          showManualDownloadButton: true,
+          backgroundVerification: true,
+          donationKey: '',
+          userAgent: '',
+          cookie: '',
+          filters: const SearchFilters(),
+        ),
+      );
+
   Future<List<SearchPageKey>> pumpResults(
     WidgetTester tester, {
     required Future<SearchManagerResult> Function(SearchPageKey key) search,
@@ -89,6 +107,7 @@ void main() {
     final keys = <SearchPageKey>[];
     await tester.pumpWidget(ProviderScope(
       overrides: [
+        appSettingsOverride(),
         initialSearchProvider.overrideWith((ref, key) {
           keys.add(key);
           return Stream.fromFuture(search(key));
@@ -234,6 +253,7 @@ void main() {
     addTearDown(controller.close);
     await tester.pumpWidget(ProviderScope(
       overrides: [
+        appSettingsOverride(),
         initialSearchProvider.overrideWith((ref, key) => controller.stream),
       ],
       child: MaterialApp(

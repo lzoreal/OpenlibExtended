@@ -46,7 +46,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
         ref.read(instanceAutoModeProvider.notifier).state = auto;
       }
     });
-    ref.read(mirrorLatencyProvider.notifier).load();
+    ref.read(mirrorLatencyProvider).load();
   }
 
   static const _serviceOrder = [
@@ -116,7 +116,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
   }
 
   Future<void> _testLatency() async {
-    if (ref.read(mirrorLatencyProvider).testing) return;
+    if (ref.read(mirrorLatencyProvider).state.testing) return;
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
     final views = <InstanceView>[];
@@ -130,7 +130,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     if (!mounted) return;
 
     try {
-      final result = await ref.read(mirrorLatencyProvider.notifier).test(views);
+      final result = await ref.read(mirrorLatencyProvider).test(views);
       if (!mounted) return;
       for (final service in _serviceOrder) {
         ref.invalidate(serviceInstancesProvider(service));
@@ -163,7 +163,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final autoMode = ref.watch(instanceAutoModeProvider);
-    final latency = ref.watch(mirrorLatencyProvider);
+    final latency = ref.watch(mirrorLatencyProvider).state;
 
     return Scaffold(
       appBar: AppBar(

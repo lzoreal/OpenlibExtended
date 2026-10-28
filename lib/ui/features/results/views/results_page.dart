@@ -162,7 +162,9 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       ),
     );
     if (selected == null || selected == current) return;
-    ref.read(app_state.selectedSortState.notifier).state = selected;
+    ref
+        .read(app_state.appSettingsProvider)
+        .setFilter(SearchFilterKind.sort, selected);
     await PreferencesRepository()
         .saveSearchFilter(SearchFilterKind.sort, selected);
     _retryPageOne();
@@ -230,13 +232,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       _forceLocalTimeouts = false;
     });
     _resetLocalPager();
-    ref.read(app_state.selectedTypeState.notifier).state = 'All';
-    ref.read(app_state.selectedSortState.notifier).state = 'Most Relevant';
-    ref.read(app_state.selectedFileTypeState.notifier).state = 'All';
-    ref.read(app_state.selectedLanguageState.notifier).state = 'All';
-    ref.read(app_state.selectedYearState.notifier).state = 'All';
-    ref.read(app_state.searchAuthorProvider.notifier).state = '';
-    ref.read(app_state.searchPublisherProvider.notifier).state = '';
+    ref.read(app_state.appSettingsProvider).resetSearchFilters();
     ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
     _listenFirstPage();
     unawaited(_persistFilterDefaults());

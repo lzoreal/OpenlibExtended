@@ -15,8 +15,11 @@ import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
+import 'package:openlib/data/repositories/trending_repository.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/mirror_latency_controller.dart';
+import 'package:openlib/ui/features/search/view_models/search_view_model.dart';
 
 import 'helpers/fake_path_provider.dart';
 
@@ -59,6 +62,19 @@ void main() {
     expect(getIt<SearchRepository>(), same(getIt<SearchRepository>()));
     expect(getIt<DownloadRepository>(), same(getIt<DownloadRepository>()));
     expect(getIt<MirrorRepository>(), same(getIt<MirrorRepository>()));
+    expect(getIt<TrendingRepository>(), same(getIt<TrendingRepository>()));
+    expect(
+      getIt<MirrorLatencyNotifier>(),
+      same(getIt<MirrorLatencyNotifier>()),
+    );
+
+    // Each page owns its transient search state, so every resolution is a
+    // fresh view model.
+    final firstViewModel = getIt<SearchViewModel>();
+    final secondViewModel = getIt<SearchViewModel>();
+    expect(identical(firstViewModel, secondViewModel), isFalse);
+    firstViewModel.dispose();
+    secondViewModel.dispose();
   });
 
   test('resetDi forgets registrations', () async {

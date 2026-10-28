@@ -19,6 +19,8 @@ import 'package:openlib/state/repository_providers.dart'
 import 'package:openlib/ui/features/trending/views/categories_page.dart';
 import 'package:openlib/ui/features/search/views/search_page.dart';
 
+import 'helpers/search_test_support.dart';
+
 void main() {
   test('genre cards use the localized title and description', () {
     final zh = lookupAppLocalizations(const Locale('zh'));
@@ -36,9 +38,11 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final viewModel = testSearchViewModel();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          ...testSearchOverrides(viewModel: viewModel),
           // The page resolves its mirrors through DI; tests do not run initDi.
           mirrorRepositoryProvider.overrideWithValue(MirrorRepository(
             manager: InstanceManager.forTest(store: MemoryPreferenceStore()),
@@ -48,7 +52,7 @@ void main() {
           locale: const Locale('zh'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: SearchPage()),
+          home: Scaffold(body: SearchPage(viewModel: viewModel)),
         ),
       ),
     );

@@ -92,7 +92,7 @@ flutter build linux --release
 lib/
 ├─ main.dart                  # 启动、偏好注入、主题/本地化、主壳与底部导航
 ├─ l10n/                      # ARB 源文件 + 生成代码（5 语言，557 个 key）
-├─ state/state.dart           # 全局 Riverpod provider、派生数据、阅读进度写入
+├─ state/state.dart           # 迁移期 Riverpod provider：搜索结果、下载、镜像；搜索页已改用 ViewModel
 ├─ app/                       # app_settings.dart（启动期偏好）、di.dart（get_it 装配）
 ├─ data/models/               # BookData、MyBook、SearchProviderId、SearchManagerResult 等模型
 ├─ data/services/             # 原 lib/services/，下面各项都在这个目录里
@@ -119,12 +119,10 @@ lib/
 │  ├─ platform_utils.dart     # 平台能力判断
 │  └─ ...                     # 元数据源、分享、偏好存储等
 ├─ ui/
-│  ├─ home_page / trending_page / categories_page
-│  ├─ search_page / results_page / book_info_page
-│  ├─ download_center_page / mybook_page / instances_page / settings_page
-│  ├─ webview_page / challenge_solver_page
-│  ├─ onboarding/、whats_new_page、about_page
-│  └─ components/             # 书卡、下载面板、错误页、文件按钮等
+│  ├─ core/                   # themes、motion、swiss_grid、open_book 与共享组件
+│  ├─ features/<feature>/views/    # 页面：shell、search、results、book_detail、library…
+│  ├─ features/<feature>/widgets/  # 只被该 feature 使用的组件
+│  └─ features/search/view_models/ # SearchViewModel（ChangeNotifier）
 test/                         # 37 个测试文件 + HTML fixtures
 tool/update_scoop_manifest.py # 发布后重写 scoop 清单
 .github/workflows/build.yml   # 唯一 CI：测试 + 全平台构建 + 发布 + scoop
@@ -138,10 +136,13 @@ bucket/openlibextended.json   # Scoop 清单
 ### 4.1 分层
 
 ```text
-Widget / Page (ConsumerWidget, ConsumerStatefulWidget)
-        │ ref.watch / ref.read
+Widget / Page
+        │ ListenableBuilder（新页面、search）
         ▼
-Riverpod providers（lib/state/state.dart + 页面内 provider）
+ViewModel（ChangeNotifier，app/di.dart 装配；search 已迁移）
+        │ 其余页面仍走 ref.watch / ref.read
+        ▼
+Riverpod providers（lib/state/state.dart；筛选值由 AppSettings 派生）
         │
         ▼
 Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogger）
@@ -192,6 +193,8 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 ### 5.1 搜索
 
 入口：首屏 `initialSearchProvider`（`lib/state/state.dart`）→ `SearchManager.watch()` 流式返回；分页走 `searchProvider` → `SearchManager.search()`（`lib/data/services/search_manager.dart`）。
+
+搜索页自身的状态在 `SearchViewModel`（`lib/ui/features/search/view_models/search_view_model.dart`，ChangeNotifier）：查询、来源选择、建议与 420ms 防抖、最近搜索、书源启用/顺序、趋势建议、镜像测速；通过 `SearchPage(viewModel:)` 注入，由 `ListenableBuilder` 刷新。筛选值（type/sort/fileType/language/year 与作者/出版社、`filtersEnabled`）存在 `AppSettings`，结果页与趋势页通过 `appSettingsProvider` 读到同一份；搜索页改筛选时由 ViewModel 写 `PreferencesRepository`。镜像测速控制器是 get_it 单例，搜索页与镜像页共享同一状态。
 
 实际行为（重要）：
 
@@ -444,7 +447,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 2. `main()` 把 `AppSettings.load(...)` 的结果传给 `initDi()`（`lib/app/di.dart`）；迁移期 Riverpod 仍通过 `ProviderScope.overrides` 收到同一份启动值，页面再从 provider 取。
 3. 在 `lib/ui/features/settings/views/settings_page.dart` 加 `_SettingsTile` / `_SettingsSwitchTile`，切换时写库。
 4. 若需要即时生效，同步更新对应服务的静态开关（参考 `backgroundVerification`）。
-5. 迁移期仍需在 `lib/state/state.dart` 定义 `StateProvider`，并在 `main.dart` 的 `ProviderScope` overrides 中接线；W6 后改由 SettingsViewModel 回写 `AppSettings`。
+5. 迁移期仍需在 `lib/state/state.dart` 定义 `StateProvider`，并在 `main.dart` 的 `ProviderScope` overrides 中接线；W6 后改由 SettingsViewModel 回写 `AppSettings`。例外：搜索筛选、作者/出版社、`filtersEnabled` 已在 W4 迁入 `AppSettings`（`appSettingsProvider` 只读派生），新代码不要再为它们加 StateProvider override。
 
 ### 新增/修改数据库字段
 

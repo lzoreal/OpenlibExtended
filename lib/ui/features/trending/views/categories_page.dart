@@ -14,7 +14,7 @@ import 'package:openlib/ui/core/components/inline_hint.dart';
 import 'package:openlib/ui/core/components/section_header.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
 import 'package:openlib/state/state.dart'
-    show getSubCategoryTypeList, enableFiltersState;
+    show getSubCategoryTypeList, appSettingsProvider;
 
 class CategoryBook {
   final String title;
@@ -476,8 +476,9 @@ class CategoryListingPage extends ConsumerWidget {
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
                             onTap: () {
-                              ref.read(enableFiltersState.notifier).state =
-                                  false;
+                              ref
+                                  .read(appSettingsProvider)
+                                  .setFiltersEnabled(false);
                               Navigator.push(context, MaterialPageRoute(
                                   builder: (BuildContext context) {
                                 return ResultPage(searchQuery: book.title!);

@@ -12,6 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 // NOTE: These imports are crucial and must exist in your project structure.
+import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/models/search_result.dart';
@@ -23,17 +25,15 @@ import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/libgen_service.dart';
 import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/files.dart';
-import 'package:openlib/data/services/open_library.dart';
 import 'package:openlib/data/services/goodreads.dart';
 import 'package:openlib/data/services/instance_manager.dart';
-import 'package:openlib/data/services/mirror_latency.dart';
+import 'package:openlib/data/services/mirror_latency_controller.dart';
 import 'package:openlib/data/services/download_manager.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
-import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/stream_throttle.dart';
 import 'package:openlib/state/repository_providers.dart';
-// Assuming OpenLibrary, Goodreads, PenguinRandomHouse, BookDigits, and SubCategoriesTypeList are defined
-// or are simple placeholder services/models that work as intended.
+
+export 'package:openlib/data/services/mirror_latency_controller.dart';
 
 MyLibraryDb dataBase = MyLibraryDb.instance;
 
@@ -255,20 +255,31 @@ final fontSizeScaleProvider = StateProvider<double>((ref) => 1.0);
 /// pins the app to that locale. Persisted as the 'locale' preference.
 final localeOverrideProvider = StateProvider<Locale?>((ref) => null);
 
+/// Source of truth for the search filters while the search page moves off
+/// Riverpod; the providers below stay read-only bridges until W5/W6.
+final appSettingsProvider =
+    ChangeNotifierProvider<AppSettings>((ref) => getIt<AppSettings>());
+
 // Search Filter States
-final selectedTypeState = StateProvider<String>((ref) => "All");
-final selectedSortState = StateProvider<String>((ref) => "Most Relevant");
-final selectedFileTypeState = StateProvider<String>((ref) => "All");
-final selectedLanguageState = StateProvider<String>((ref) => "All");
-final selectedYearState = StateProvider<String>((ref) => "All");
-final selectedSourceState = StateProvider<SearchProviderId?>((ref) => null);
-final searchQueryProvider = StateProvider<String>((ref) => "");
+final selectedTypeState =
+    Provider<String>((ref) => ref.watch(appSettingsProvider).filters.type);
+final selectedSortState =
+    Provider<String>((ref) => ref.watch(appSettingsProvider).filters.sort);
+final selectedFileTypeState =
+    Provider<String>((ref) => ref.watch(appSettingsProvider).filters.fileType);
+final selectedLanguageState =
+    Provider<String>((ref) => ref.watch(appSettingsProvider).filters.language);
+final selectedYearState =
+    Provider<String>((ref) => ref.watch(appSettingsProvider).filters.year);
 
 // Advanced (metadata) search fields from the expandable panel. Empty
 // strings mean "not filtering on this field".
-final searchAuthorProvider = StateProvider<String>((ref) => "");
-final searchPublisherProvider = StateProvider<String>((ref) => "");
-final enableFiltersState = StateProvider<bool>((ref) => true);
+final searchAuthorProvider =
+    Provider<String>((ref) => ref.watch(appSettingsProvider).searchAuthor);
+final searchPublisherProvider =
+    Provider<String>((ref) => ref.watch(appSettingsProvider).searchPublisher);
+final enableFiltersState =
+    Provider<bool>((ref) => ref.watch(appSettingsProvider).filtersEnabled);
 
 // Web/Download States
 final donationKeyProvider = StateProvider<String>((ref) => "");
@@ -316,136 +327,9 @@ final serviceInstancesProvider =
   return ref.watch(mirrorRepositoryProvider).instances(service);
 });
 
-@immutable
-class MirrorLatencyState {
-  const MirrorLatencyState({
-    this.testing = false,
-    this.testingHosts = const <String>{},
-    this.readings = const <String, MirrorLatencyReading>{},
-    this.loaded = false,
-  });
-
-  final bool testing;
-  final Set<String> testingHosts;
-  final Map<String, MirrorLatencyReading> readings;
-
-  /// Whether persisted readings have been read at least once, so an empty
-  /// [readings] map means "never tested" rather than "still loading".
-  final bool loaded;
-
-  MirrorLatencyState copyWith({
-    bool? testing,
-    Set<String>? testingHosts,
-    Map<String, MirrorLatencyReading>? readings,
-    bool? loaded,
-  }) {
-    return MirrorLatencyState(
-      testing: testing ?? this.testing,
-      testingHosts: testingHosts ?? this.testingHosts,
-      readings: readings ?? this.readings,
-      loaded: loaded ?? this.loaded,
-    );
-  }
-}
-
-/// True when no local latency reading is fresh enough to affect ordering.
-bool hasFreshMirrorLatency(
-    Map<String, MirrorLatencyReading> readings, DateTime now) {
-  return readings.values.any((reading) => reading.isFreshAt(now));
-}
-
-/// The search page nudges the user after readings have loaded and every
-/// stored reading is missing or older than 24 hours. It stays visible while
-/// a test runs so the hint can show progress in place.
-bool shouldShowMirrorLatencyHint(MirrorLatencyState state, DateTime now) {
-  return state.loaded && !hasFreshMirrorLatency(state.readings, now);
-}
-
-@immutable
-class MirrorLatencyResult {
-  const MirrorLatencyResult({
-    required this.total,
-    required this.reachable,
-    required this.fastestMs,
-  });
-
-  final int total;
-  final int reachable;
-  final int? fastestMs;
-}
-
-/// Runs one manual latency test over the enabled, non-down mirrors and
-/// persists the readings. The page owns the trigger; this class owns the
-/// filtering, in-flight state and storage merge.
-class MirrorLatencyNotifier extends StateNotifier<MirrorLatencyState> {
-  MirrorLatencyNotifier(
-    this._repository, {
-    DateTime Function()? clock,
-  })  : _clock = clock ?? DateTime.now,
-        super(const MirrorLatencyState());
-
-  final MirrorRepository _repository;
-  final DateTime Function() _clock;
-
-  Future<void> load() async {
-    final readings = await _repository.localLatencies();
-    if (mounted) state = state.copyWith(readings: readings, loaded: true);
-  }
-
-  Future<MirrorLatencyResult> test(Iterable<InstanceView> views) async {
-    final targets = <SlumSite>[];
-    final seen = <String>{};
-    for (final view in views) {
-      if (!view.enabled || view.site.isDown) continue;
-      if (seen.add(view.site.host)) targets.add(view.site);
-    }
-    if (targets.isEmpty) {
-      return const MirrorLatencyResult(
-        total: 0,
-        reachable: 0,
-        fastestMs: null,
-      );
-    }
-
-    final hosts = targets.map((site) => site.host).toSet();
-    state = state.copyWith(testing: true, testingHosts: hosts);
-    try {
-      final results =
-          await _repository.measureLatency(targets.map((site) => site.url));
-      await _repository.saveLocalLatencies(results, testedAt: _clock());
-      final readings = await _repository.localLatencies();
-      if (mounted) {
-        state = MirrorLatencyState(readings: readings, loaded: true);
-      }
-
-      var reachable = 0;
-      int? fastest;
-      for (final value in results.values) {
-        if (value == null) continue;
-        reachable++;
-        if (fastest == null || value < fastest) fastest = value;
-      }
-      return MirrorLatencyResult(
-        total: hosts.length,
-        reachable: reachable,
-        fastestMs: fastest,
-      );
-    } catch (_) {
-      if (mounted) {
-        state = state.copyWith(
-          testing: false,
-          testingHosts: const <String>{},
-        );
-      }
-      rethrow;
-    }
-  }
-}
-
 final mirrorLatencyProvider =
-    StateNotifierProvider<MirrorLatencyNotifier, MirrorLatencyState>((ref) {
-  return MirrorLatencyNotifier(ref.watch(mirrorRepositoryProvider));
-});
+    ChangeNotifierProvider<MirrorLatencyNotifier>(
+        (ref) => getIt<MirrorLatencyNotifier>());
 
 /// The Anna's Archive base URL the "open in site" button uses, or null
 /// when no attemptable mirror is known.
@@ -497,26 +381,11 @@ final getYearValue = Provider.autoDispose<String>((ref) {
 
 // Provider for Trending Books
 final getTrendingBooks = FutureProvider<List<TrendingBookData>>((ref) async {
-  // NOTE: Assuming TrendingBookData and the service classes exist and are functional
-  GoodReads goodReads = GoodReads();
-  // Assuming these classes are available from your project imports
-  // ignore: prefer_const_constructors
-  final penguinTrending = PenguinRandomHouse();
-  // ignore: prefer_const_constructors
-  final bookDigits = BookDigits();
-
-  List<TrendingBookData> trendingBooks =
-      await Future.wait<List<TrendingBookData>>([
-    goodReads.trendingBooks(),
-    penguinTrending.trendingBooks(),
-    // openLibrary.trendingBooks(), // Commented out as in the original
-    bookDigits.trendingBooks(),
-  ]).then((List<List<TrendingBookData>> listOfData) =>
-          listOfData.expand((element) => element).toList());
+  final trendingBooks =
+      await ref.watch(trendingRepositoryProvider).trendingBooks();
 
   if (trendingBooks.isEmpty) {
-    throw Exception(
-        'Nothing Trending Today :('); // Use Exception instead of String
+    throw Exception('Nothing Trending Today :(');
   }
   trendingBooks.shuffle();
   return trendingBooks;

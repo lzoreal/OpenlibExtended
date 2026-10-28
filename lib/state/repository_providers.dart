@@ -7,9 +7,13 @@ import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
+import 'package:openlib/data/repositories/trending_repository.dart';
 
 final libraryRepositoryProvider =
     Provider<LibraryRepository>((ref) => getIt<LibraryRepository>());
+
+final trendingRepositoryProvider =
+    Provider<TrendingRepository>((ref) => getIt<TrendingRepository>());
 
 final mirrorRepositoryProvider =
     Provider<MirrorRepository>((ref) => getIt<MirrorRepository>());

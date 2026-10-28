@@ -1,10 +1,5 @@
 // Dart imports:
-import 'dart:async';
 import 'dart:convert';
-
-// Package imports:
-import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/data/services/database.dart';
@@ -69,46 +64,3 @@ class DbRecentSearchStore implements RecentSearchStore {
     }
   }
 }
-
-class RecentSearchesNotifier extends StateNotifier<List<String>> {
-  RecentSearchesNotifier({RecentSearchStore? store})
-      : _store = store ?? DbRecentSearchStore(),
-        super(const []) {
-    _ready = _load();
-  }
-
-  final RecentSearchStore _store;
-  late final Future<void> _ready;
-
-  Future<void> get ready => _ready;
-
-  Future<void> _load() async {
-    final loaded = await _store.load();
-    if (!mounted) return;
-    state = loaded;
-  }
-
-  void record(String query) {
-    final next = withRecentSearch(state, query);
-    if (listEquals(next, state)) return;
-    state = next;
-    unawaited(_store.save(state));
-  }
-
-  void remove(String query) {
-    final next = withoutRecentSearch(state, query);
-    if (listEquals(next, state)) return;
-    state = next;
-    unawaited(_store.save(state));
-  }
-
-  void clear() {
-    if (state.isEmpty) return;
-    state = const [];
-    unawaited(_store.save(state));
-  }
-}
-
-final recentSearchesProvider =
-    StateNotifierProvider<RecentSearchesNotifier, List<String>>(
-        (ref) => RecentSearchesNotifier());

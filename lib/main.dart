@@ -54,12 +54,7 @@ import 'package:openlib/state/state.dart'
         backgroundVerificationProvider,
         userAgentProvider,
         cookieProvider,
-        donationKeyProvider,
-        selectedTypeState,
-        selectedSortState,
-        selectedFileTypeState,
-        selectedLanguageState,
-        selectedYearState;
+        donationKeyProvider;
 
 void main(List<String> args) async {
   // Required for desktop_webview_window on Linux - must be called before ensureInitialized
@@ -148,11 +143,6 @@ void main(List<String> args) async {
         donationKeyProvider.overrideWith((ref) => settings.donationKey),
         userAgentProvider.overrideWith((ref) => settings.userAgent),
         cookieProvider.overrideWith((ref) => settings.cookie),
-        selectedTypeState.overrideWith((ref) => settings.filters.type),
-        selectedSortState.overrideWith((ref) => settings.filters.sort),
-        selectedFileTypeState.overrideWith((ref) => settings.filters.fileType),
-        selectedLanguageState.overrideWith((ref) => settings.filters.language),
-        selectedYearState.overrideWith((ref) => settings.filters.year),
       ],
       child: MyApp(
         onboardingCompleted: onboardingCompleted,
@@ -270,11 +260,11 @@ void switchToTab(PageController controller, int next) {
 
 class _MainScreenState extends ConsumerState<MainScreen>
     with WidgetsBindingObserver {
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomePage(),
-    SearchPage(),
-    DownloadCenterPage(),
-    SettingsPage(),
+  late final List<Widget> _pages = <Widget>[
+    const HomePage(),
+    SearchPage(onManageSources: () => _selectTab(3)),
+    const DownloadCenterPage(),
+    const SettingsPage(),
   ];
 
   late final PageController _pageController;
@@ -461,10 +451,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
               }
             },
             children: [
-              for (var index = 0; index < _widgetOptions.length; index++)
+              for (var index = 0; index < _pages.length; index++)
                 TabKeepAlive(
                   active: index == selectedIndex,
-                  child: _widgetOptions[index],
+                  child: _pages[index],
                 ),
             ],
           ),

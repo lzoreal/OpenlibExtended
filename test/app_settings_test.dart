@@ -14,6 +14,28 @@ import 'package:openlib/data/services/database.dart';
 
 import 'helpers/fake_path_provider.dart';
 
+AppSettings _settingsWith({
+  SearchFilters filters = const SearchFilters(),
+  String searchAuthor = '',
+  String searchPublisher = '',
+  bool filtersEnabled = true,
+}) {
+  return AppSettings(
+    themeMode: ThemeMode.system,
+    fontSizeScale: 1.0,
+    locale: null,
+    showManualDownloadButton: true,
+    backgroundVerification: true,
+    donationKey: '',
+    userAgent: '',
+    cookie: '',
+    filters: filters,
+    searchAuthor: searchAuthor,
+    searchPublisher: searchPublisher,
+    filtersEnabled: filtersEnabled,
+  );
+}
+
 void main() {
   final paths = FakePathProvider('app_settings');
 
@@ -197,5 +219,76 @@ void main() {
       expect(notified, testCase.notifications,
           reason: '${testCase.name} must only notify again for a real change');
     }
+  });
+
+  test('setFilter updates only that field and notifies', () {
+    final settings = _settingsWith();
+    var notified = 0;
+    settings.addListener(() => notified++);
+
+    settings.setFilter(SearchFilterKind.language, 'German');
+
+    expect(settings.filters.language, 'German');
+    expect(settings.filters.type, 'All');
+    expect(settings.filters.sort, 'Most Relevant');
+    expect(settings.filters.fileType, 'All');
+    expect(settings.filters.year, 'All');
+    expect(notified, 1);
+
+    settings.setFilter(SearchFilterKind.year, 'Before 1980');
+
+    expect(settings.filters.language, 'German');
+    expect(settings.filters.year, 'Before 1980');
+    expect(notified, 2);
+  });
+
+  test('resetSearchFilters restores defaults but leaves the toggle alone', () {
+    final settings = _settingsWith(
+      filters: const SearchFilters(
+        type: 'Comic Books',
+        sort: 'Newest',
+        fileType: 'EPUB',
+        language: 'German',
+        year: 'Before 1980',
+      ),
+      searchAuthor: 'Ursula',
+      searchPublisher: 'Ace',
+      filtersEnabled: false,
+    );
+    var notified = 0;
+    settings.addListener(() => notified++);
+
+    settings.resetSearchFilters();
+
+    expect(settings.filters.type, 'All');
+    expect(settings.filters.sort, 'Most Relevant');
+    expect(settings.filters.fileType, 'All');
+    expect(settings.filters.language, 'All');
+    expect(settings.filters.year, 'All');
+    expect(settings.searchAuthor, isEmpty);
+    expect(settings.searchPublisher, isEmpty);
+    expect(settings.filtersEnabled, isFalse);
+    expect(notified, 1);
+  });
+
+  test('search author, publisher and the filters toggle each notify', () {
+    final settings = _settingsWith();
+    var notified = 0;
+    settings.addListener(() => notified++);
+
+    settings.setFiltersEnabled(false);
+    expect(settings.filtersEnabled, isFalse);
+    expect(settings.filters.type, 'All', reason: 'the toggle is not a filter');
+    expect(notified, 1);
+
+    settings.setSearchAuthor('Ursula');
+    expect(settings.searchAuthor, 'Ursula');
+    expect(settings.searchPublisher, isEmpty);
+    expect(notified, 2);
+
+    settings.setSearchPublisher('Ace');
+    expect(settings.searchPublisher, 'Ace');
+    expect(settings.searchAuthor, 'Ursula');
+    expect(notified, 3);
   });
 }

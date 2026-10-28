@@ -10,7 +10,7 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/trending_book_data.dart'
     show TrendingBookData;
 import 'package:openlib/state/state.dart'
-    show getTrendingBooks, enableFiltersState;
+    show getTrendingBooks, appSettingsProvider;
 import 'package:openlib/ui/features/trending/views/categories_page.dart'
     show GenreShortcutSection;
 import 'package:openlib/ui/core/components/error_widget.dart';
@@ -56,7 +56,9 @@ class TrendingPage extends ConsumerWidget {
                     return _TrendingBookCard(
                       book: book,
                       onTap: () {
-                        ref.read(enableFiltersState.notifier).state = false;
+                        ref
+                            .read(appSettingsProvider)
+                            .setFiltersEnabled(false);
                         Navigator.push(
                           context,
                           MaterialPageRoute(
