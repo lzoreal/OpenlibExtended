@@ -45,7 +45,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
 
 ## 3. 硬性架构约束
 
-修改代码时优先遵守现有分层；不要为了“更优雅”重写核心链路。
+修改代码时优先遵守现有分层。
 
 1. **镜像地址只能来自 SLUM**
    - 唯一允许硬编码的镜像相关 URL 是 `https://open-slum.org`（`lib/services/slum_catalogue.dart`）。
