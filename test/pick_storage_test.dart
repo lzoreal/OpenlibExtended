@@ -11,7 +11,7 @@ import 'package:file_picker_platform_interface/file_picker_platform_interface.da
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 // Project imports:
-import 'package:openlib/services/files.dart';
+import 'package:openlib/data/services/files.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this.documentsPath);

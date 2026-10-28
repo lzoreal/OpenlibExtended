@@ -10,7 +10,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/mirror_latency.dart';
+import 'package:openlib/data/services/mirror_latency.dart';
 
 void main() {
   group('latency formatting', () {

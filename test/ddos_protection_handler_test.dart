@@ -13,7 +13,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 // Project imports:
-import 'package:openlib/services/ddos_protection_handler.dart';
+import 'package:openlib/data/services/ddos_protection_handler.dart';
 
 import 'helpers/fake_path_provider.dart';
 

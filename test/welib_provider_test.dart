@@ -13,10 +13,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/search_manager.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 const _md5 = '00f8a97a0e03ac203235b306e249aa76';
 

@@ -16,12 +16,12 @@ import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/database.dart' show MyLibraryDb;
-import 'package:openlib/services/platform_utils.dart';
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
-import 'package:openlib/services/update_checker.dart';
-import 'package:openlib/services/upgrade_detector.dart';
+import 'package:openlib/data/services/database.dart' show MyLibraryDb;
+import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/update_checker.dart';
+import 'package:openlib/data/services/upgrade_detector.dart';
 import 'package:openlib/ui/components/bottom_nav_bar.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/swiss_grid_overlay.dart';
@@ -35,11 +35,11 @@ import 'package:openlib/ui/onboarding/onboarding_page.dart';
 import 'package:openlib/ui/challenge_solver_page.dart';
 import 'package:openlib/ui/whats_new_page.dart';
 
-import 'package:openlib/services/files.dart'
+import 'package:openlib/data/services/files.dart'
     show moveFilesToAndroidInternalStorage;
-import 'package:openlib/services/download_manager.dart';
-import 'package:openlib/services/download_notification.dart';
-import 'package:openlib/services/instance_manager.dart';
+import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/download_notification.dart';
+import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/state/state.dart'
     show
         ThemeModeNotifier,

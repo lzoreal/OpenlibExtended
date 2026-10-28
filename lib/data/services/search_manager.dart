@@ -11,15 +11,15 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/book_format.dart';
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/diamwall_solver.dart';
-import 'package:openlib/services/hedged_requests.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/book_format.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/diamwall_solver.dart';
+import 'package:openlib/data/services/hedged_requests.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 /// One searchable catalog the app can query.
 enum SearchProviderId { annasArchive, libgen, zlibrary, welib }

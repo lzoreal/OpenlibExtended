@@ -7,8 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 // Project imports:
-import 'package:openlib/services/book_format.dart';
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/book_format.dart';
+import 'package:openlib/data/services/database.dart';
 import 'package:openlib/state/state.dart'
     show myLibraryProvider;
 

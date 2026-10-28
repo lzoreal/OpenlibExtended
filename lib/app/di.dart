@@ -3,10 +3,10 @@ import 'package:get_it/get_it.dart';
 
 // Project imports:
 import 'package:openlib/app/app_settings.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/download_manager.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/preferences.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/preferences.dart';
 
 final GetIt getIt = GetIt.instance;
 

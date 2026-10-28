@@ -1,6 +1,6 @@
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/search_manager.dart';
 
 /// Book lists for the merged and per-source result views, plus their page
 /// cursors. The results page reads this and calls it; none of the merge or

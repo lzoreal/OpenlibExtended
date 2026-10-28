@@ -9,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/search_manager.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

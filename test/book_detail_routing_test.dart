@@ -16,10 +16,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
-import 'package:openlib/services/book_detail_routing.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/preference_store.dart';
-import 'package:openlib/services/slum_catalogue.dart';
+import 'package:openlib/data/services/book_detail_routing.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/services/slum_catalogue.dart';
 import 'package:openlib/state/state.dart'
     show annaArchiveBaseUrlProvider, instanceManagerProvider;
 

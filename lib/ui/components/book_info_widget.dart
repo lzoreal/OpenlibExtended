@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
-import 'package:openlib/services/book_detail_source.dart';
+import 'package:openlib/data/services/book_detail_source.dart';
 import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/components/book_card_widget.dart'
     show getFileType, getLanguage;

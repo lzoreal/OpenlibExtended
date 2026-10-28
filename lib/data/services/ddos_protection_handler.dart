@@ -17,8 +17,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 
 // Project imports:
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/database.dart';
 
 class DDoSProtectionHandler {
   static final DDoSProtectionHandler _instance =

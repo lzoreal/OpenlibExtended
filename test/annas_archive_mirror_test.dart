@@ -23,13 +23,13 @@ import 'package:flutter_test/flutter_test.dart';
 // Package imports:
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/network_error.dart';
-import 'package:openlib/services/preference_store.dart';
-import 'package:openlib/services/slum_catalogue.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/network_error.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/services/slum_catalogue.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 /// Builds an open-slum.org page in the exact shape SLUM serves: one
 /// `div.card` per mirror with a `card-title` link, a status badge and,

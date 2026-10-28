@@ -5,8 +5,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/state/results_pager.dart';
 
 List<BookData> _books(String tag, int page, int count) {

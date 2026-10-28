@@ -6,10 +6,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 // Project imports:
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/libgen_service.dart';
-import 'package:openlib/services/preference_store.dart';
-import 'package:openlib/services/slum_catalogue.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/libgen_service.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/services/slum_catalogue.dart';
 
 // The libgen tests inject an InstanceManager whose catalogue is a local
 // server, so the enabled-mirror list they exercise comes from a real

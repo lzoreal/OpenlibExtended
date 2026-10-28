@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/services/stream_throttle.dart';
+import 'package:openlib/data/services/stream_throttle.dart';
 
 void main() {
   test('coalesces a burst and keeps the latest value', () async {

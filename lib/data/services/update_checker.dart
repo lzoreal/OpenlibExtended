@@ -20,8 +20,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/logger.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/logger.dart';
 
 // Release information from GitHub
 class ReleaseInfo {

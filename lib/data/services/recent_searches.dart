@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/database.dart';
 
 const int maxRecentSearches = 6;
 const String recentSearchesPreferenceKey = 'recentSearches';

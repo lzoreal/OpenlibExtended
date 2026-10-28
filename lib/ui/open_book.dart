@@ -6,8 +6,8 @@ import 'package:open_file/open_file.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/book_format.dart';
-import 'package:openlib/services/files.dart' show getFilePath;
+import 'package:openlib/data/services/book_format.dart';
+import 'package:openlib/data/services/files.dart' show getFilePath;
 import 'package:openlib/ui/components/snack_bar_widget.dart';
 
 /// Opens a downloaded book with the system/third-party reader. The app

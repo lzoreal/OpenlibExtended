@@ -13,9 +13,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/preference_store.dart';
-import 'package:openlib/services/slum_catalogue.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/services/slum_catalogue.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/instances_page.dart';
 

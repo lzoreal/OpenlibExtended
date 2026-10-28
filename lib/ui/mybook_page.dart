@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
 // Project imports:
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/share_book.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/share_book.dart';
 import 'package:openlib/ui/components/book_info_widget.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/error_widget.dart';

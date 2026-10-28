@@ -15,9 +15,9 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/download_manager.dart';
-import 'package:openlib/services/files.dart' show generateBookFileName;
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/files.dart' show generateBookFileName;
 
 import 'helpers/fake_path_provider.dart';
 

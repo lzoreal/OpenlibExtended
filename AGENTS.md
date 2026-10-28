@@ -48,10 +48,10 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
 修改代码时优先遵守现有分层。
 
 1. **镜像地址只能来自 SLUM**
-   - 唯一允许硬编码的镜像相关 URL 是 `https://open-slum.org`（`lib/services/slum_catalogue.dart`）。
+   - 唯一允许硬编码的镜像相关 URL 是 `https://open-slum.org`（`lib/data/services/slum_catalogue.dart`）。
    - 取镜像用 `InstanceManager().enabledUrls(...)`；不要在 provider/UI 里写 `z-lib.*`、`libgen.*`、AA host 常量。
    - DOWN 镜像永不请求；用户禁用和 `headlessOnly` 过滤必须保留。
-   - 本机测速只在 `lib/services/mirror_latency.dart` 发起（HEAD → GET 回退，TTFB，6s 超时，最多 4 并发）；不要从 UI 直接做网络探测。
+   - 本机测速只在 `lib/data/services/mirror_latency.dart` 发起（HEAD → GET 回退，TTFB，6s 超时，最多 4 并发）；不要从 UI 直接做网络探测。
    - 测速结果用 `InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时；过期结果仅展示“已过期”，不再参与排序。
    - 自动排序：已测且可达的节点优先，按本机延迟升序；未测节点回退保护等级/状态/SLUM 延迟；DOWN 永远最后。手动模式不受影响。
 
@@ -187,7 +187,7 @@ flutter test
 - **加书源**：`SearchProviderId` → 实现 `SearchProvider` → 注册 `SearchManager` → SLUM 服务映射 → `routeBookDetail` → 详情下载分支 → ARB/设置开关 → 测试。
 - **加设置项**：`lib/app/app_settings.dart` 字段、setter 与 `AppSettings.load` 读偏好 → `lib/main.dart` 把启动值 override 进 Riverpod（迁移期）→ `lib/ui/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
 - **加 l10n**：五份 ARB + `@description` → `flutter gen-l10n` → `AppLocalizations.of(context)`。
-- **改下载**：`DownloadManager` → `lib/services/download_target.dart` → `lib/ui/book_info_page.dart` → `download_manager_test`。
+- **改下载**：`DownloadManager` → `lib/data/services/download_target.dart` → `lib/ui/book_info_page.dart` → `download_manager_test`。
 - **改镜像/本机测速**：`SlumCatalogue` / `InstanceManager` / `mirror_latency.dart` → `slum_catalogue_test` / `instance_manager_test` / `mirror_latency_*_test`；确认 24h 过期与自动排序。
 - **改更新**：`update_checker.dart` → `upgrade_detector`/What's New → 相关 widget 测试；注意 CI 产物命名约定。
 - **改发布**：`.github/workflows/build.yml` + `tool/update_scoop_manifest.py` + `bucket/openlibextended.json`；改产物名会破坏应用内更新识别。

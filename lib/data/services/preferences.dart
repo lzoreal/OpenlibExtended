@@ -1,5 +1,5 @@
 // Project imports:
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/database.dart';
 
 enum SearchFilterKind { type, sort, fileType, language, year }
 

@@ -9,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'dart:async';
 
 // Project imports:
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 void main() {
   setUp(WebviewChallengeSolver.clearAutoSolveFailures);

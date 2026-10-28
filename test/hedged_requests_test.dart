@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/services/hedged_requests.dart';
+import 'package:openlib/data/services/hedged_requests.dart';
 
 void main() {
   test('returns the first winner and never launches the rest', () async {

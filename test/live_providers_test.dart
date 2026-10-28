@@ -19,8 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 
 // Project imports:
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/search_manager.dart';
 
 const _ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '

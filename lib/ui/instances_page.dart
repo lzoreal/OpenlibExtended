@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/mirror_latency.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/settings_row.dart';

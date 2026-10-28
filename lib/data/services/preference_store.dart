@@ -1,5 +1,5 @@
 // Project imports:
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/database.dart';
 
 /// The little bit of key/value storage the mirror layer needs.
 ///

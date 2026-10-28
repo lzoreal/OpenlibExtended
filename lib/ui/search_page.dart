@@ -9,11 +9,11 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
-import 'package:openlib/services/google_suggest_api.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/mirror_latency.dart';
-import 'package:openlib/services/preferences.dart';
-import 'package:openlib/services/recent_searches.dart';
+import 'package:openlib/data/services/google_suggest_api.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/mirror_latency.dart';
+import 'package:openlib/data/services/preferences.dart';
+import 'package:openlib/data/services/recent_searches.dart';
 import 'package:openlib/state/state.dart'
     show
         enableFiltersState,

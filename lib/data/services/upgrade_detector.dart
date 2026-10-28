@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 // Project imports:
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/database.dart';
 
 /// Result of an upgrade check.
 @immutable

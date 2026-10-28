@@ -25,9 +25,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 // Project imports:
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 
 class WebviewChallengeSolver {
   WebviewChallengeSolver._();

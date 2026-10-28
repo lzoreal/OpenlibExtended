@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/ui/components/search_source_meta.dart';
 import 'package:openlib/ui/swiss_grid.dart';
 

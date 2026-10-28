@@ -14,9 +14,9 @@ import 'package:desktop_webview_window/desktop_webview_window.dart'
 import 'package:path_provider/path_provider.dart';
 
 // Project imports:
-import 'package:openlib/services/platform_utils.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/ddos_protection_handler.dart';
+import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/ddos_protection_handler.dart';
 
 class Webview extends ConsumerStatefulWidget {
   const Webview({

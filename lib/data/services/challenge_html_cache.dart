@@ -10,7 +10,7 @@
 // Dart imports:
 
 // Project imports:
-import 'package:openlib/services/logger.dart';
+import 'package:openlib/data/services/logger.dart';
 
 class ChallengeHtmlCache {
   ChallengeHtmlCache._();

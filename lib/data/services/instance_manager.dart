@@ -5,14 +5,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 // Project imports:
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/mirror_latency.dart';
-import 'package:openlib/services/preference_store.dart';
-import 'package:openlib/services/slum_catalogue.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/mirror_latency.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/services/slum_catalogue.dart';
 
 // MirrorService and the SLUM model live in the catalogue; re-exported so
 // callers keep importing only this file.
-export 'package:openlib/services/slum_catalogue.dart'
+export 'package:openlib/data/services/slum_catalogue.dart'
     show MirrorService, SlumStatus, SlumSite, Protection, ProtectionRank;
 
 /// One mirror as the settings screen shows it: the SLUM reading plus the

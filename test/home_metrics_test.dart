@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/download_manager.dart' show DownloadTask;
-import 'package:openlib/services/open_library.dart' show TrendingBookData;
+import 'package:openlib/data/services/download_manager.dart' show DownloadTask;
+import 'package:openlib/data/services/open_library.dart' show TrendingBookData;
 import 'package:openlib/state/state.dart'
     show
         activeDownloadsProvider,

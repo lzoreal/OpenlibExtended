@@ -2,7 +2,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/recent_searches.dart';
+import 'package:openlib/data/services/recent_searches.dart';
 
 class _MemoryStore implements RecentSearchStore {
   _MemoryStore([List<String> initial = const []])

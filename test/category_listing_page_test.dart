@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/goodreads.dart';
+import 'package:openlib/data/services/goodreads.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/categories_page.dart';
 

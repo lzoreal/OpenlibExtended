@@ -11,8 +11,8 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
 // Project imports:
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/preference_store.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/preference_store.dart';
 
 /// Which shadow-library family a mirror belongs to.
 ///

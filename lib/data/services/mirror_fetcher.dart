@@ -5,8 +5,8 @@ import 'dart:async';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 // Project imports:
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 
 /// Service to fetch mirror links in the background without showing UI
 class MirrorFetcherService {

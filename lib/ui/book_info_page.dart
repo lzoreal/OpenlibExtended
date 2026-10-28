@@ -6,12 +6,12 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/download_target.dart';
-import 'package:openlib/services/search_manager.dart';
-import 'package:openlib/services/download_manager.dart';
-import 'package:openlib/services/platform_utils.dart';
-import 'package:openlib/services/share_book.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/download_target.dart';
+import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/services/share_book.dart';
 import 'package:openlib/ui/components/book_info_widget.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/detail_bottom_bar.dart';

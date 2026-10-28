@@ -6,7 +6,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/download_target.dart';
+import 'package:openlib/data/services/download_target.dart';
 
 void main() {
   group('chooseDownloadTarget', () {

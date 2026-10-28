@@ -14,8 +14,8 @@ import 'package:share_plus/share_plus.dart';
 
 // Project imports:
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
-import 'package:openlib/services/files.dart' show getFilePath;
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/files.dart' show getFilePath;
+import 'package:openlib/data/services/platform_utils.dart';
 
 /// Result of a share attempt. On platforms without a share sheet
 /// (Linux desktop), the caller gets [ShareOutcome.pathCopied] and the

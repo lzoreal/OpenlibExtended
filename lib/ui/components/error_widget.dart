@@ -15,9 +15,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
-import 'package:openlib/services/network_error.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/network_error.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/ui/challenge_solver_page.dart';
 
 String _networkErrorTitle(AppLocalizations l10n, NetworkError error) {

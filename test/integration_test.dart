@@ -16,11 +16,11 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/network_error.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/network_error.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 import 'helpers/fake_path_provider.dart';
 

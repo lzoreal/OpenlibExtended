@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/annas_archieve.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
 import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/components/book_info_widget.dart';
 import 'package:openlib/ui/themes.dart';

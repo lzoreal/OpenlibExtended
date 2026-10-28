@@ -9,9 +9,9 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
 // Project imports:
-import 'package:openlib/services/book_info_cache.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/logger.dart';
+import 'package:openlib/data/services/book_info_cache.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/logger.dart';
 
 /// Creates and restores full JSON backups of the app's local data:
 /// preferences (settings, instance list, donation key, storage paths),

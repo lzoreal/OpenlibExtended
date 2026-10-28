@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/book_format.dart';
+import 'package:openlib/data/services/book_format.dart';
 import 'package:openlib/state/state.dart'
     show
         checkIdExists,

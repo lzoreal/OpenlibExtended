@@ -17,9 +17,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/preference_store.dart';
-import 'package:openlib/services/slum_catalogue.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/services/slum_catalogue.dart';
 
 /// Serves the captured open-slum.org pages under their real paths.
 Future<HttpServer> _slumServer() async {

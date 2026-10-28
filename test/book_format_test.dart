@@ -2,7 +2,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/book_format.dart';
+import 'package:openlib/data/services/book_format.dart';
 
 void main() {
   group('detectBookFormat', () {

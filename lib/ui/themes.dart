@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 // Project imports:
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/ui/swiss_grid.dart';
 
 /// Warm paper and emerald give the reading-focused UI a calmer,

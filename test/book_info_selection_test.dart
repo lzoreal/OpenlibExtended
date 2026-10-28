@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/book_detail_source.dart';
+import 'package:openlib/data/services/book_detail_source.dart';
 import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/components/book_info_widget.dart';
 

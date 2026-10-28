@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/services/goodreads.dart';
+import 'package:openlib/data/services/goodreads.dart';
 
 void main() {
   test('category parser keeps author, rating and published year', () {

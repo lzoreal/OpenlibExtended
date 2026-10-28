@@ -1,7 +1,7 @@
 // Which provider serves a book-detail page.
 
 // Project imports:
-import 'package:openlib/services/instance_manager.dart';
+import 'package:openlib/data/services/instance_manager.dart';
 
 /// The provider that can serve a book-detail URL.
 enum BookDetailRoute { libgen, zlibrary, welib, annasArchive }

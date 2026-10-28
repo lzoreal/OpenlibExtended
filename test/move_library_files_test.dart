@@ -9,7 +9,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/files.dart';
+import 'package:openlib/data/services/files.dart';
 
 void main() {
   late Directory source;

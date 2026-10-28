@@ -15,9 +15,9 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 // Project imports:
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 class ChallengeSolverPage extends StatefulWidget {
   const ChallengeSolverPage({super.key, required this.url});

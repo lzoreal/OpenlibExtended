@@ -8,9 +8,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/main.dart' show MainScreen;
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/search_manager.dart';
-import 'package:openlib/services/update_checker.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/data/services/update_checker.dart';
 import 'package:openlib/ui/components/pill_tabs.dart';
 
 /// Shown once after an app upgrade (not on first install): what's

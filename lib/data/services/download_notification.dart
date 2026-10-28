@@ -9,7 +9,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // Project imports:
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 
 /// Minimum whole-percent change before the notification re-posts.
 /// Debounces the Android channel so a fast download does not spam

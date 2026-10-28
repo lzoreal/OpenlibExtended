@@ -14,10 +14,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/search_manager.dart';
 
 import 'helpers/fake_path_provider.dart';
 

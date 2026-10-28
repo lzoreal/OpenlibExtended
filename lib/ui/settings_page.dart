@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:openlib/services/backup_service.dart';
+import 'package:openlib/data/services/backup_service.dart';
 
 // Flutter imports:
 import 'package:flutter/material.dart';
@@ -15,18 +15,18 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/files.dart';
-import 'package:openlib/services/platform_utils.dart';
-import 'package:openlib/services/update_checker.dart';
+import 'package:openlib/data/services/files.dart';
+import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/services/update_checker.dart';
 
 // Project imports:
-import 'package:openlib/services/book_import.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/preferences.dart';
-import 'package:openlib/services/search_manager.dart';
-import 'package:openlib/services/storage_permission.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/book_import.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/preferences.dart';
+import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/data/services/storage_permission.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/page_header.dart';
 import 'package:openlib/ui/components/pill_tabs.dart';

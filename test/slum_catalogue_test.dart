@@ -16,7 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 
 // Project imports:
-import 'package:openlib/services/slum_catalogue.dart';
+import 'package:openlib/data/services/slum_catalogue.dart';
 
 String _fixture(String name) => File('test/fixtures/$name').readAsStringSync();
 

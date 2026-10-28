@@ -9,11 +9,11 @@ import 'package:crypto/crypto.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/database.dart' show MyLibraryDb, MyBook;
-import 'package:openlib/services/download_notification.dart';
-import 'package:openlib/services/files.dart' show generateBookFileName;
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/mirror_fetcher.dart';
+import 'package:openlib/data/services/database.dart' show MyLibraryDb, MyBook;
+import 'package:openlib/data/services/download_notification.dart';
+import 'package:openlib/data/services/files.dart' show generateBookFileName;
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/mirror_fetcher.dart';
 
 enum DownloadStatus {
   queued,

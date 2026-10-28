@@ -10,13 +10,13 @@ import 'package:html/dom.dart' as dom;
 import 'package:meta/meta.dart';
 
 // Project imports:
-import 'package:openlib/services/book_detail_source.dart';
-import 'package:openlib/services/book_format.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/logger.dart';
-import 'package:openlib/services/network_error.dart';
-import 'package:openlib/services/challenge_html_cache.dart';
-import 'package:openlib/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/book_detail_source.dart';
+import 'package:openlib/data/services/book_format.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/logger.dart';
+import 'package:openlib/data/services/network_error.dart';
+import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 class BookData implements BookDetailSource {
   @override

@@ -2,8 +2,8 @@
 import 'dart:io';
 
 // Project imports:
-import 'package:openlib/services/book_format.dart';
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/book_format.dart';
+import 'package:openlib/data/services/database.dart';
 
 /// Scans a directory for book files and registers the ones the library does
 /// not know yet. Returns how many rows were added so the caller can refresh

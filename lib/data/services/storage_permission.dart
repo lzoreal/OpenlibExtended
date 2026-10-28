@@ -3,7 +3,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // Project imports:
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 
 Future<void> requestStoragePermission() async {
   // Desktop platforms don't require runtime storage permissions

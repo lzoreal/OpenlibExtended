@@ -1,5 +1,5 @@
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/search_manager.dart';
 
 /// Shown while the saved order (MyLibraryDb) is still loading; the user's
 /// own order always wins over this.

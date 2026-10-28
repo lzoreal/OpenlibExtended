@@ -6,7 +6,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/services/download_notification.dart';
+import 'package:openlib/data/services/download_notification.dart';
 
 void main() {
   group('shouldNotifyProgress', () {

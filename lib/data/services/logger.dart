@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 // Package imports:
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 

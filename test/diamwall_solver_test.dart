@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/services/diamwall_solver.dart';
+import 'package:openlib/data/services/diamwall_solver.dart';
 
 void main() {
   tearDown(DiamWallSolver.clearCookieCache);

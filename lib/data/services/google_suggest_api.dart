@@ -1,4 +1,4 @@
-// lib/services/google_suggest_api.dart
+// lib/data/services/google_suggest_api.dart
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;

@@ -7,10 +7,10 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:meta/meta.dart';
 
 // Project imports:
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/hedged_requests.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/logger.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/hedged_requests.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/logger.dart';
 
 /// Library Genesis book-info + download service.
 ///

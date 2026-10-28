@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:sqflite/sqflite.dart' show DatabaseException;
-import 'package:openlib/services/network_error.dart';
+import 'package:openlib/data/services/network_error.dart';
 
 class _TestDatabaseException extends DatabaseException {
   _TestDatabaseException() : super('disk I/O error');

@@ -14,10 +14,10 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:dio/dio.dart';
 
 // Project imports:
-import 'package:openlib/services/diamwall_solver.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/preference_store.dart';
-import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/data/services/diamwall_solver.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/services/search_manager.dart';
 
 void main() {
   final challenge =

@@ -9,8 +9,8 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
-import 'package:openlib/services/book_import.dart';
-import 'package:openlib/services/database.dart';
+import 'package:openlib/data/services/book_import.dart';
+import 'package:openlib/data/services/database.dart';
 
 import 'helpers/fake_path_provider.dart';
 

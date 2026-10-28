@@ -10,7 +10,7 @@ import 'package:dio/dio.dart';
 import 'package:sqflite/sqflite.dart' show DatabaseException;
 
 // Project imports:
-import 'package:openlib/services/logger.dart';
+import 'package:openlib/data/services/logger.dart';
 
 // Enum for categorized network error types
 enum NetworkErrorType {

@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:html/parser.dart' show parse;
 
 // Project imports:
-import 'package:openlib/services/network_error.dart';
-import 'package:openlib/services/logger.dart';
+import 'package:openlib/data/services/network_error.dart';
+import 'package:openlib/data/services/logger.dart';
 
 class CategoryBookData {
   final String? title;

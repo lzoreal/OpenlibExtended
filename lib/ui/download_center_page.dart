@@ -13,12 +13,12 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/download_manager.dart';
-import 'package:openlib/services/files.dart' show deleteFile, getFilePath;
-import 'package:openlib/services/platform_utils.dart';
-import 'package:openlib/services/share_book.dart';
-import 'package:openlib/services/preferences.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/files.dart' show deleteFile, getFilePath;
+import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/services/share_book.dart';
+import 'package:openlib/data/services/preferences.dart';
 import 'package:openlib/state/state.dart'
     show
         activeDownloadsProvider,

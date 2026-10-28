@@ -12,19 +12,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 // NOTE: These imports are crucial and must exist in your project structure.
-import 'package:openlib/services/annas_archieve.dart';
-import 'package:openlib/services/book_detail_routing.dart';
-import 'package:openlib/services/book_info_cache.dart';
-import 'package:openlib/services/database.dart';
-import 'package:openlib/services/libgen_service.dart';
-import 'package:openlib/services/search_manager.dart';
-import 'package:openlib/services/files.dart';
-import 'package:openlib/services/open_library.dart';
-import 'package:openlib/services/goodreads.dart';
-import 'package:openlib/services/instance_manager.dart';
-import 'package:openlib/services/mirror_latency.dart';
-import 'package:openlib/services/download_manager.dart';
-import 'package:openlib/services/stream_throttle.dart';
+import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/services/book_detail_routing.dart';
+import 'package:openlib/data/services/book_info_cache.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/libgen_service.dart';
+import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/data/services/files.dart';
+import 'package:openlib/data/services/open_library.dart';
+import 'package:openlib/data/services/goodreads.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/mirror_latency.dart';
+import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/stream_throttle.dart';
 // Assuming OpenLibrary, Goodreads, PenguinRandomHouse, BookDigits, and SubCategoriesTypeList are defined
 // or are simple placeholder services/models that work as intended.
 
