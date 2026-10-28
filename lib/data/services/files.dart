@@ -2,15 +2,12 @@
 import 'dart:io';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 // Project imports:
 import 'package:openlib/data/services/book_format.dart';
 import 'package:openlib/data/services/database.dart';
-import 'package:openlib/state/state.dart'
-    show myLibraryProvider;
 
 MyLibraryDb dataBase = MyLibraryDb.instance;
 
@@ -214,20 +211,3 @@ Future<String> getFilePath(String fileName) async {
   throw "File Not Exists";
 }
 
-Future<void> deleteFileWithDbData(Ref ref, String md5, String format,
-    {String? fileName}) async {
-  try {
-    // Use provided fileName or fall back to md5.format
-    String actualFileName = fileName ?? '$md5.$format';
-    final bookStorageDirectory =
-        await dataBase.getPreference('bookStorageDirectory');
-    await deleteFile('$bookStorageDirectory/$actualFileName');
-    await dataBase.delete(md5);
-    await dataBase.deleteBookState(actualFileName);
-    // ignore: unused_result
-    ref.refresh(myLibraryProvider);
-  } catch (e) {
-    // print(e);
-    rethrow;
-  }
-}

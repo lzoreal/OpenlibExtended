@@ -16,7 +16,7 @@ import 'package:openlib/data/services/download_manager.dart';
 import 'package:openlib/data/services/files.dart' show getFilePath;
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/share_book.dart';
-import 'package:openlib/state/state.dart' show FileName;
+import 'package:openlib/data/models/file_name.dart';
 import 'package:openlib/ui/core/components/book_info_widget.dart'
     show sourceLabelForUrl;
 import 'package:openlib/ui/core/components/inline_hint.dart';

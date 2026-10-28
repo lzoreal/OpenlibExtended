@@ -15,7 +15,7 @@ OpenlibExtended 是一个 Flutter 跨平台电子书客户端，从 Anna's Archi
 | Dart 包名 | `openlib`（`pubspec.yaml:1`） |
 | Android applicationId | `dev.wath.openlibextended`（`android/app/build.gradle:18,34`） |
 | 许可证 | AGPL-3.0 |
-| 状态管理 | Riverpod 2（`flutter_riverpod`） |
+| 状态管理 | ChangeNotifier ViewModel + get_it（W7 移除 Riverpod） |
 | 网络 | Dio + `package:html` 解析 HTML |
 | 本地存储 | SQLite（`sqflite` / 桌面 `sqflite_common_ffi`） |
 | 阅读 | 仅外部阅读器（系统/第三方应用）；不包含内置阅读器与 TTS 依赖 |
@@ -92,7 +92,6 @@ flutter build linux --release
 lib/
 ├─ main.dart                  # 启动、偏好注入、主题/本地化、主壳与底部导航
 ├─ l10n/                      # ARB 源文件 + 生成代码（5 语言，557 个 key）
-├─ state/state.dart           # 迁移期 Riverpod provider：搜索结果、下载、镜像；搜索页已改用 ViewModel
 ├─ app/                       # app_settings.dart（启动期偏好）、di.dart（get_it 装配）
 ├─ data/models/               # BookData、MyBook、SearchProviderId、SearchManagerResult 等模型
 ├─ data/services/             # 原 lib/services/，下面各项都在这个目录里
@@ -122,7 +121,7 @@ lib/
 │  ├─ core/                   # themes、motion、swiss_grid、open_book 与共享组件
 │  ├─ features/<feature>/views/    # 页面：shell、search、results、book_detail、library…
 │  ├─ features/<feature>/widgets/  # 只被该 feature 使用的组件
-│  └─ features/<feature>/view_models/ # Search/Results/Library/BookDetailViewModel（ChangeNotifier）
+│  └─ features/<feature>/view_models/ # 每个 feature 的 ViewModel（ChangeNotifier）
 test/                         # 37 个测试文件 + HTML fixtures
 tool/update_scoop_manifest.py # 发布后重写 scoop 清单
 .github/workflows/build.yml   # 唯一 CI：测试 + 全平台构建 + 发布 + scoop
@@ -137,12 +136,12 @@ bucket/openlibextended.json   # Scoop 清单
 
 ```text
 Widget / Page
-        │ ListenableBuilder（新页面、search）
+        │ ListenableBuilder
         ▼
-ViewModel（ChangeNotifier，app/di.dart 装配；search/results/library/book_detail 已迁移）
-        │ 其余页面仍走 ref.watch / ref.read
+ViewModel（ChangeNotifier；页面 `fromDi()` 或构造注入，app/di.dart 装配）
+        │
         ▼
-Riverpod providers（lib/state/state.dart；筛选值由 AppSettings 派生）
+Repositories（get_it 单例；VM 通过构造注入）
         │
         ▼
 Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogger）
@@ -156,7 +155,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 约定：
 
 - **UI 不直接发网络请求或写文件**；下载统一走 `DownloadManager`，下载记录/偏好读写统一走 `MyLibraryDb`。
-- 启动期偏好由 `AppSettings.load`（`lib/app/app_settings.dart`）读库，`main()` 把结果传给 `initDi()`（`lib/app/di.dart`）；迁移期 Riverpod 仍通过 `ProviderScope.overrides` 收到同一份启动值，页面再 `watch` 对应 provider。
+- 启动期偏好由 `AppSettings.load`（`lib/app/app_settings.dart`）读库，`main()` 把结果传给 `initDi()`（`lib/app/di.dart`）；所有页面通过 ViewModel 读取 `AppSettings` 并由 `ListenableBuilder` 刷新。
 - 重要服务都是单例：`AppSettings`（容器内注册）、`MyLibraryDb.instance`、`DownloadManager()`、`InstanceManager()`、`AppLogger()`。
 - 书源、镜像、下载目标都有明确的“服务 + 数据模型 + 纯函数”拆分，便于测试注入（如 `SearchManager(providers: ...)`、`InstanceManager.forTest`）。
 
@@ -424,7 +423,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 14. **备份不含书籍文件**：仅备份数据库表，换机后需自行迁移书籍目录。
 15. **本地化覆盖**：5 个语言、531 个 key，测试强制五份 ARB key 完全一致（`test/localization_test.dart:31-52`）；仍有少量硬编码英文（如设置页部分说明、实例页）。
 16. **依赖锁有明确原因，不要随意升级**：`html` 0.15.6、`permission_handler_android` 13.0.1、`sqlite3_flutter_libs` 0.5.42 都是为兼容当前 Flutter/插件而钉死的（`pubspec.yaml:39-92`）。
-17. **年份筛选硬编码到 2025**：`yearValues`（`lib/state/state.dart`）没有 2026，跨年后需要更新。
+17. **年份筛选硬编码到 2025**：`yearValues`（`lib/ui/core/filter_options.dart`）没有 2026，跨年后需要更新。
 18. **`MirrorFetcherService` 错误路径不释放 WebView**：超时/异常返回时没有 `dispose()`（`lib/data/services/mirror_fetcher.dart:95-112`），长期运行可能泄漏。
 19. **`setCompleted` 仍会清空阅读位置**：标记完成时以 `position: ''` 覆盖同一行（`MyLibraryDb.setCompleted`，`lib/data/services/database.dart`）；内置阅读器已删除，应用内不再写入阅读位置，但旧数据/备份仍可能包含。
 
@@ -444,10 +443,10 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 ### 新增一个设置项
 
 1. 在 `AppSettings`（`lib/app/app_settings.dart`）加字段与 setter，并在 `AppSettings.load` 里读偏好。
-2. `main()` 把 `AppSettings.load(...)` 的结果传给 `initDi()`（`lib/app/di.dart`）；迁移期 Riverpod 仍通过 `ProviderScope.overrides` 收到同一份启动值，页面再从 provider 取。
+2. `main()` 把 `AppSettings.load(...)` 的结果传给 `initDi()`（`lib/app/di.dart`）；页面通过 `fromDi()` 取得 ViewModel，再读 `AppSettings`。
 3. 在 `lib/ui/features/settings/views/settings_page.dart` 加 `_SettingsTile` / `_SettingsSwitchTile`，切换时写库。
 4. 若需要即时生效，同步更新对应服务的静态开关（参考 `backgroundVerification`）。
-5. 迁移期仍需在 `lib/state/state.dart` 定义 `StateProvider`，并在 `main.dart` 的 `ProviderScope` overrides 中接线；W6 后改由 SettingsViewModel 回写 `AppSettings`。例外：搜索筛选、作者/出版社、`filtersEnabled` 已在 W4 迁入 `AppSettings`（`appSettingsProvider` 只读派生），新代码不要再为它们加 StateProvider override。
+5. 设置项统一写入 `AppSettings`（`lib/app/app_settings.dart`）并由 SettingsViewModel 暴露；不要再引入新的 provider 或 `ProviderScope` override。
 
 ### 新增/修改数据库字段
 
@@ -479,7 +478,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 | 启动、导航、主题 | `lib/main.dart` |
 | 启动期偏好与 DI 容器 | `lib/app/app_settings.dart`、`lib/app/di.dart` |
 | 数据模型 | `lib/data/models/book_data.dart`、`lib/data/models/my_book.dart`、`lib/data/models/search_result.dart`、`lib/data/models/trending_book_data.dart` |
-| 所有全局状态/数据源 | `lib/state/state.dart` |
+| 所有全局状态 | 各 feature 的 `view_models/` + `lib/app/app_settings.dart` |
 | 搜索与书源 | `lib/data/services/search_manager.dart` |
 | Anna's Archive | `lib/data/services/annas_archieve.dart` |
 | 镜像目录 | `lib/data/services/slum_catalogue.dart`、`lib/data/services/instance_manager.dart` |

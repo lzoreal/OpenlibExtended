@@ -1,9 +1,9 @@
-// Builds the real SettingsPage with a real (ffi-backed) database and provider
-// scope. Regression coverage on the page structure: every section header and
-// tile renders, and the theme dropdown commits through to the provider.
-// The DB persistence of setTheme itself is covered by a plain (real-zone)
-// test below, because real sqlite I/O freezes inside the widget-test fake
-// async zone.
+// Builds the real SettingsPage with a real (ffi-backed) database and an
+// injected SettingsViewModel. Regression coverage on the page structure:
+// every section header and tile renders, the source cards follow the saved
+// chain, and the theme/language rows commit through to AppSettings.
+// The DB persistence of theme is covered by the widget test below, because
+// real sqlite I/O freezes inside the widget-test fake async zone.
 
 // Dart imports:
 import 'dart:io';
@@ -13,7 +13,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -23,18 +22,61 @@ import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/search_result.dart';
-import 'package:openlib/data/repositories/download_repository.dart';
+import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
+import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/database.dart';
-import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/features/settings/views/settings_page.dart';
+import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/ui/features/settings/view_models/settings_view_model.dart';
+import 'package:openlib/ui/features/settings/views/settings_page.dart';
 
 import 'helpers/fake_path_provider.dart';
 
 final _paths = FakePathProvider('settings');
 
+/// In-memory source toggles/order; the real repository queues a network
+/// manager and reads preferences from sqlite, neither of which the widget
+/// test fake async zone can settle.
+class _FakeSearchRepository extends SearchRepository {
+  _FakeSearchRepository() : super(manager: SearchManager(providers: const []));
+
+  Set<SearchProviderId> enabled = SearchProviderId.values.toSet();
+  List<SearchProviderId> order = defaultSearchSourceOrder;
+
+  @override
+  Future<Set<SearchProviderId>> enabledProviders() async => enabled;
+
+  @override
+  Future<List<SearchProviderId>> sourceOrder() async => order;
+
+  @override
+  Future<void> setProviderEnabled(SearchProviderId id, bool value) async {
+    enabled = value ? {...enabled, id} : ({...enabled}..remove(id));
+  }
+
+  @override
+  Future<void> setSourceOrder(List<SearchProviderId> next) async {
+    order = List<SearchProviderId>.of(next);
+  }
+}
+
+class _FakeLibraryRepository extends LibraryRepository {
+  int notifications = 0;
+
+  @override
+  void notifyChanged() {
+    notifications++;
+    super.notifyChanged();
+  }
+}
+
 void main() {
+  late AppSettings settings;
+  late _FakeSearchRepository searchRepository;
+  late _FakeLibraryRepository libraryRepository;
+  late SettingsViewModel viewModel;
+
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
@@ -57,29 +99,36 @@ void main() {
   });
 
   setUp(() async {
-    // The search-source block resolves SearchRepository through getIt and
-    // swallows a missing registration into an empty box, so the page has to
-    // run with the real container or the cards silently disappear.
+    settings = AppSettings(
+      themeMode: ThemeMode.system,
+      fontSizeScale: 1,
+      locale: null,
+      showManualDownloadButton: true,
+      backgroundVerification: true,
+      donationKey: '',
+      userAgent: '',
+      cookie: '',
+      filters: const SearchFilters(),
+    );
+    searchRepository = _FakeSearchRepository();
+    libraryRepository = _FakeLibraryRepository();
+    viewModel = SettingsViewModel(
+      settings: settings,
+      search: searchRepository,
+      library: libraryRepository,
+    );
+    // The locale row refreshes the download notifications through the DI
+    // container even though the page itself is driven by the injected
+    // view model.
     await initDi(
-      // Built directly so setup does not await sqlite inside the widget-test
-      // fake async zone; the page does not read AppSettings.
-      settings: AppSettings(
-        themeMode: ThemeMode.system,
-        fontSizeScale: 1,
-        locale: null,
-        showManualDownloadButton: true,
-        backgroundVerification: true,
-        donationKey: '',
-        userAgent: '',
-        cookie: '',
-        filters: const SearchFilters(),
-      ),
+      settings: settings,
       database: MyLibraryDb.instance,
       preferences: PreferencesRepository(database: MyLibraryDb.instance),
     );
   });
 
   tearDown(() async {
+    viewModel.dispose();
     await resetDi();
   });
 
@@ -90,25 +139,18 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    // The search-source providers read preferences from sqlite, whose
-    // futures never complete in the widget-test fake async zone, so the
-    // first frame and the real async window it needs live inside runAsync.
+    // The storage-location row reads preferences from sqlite, whose futures
+    // never complete in the widget-test fake async zone, so the first frame
+    // and the real async window it needs live inside runAsync.
     await tester.runAsync(() async {
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            // A bare repository keeps this test off the shared manager's
-            // queue even though the container registers one.
-            downloadManagerProvider.overrideWithValue(DownloadRepository()),
-          ],
-          child: MaterialApp(
-            locale: locale,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            theme: ThemeData.light(),
-            darkTheme: ThemeData.dark(),
-            home: const Scaffold(body: SettingsPage()),
-          ),
+        MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: ThemeData.light(),
+          darkTheme: ThemeData.dark(),
+          home: Scaffold(body: SettingsPage(viewModel: viewModel)),
         ),
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -140,7 +182,7 @@ void main() {
     expect(find.text('Search Providers'), findsOneWidget);
     expect(find.text('WeLib'), findsOneWidget,
         reason:
-            'the search-source cards must render, not the blank DI fallback');
+            'the search-source cards must render, not the blank loading box');
     expect(find.text('SOURCE BEHAVIOR'), findsOneWidget);
     expect(
       find.ancestor(
@@ -242,20 +284,14 @@ void main() {
       SearchProviderId.libgen,
       SearchProviderId.zlibrary,
     ];
+    searchRepository.order = saved;
 
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          searchSourceOrderProvider.overrideWith((ref) => saved),
-          searchProviderToggles
-              .overrideWith((ref) => SearchProviderId.values.toSet()),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('en'),
-          home: const Scaffold(body: SettingsPage()),
-        ),
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
+        home: Scaffold(body: SettingsPage(viewModel: viewModel)),
       ),
     );
     await tester.pump(const Duration(seconds: 1));
@@ -291,7 +327,7 @@ void main() {
     );
   });
 
-  testWidgets('theme tiles update the provider state', (tester) async {
+  testWidgets('theme tiles update AppSettings', (tester) async {
     await pumpPage(tester);
 
     await openTab(tester, 1);
@@ -309,13 +345,16 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 200)));
     await tester.pump();
 
-    final element = tester.element(find.byType(SettingsPage));
-    final container = ProviderScope.containerOf(element);
-    expect(container.read(themeModeProvider), ThemeMode.dark,
-        reason: 'selecting Dark must update the provider state');
+    expect(settings.themeMode, ThemeMode.dark,
+        reason: 'selecting Dark must update AppSettings');
+    final saved = await tester
+        .runAsync(() => MyLibraryDb.instance.getPreference('themeMode'));
+    expect(saved, 'dark',
+        reason: 'the selected mode must still reach the preferences table');
   });
 
-  testWidgets('language tiles update the locale provider', (tester) async {
+  testWidgets('language tiles update the locale on AppSettings',
+      (tester) async {
     await pumpPage(tester);
 
     await openTab(tester, 1);
@@ -333,9 +372,7 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 200)));
     await tester.pump();
 
-    final element = tester.element(find.byType(SettingsPage));
-    final container = ProviderScope.containerOf(element);
-    expect(container.read(localeOverrideProvider)?.languageCode, 'de',
+    expect(settings.locale?.languageCode, 'de',
         reason: 'selecting a language tile must switch the locale override');
 
     await tester.tap(find.byKey(const ValueKey('language-selector-toggle')));
@@ -345,16 +382,26 @@ void main() {
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 200)));
     await tester.pump();
-    expect(container.read(localeOverrideProvider), isNull,
+    expect(settings.locale, isNull,
         reason: 'the system tile clears the override');
   });
 
-  test('setTheme persists the selected mode', () async {
-    final notifier = ThemeModeNotifier(ThemeMode.light);
-    await notifier.setTheme(ThemeMode.dark);
+  test('the view model forwards theme changes into AppSettings', () {
+    var notifications = 0;
+    viewModel.addListener(() => notifications++);
 
-    final saved = await MyLibraryDb.instance.getPreference('themeMode');
-    expect(saved, 'dark',
-        reason: 'setTheme must persist the mode to the preferences table');
+    viewModel.setThemeMode(ThemeMode.dark);
+
+    expect(settings.themeMode, ThemeMode.dark,
+        reason: 'setThemeMode must write the shared AppSettings');
+    expect(notifications, 1,
+        reason: 'the page rebuilds through the AppSettings forward');
+  });
+
+  test('refreshLibrary notifies library listeners', () {
+    viewModel.refreshLibrary();
+
+    expect(libraryRepository.notifications, 1,
+        reason: 'the download center must hear about direct database writes');
   });
 }

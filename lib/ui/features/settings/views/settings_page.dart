@@ -1,4 +1,5 @@
 // Dart imports:
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -12,10 +13,8 @@ import 'package:flutter/material.dart';
 
 // Package imports:
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/services/files.dart';
 import 'package:openlib/data/services/platform_utils.dart';
@@ -23,6 +22,7 @@ import 'package:openlib/data/services/update_checker.dart';
 
 // Project imports:
 import 'package:openlib/data/models/search_result.dart';
+import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/book_import.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/logger.dart';
@@ -34,27 +34,12 @@ import 'package:openlib/ui/core/components/page_header.dart';
 import 'package:openlib/ui/core/components/pill_tabs.dart';
 import 'package:openlib/ui/core/components/settings_row.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
-import 'package:openlib/ui/core/components/search_source_meta.dart';
 import 'package:openlib/ui/core/components/snack_bar_widget.dart';
+import 'package:openlib/ui/features/settings/view_models/settings_view_model.dart';
 import 'package:openlib/ui/features/settings/views/about_page.dart';
 import 'package:openlib/ui/features/instances/views/instances_page.dart';
 import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
 import 'package:openlib/ui/core/themes.dart' show openlibColorScheme;
-
-import 'package:openlib/state/repository_providers.dart'
-    show searchRepositoryProvider;
-import 'package:openlib/state/state.dart'
-    show
-        themeModeProvider,
-        fontSizeScaleProvider,
-        showManualDownloadButtonProvider,
-        backgroundVerificationProvider,
-        donationKeyProvider,
-        myLibraryProvider,
-        searchProviderToggles,
-        searchSourceOrderProvider,
-        localeOverrideProvider,
-        downloadManagerProvider;
 
 // ---------------------------------------------------------------------------
 // Shared building blocks: every settings row renders through these, so all
@@ -171,17 +156,23 @@ class _SettingsSwitchTile extends StatelessWidget {
   }
 }
 
-class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key});
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key, this.viewModel});
+
+  /// Test seam; production builds the view model from the DI container.
+  final SettingsViewModel? viewModel;
 
   @override
-  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+  State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends ConsumerState<SettingsPage>
+class _SettingsPageState extends State<SettingsPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController =
       TabController(length: 4, vsync: this);
+
+  late final SettingsViewModel _viewModel;
+  late final bool _ownsViewModel;
 
   // Kept on the State instead of being rebuilt in build(): a new future
   // per build meant a database query and a platform-channel call every
@@ -194,63 +185,74 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   }
 
   @override
+  void initState() {
+    super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ?? SettingsViewModel.fromDi();
+    unawaited(_viewModel.loadSources());
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
+    if (_ownsViewModel) _viewModel.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final showManualDownload = ref.watch(showManualDownloadButtonProvider);
-    final backgroundVerification = ref.watch(backgroundVerificationProvider);
     final l10n = AppLocalizations.of(context);
     final dataBase = MyLibraryDb.instance;
 
-    return ContentWidth(
-      maxWidth: 900,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: PageHeader(
-              eyebrow: l10n.settingsEyebrow,
-              title: l10n.settingsTitle,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            ),
-          ),
-          PillTabs(
-            controller: _tabController,
-            tabs: [
-              Tab(text: l10n.searchProvidersSection),
-              Tab(text: l10n.appearanceSection),
-              Tab(text: l10n.advancedSection),
-              Tab(text: l10n.aboutSection),
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        return ContentWidth(
+          maxWidth: 900,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: PageHeader(
+                  eyebrow: l10n.settingsEyebrow,
+                  title: l10n.settingsTitle,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                ),
+              ),
+              PillTabs(
+                controller: _tabController,
+                tabs: [
+                  Tab(text: l10n.searchProvidersSection),
+                  Tab(text: l10n.appearanceSection),
+                  Tab(text: l10n.advancedSection),
+                  Tab(text: l10n.aboutSection),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _sourcesTab(context, dataBase, l10n),
+                    _appearanceTab(context, dataBase, l10n),
+                    _advancedTab(context, dataBase, l10n),
+                    _aboutTab(context, dataBase, l10n),
+                  ],
+                ),
+              ),
             ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _sourcesTab(context, ref, dataBase, l10n),
-                _appearanceTab(context, ref, dataBase, l10n),
-                _advancedTab(context, ref, dataBase, l10n, showManualDownload,
-                    backgroundVerification),
-                _aboutTab(context, ref, dataBase, l10n),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _sourcesTab(BuildContext context, WidgetRef ref, MyLibraryDb dataBase,
-      AppLocalizations l10n) {
+  Widget _sourcesTab(
+      BuildContext context, MyLibraryDb dataBase, AppLocalizations l10n) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const _SearchProvidersWidget(),
+        _SearchProvidersWidget(viewModel: _viewModel),
         const SizedBox(height: 12),
         _SettingsGroup(
           title: l10n.sourceBehaviorSection,
@@ -269,7 +271,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               title: l10n.donationKeyTitle,
               subtitle: l10n.enterKeyForFasterDownloads,
               icon: Icons.key,
-              onTap: () => _showDonationKeyDialog(context, ref, dataBase),
+              onTap: () => _showDonationKeyDialog(context, dataBase),
             ),
           ],
         ),
@@ -277,28 +279,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     );
   }
 
-  Widget _appearanceTab(BuildContext context, WidgetRef ref,
-      MyLibraryDb dataBase, AppLocalizations l10n) {
+  Widget _appearanceTab(
+      BuildContext context, MyLibraryDb dataBase, AppLocalizations l10n) {
     return ListView(
       key: const ValueKey('appearance-list'),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         _SettingsGroup(
-          children: const [_LanguageSelectorWidget()],
+          children: [_LanguageSelectorWidget(viewModel: _viewModel)],
         ),
         _SettingsGroup(
           title: l10n.themeTitle,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _ThemeSelectorWidget(),
+              child: _ThemeSelectorWidget(viewModel: _viewModel),
             ),
           ],
         ),
         _SettingsGroup(
           title: l10n.displaySection,
           children: [
-            _FontSizeSelector(dataBase: dataBase),
+            _FontSizeSelector(dataBase: dataBase, viewModel: _viewModel),
           ],
         ),
       ],
@@ -306,12 +308,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   }
 
   Widget _advancedTab(
-      BuildContext context,
-      WidgetRef ref,
-      MyLibraryDb dataBase,
-      AppLocalizations l10n,
-      bool showManualDownload,
-      bool backgroundVerification) {
+      BuildContext context, MyLibraryDb dataBase, AppLocalizations l10n) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
@@ -345,8 +342,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                         'bookStorageDirectory', pickedDirectory);
                     await importBooksFromDirectory(
                         pickedDirectory, dataBase);
-                    // ignore: unused_result
-                    ref.refresh(myLibraryProvider);
+                    _viewModel.refreshLibrary();
                     if (!mounted) return;
                     setState(() {
                       _storageDirectory = Future.value(pickedDirectory);
@@ -364,10 +360,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               title: l10n.manualDownloadButton,
               subtitle: l10n.showManualDownloadHint,
               icon: Icons.download_outlined,
-              value: showManualDownload,
+              value: _viewModel.showManualDownloadButton,
               onChanged: (val) {
-                ref.read(showManualDownloadButtonProvider.notifier).state = val;
-                getIt<AppSettings>().setShowManualDownloadButton(val);
+                _viewModel.setShowManualDownloadButton(val);
                 dataBase.savePreference('showManualDownloadButton', val);
               },
             ),
@@ -375,9 +370,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               title: l10n.backgroundVerification,
               subtitle: l10n.backgroundVerificationHint,
               icon: Icons.verified_user_outlined,
-              value: backgroundVerification,
+              value: _viewModel.backgroundVerification,
               onChanged: (val) {
-                ref.read(backgroundVerificationProvider.notifier).state = val;
+                _viewModel.setBackgroundVerification(val);
                 WebviewChallengeSolver.headlessEnabled = val;
                 dataBase.savePreference('backgroundVerification', val ? 1 : 0);
               },
@@ -385,7 +380,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           ],
         ),
         const _UpdateSettingsWidget(),
-        _BackupSettingsWidget(database: dataBase),
+        _BackupSettingsWidget(database: dataBase, viewModel: _viewModel),
         _SettingsGroup(
           title: l10n.maintenanceSection,
           children: [
@@ -407,8 +402,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     );
   }
 
-  Widget _aboutTab(BuildContext context, WidgetRef ref, MyLibraryDb dataBase,
-      AppLocalizations l10n) {
+  Widget _aboutTab(
+      BuildContext context, MyLibraryDb dataBase, AppLocalizations l10n) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
@@ -602,10 +597,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     }
   }
 
-  void _showDonationKeyDialog(
-      BuildContext context, WidgetRef ref, MyLibraryDb dataBase) {
+  void _showDonationKeyDialog(BuildContext context, MyLibraryDb dataBase) {
     final dialogL10n = AppLocalizations.of(context);
-    final currentKey = ref.read(donationKeyProvider);
+    final currentKey = _viewModel.donationKey;
     final controller = TextEditingController(text: currentKey);
     showDialog(
       context: context,
@@ -626,8 +620,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           TextButton(
             onPressed: () {
               final newKey = controller.text.trim();
-              ref.read(donationKeyProvider.notifier).state = newKey;
-              getIt<AppSettings>().setDonationKey(newKey);
+              _viewModel.setDonationKey(newKey);
               dataBase.savePreference('donationKey', newKey);
               Navigator.pop(dialogContext);
             },
@@ -740,126 +733,116 @@ class _UpdateSettingsWidgetState extends State<_UpdateSettingsWidget> {
 /// The cards also carry the automatic chain's order: dragging one onto
 /// another drops it into that slot. The stored order is shared with the
 /// search capsules, the suggestions panel and the manager's fallback.
-class _SearchProvidersWidget extends ConsumerWidget {
-  const _SearchProvidersWidget();
+class _SearchProvidersWidget extends StatelessWidget {
+  const _SearchProvidersWidget({required this.viewModel});
+
+  final SettingsViewModel viewModel;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final enabled = ref.watch(searchProviderToggles);
-    // The grid has to stay on screen across the refresh that follows a
-    // drop, so an in-flight save keeps showing the order it started from.
-    final order = ref.watch(searchSourceOrderProvider).valueOrNull ??
-        fallbackSearchSourceOrder;
+    // The view model keeps the previous snapshot while a reload is in
+    // flight, so a drop keeps showing the order it started from.
+    if (!viewModel.sourcesLoaded) return const SizedBox.shrink();
+    final enabledIds = viewModel.enabledSources;
+    final order = viewModel.sourceOrder;
     final touch = theme.platform == TargetPlatform.android ||
         theme.platform == TargetPlatform.iOS;
 
-    return enabled.when(
-      data: (enabledIds) {
-        final catalog = {
-          SearchProviderId.annasArchive: (
-            name: "Anna's Archive",
-            subtitle: l10n.providerSourceOriginal,
-            mark: 'AA',
-          ),
-          SearchProviderId.libgen: (
-            name: 'LibGen',
-            subtitle: l10n.providerLibgenCatalog,
-            mark: 'LG',
-          ),
-          SearchProviderId.zlibrary: (
-            name: 'Z-Library',
-            subtitle: l10n.providerZlibMirrors,
-            mark: 'ZL',
-          ),
-          SearchProviderId.welib: (
-            name: 'WeLib',
-            subtitle: l10n.providerWelibCatalog,
-            mark: 'WL',
-          ),
-        };
-        final ids = order.where(catalog.containsKey).toList(growable: false);
+    final catalog = {
+      SearchProviderId.annasArchive: (
+        name: "Anna's Archive",
+        subtitle: l10n.providerSourceOriginal,
+        mark: 'AA',
+      ),
+      SearchProviderId.libgen: (
+        name: 'LibGen',
+        subtitle: l10n.providerLibgenCatalog,
+        mark: 'LG',
+      ),
+      SearchProviderId.zlibrary: (
+        name: 'Z-Library',
+        subtitle: l10n.providerZlibMirrors,
+        mark: 'ZL',
+      ),
+      SearchProviderId.welib: (
+        name: 'WeLib',
+        subtitle: l10n.providerWelibCatalog,
+        mark: 'WL',
+      ),
+    };
+    final ids = order.where(catalog.containsKey).toList(growable: false);
 
-        Future<void> moveTo(SearchProviderId dragged, int targetIndex) async {
-          final next = [...ids];
-          final from = next.indexOf(dragged);
-          if (from < 0 || from == targetIndex) return;
-          next.removeAt(from);
-          // The dragged card takes the target's slot; removing it first
-          // shifts everything after it, so the target index still lands
-          // right in both directions.
-          next.insert(targetIndex, dragged);
-          await ref.read(searchRepositoryProvider).setSourceOrder(next);
-          // ignore: unused_result
-          ref.refresh(searchSourceOrderProvider);
-        }
+    Future<void> moveTo(SearchProviderId dragged, int targetIndex) async {
+      final next = [...ids];
+      final from = next.indexOf(dragged);
+      if (from < 0 || from == targetIndex) return;
+      next.removeAt(from);
+      // The dragged card takes the target's slot; removing it first
+      // shifts everything after it, so the target index still lands
+      // right in both directions.
+      next.insert(targetIndex, dragged);
+      await viewModel.setSourceOrder(next);
+    }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-              child: Text(
-                l10n.searchSourcesIntro,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  height: 1.6,
-                ),
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+          child: Text(
+            l10n.searchSourcesIntro,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              height: 1.6,
             ),
-            for (var index = 0; index < ids.length; index++) ...[
-              Builder(
-                builder: (context) {
-                  final id = ids[index];
-                  final provider = catalog[id]!;
-                  final selected = enabledIds.contains(id);
+          ),
+        ),
+        for (var index = 0; index < ids.length; index++) ...[
+          Builder(
+            builder: (context) {
+              final id = ids[index];
+              final provider = catalog[id]!;
+              final selected = enabledIds.contains(id);
 
-                  Future<void> toggle() async {
-                    if (selected && enabledIds.length == 1) {
-                      showSnackBar(
-                          context: context, message: l10n.atLeastOneSource);
-                      return;
-                    }
-                    await ref
-                        .read(searchRepositoryProvider)
-                        .setProviderEnabled(id, !selected);
-                    // ignore: unused_result
-                    ref.refresh(searchProviderToggles);
-                  }
+              Future<void> toggle() async {
+                if (selected && enabledIds.length == 1) {
+                  showSnackBar(
+                      context: context, message: l10n.atLeastOneSource);
+                  return;
+                }
+                await viewModel.setEnabled(id, !selected);
+              }
 
-                  return _DraggableProviderCard(
-                    key: ValueKey(id.name),
-                    id: id,
-                    touch: touch,
-                    onDropped: (dragged) => moveTo(dragged, index),
-                    child: _ProviderCard(
-                      mark: provider.mark,
-                      name: provider.name,
-                      subtitle: provider.subtitle,
-                      selected: selected,
-                      longPressTooltip: !touch,
-                      onTap: toggle,
-                      onOpenMirrors: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const InstancesPage(),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-              if (index < ids.length - 1) const SizedBox(height: 9),
-            ],
-          ],
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
+              return _DraggableProviderCard(
+                key: ValueKey(id.name),
+                id: id,
+                touch: touch,
+                onDropped: (dragged) => moveTo(dragged, index),
+                child: _ProviderCard(
+                  mark: provider.mark,
+                  name: provider.name,
+                  subtitle: provider.subtitle,
+                  selected: selected,
+                  longPressTooltip: !touch,
+                  onTap: toggle,
+                  onOpenMirrors: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const InstancesPage(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+          if (index < ids.length - 1) const SizedBox(height: 9),
+        ],
+      ],
     );
   }
 }
@@ -1108,10 +1091,14 @@ class _ProviderCard extends StatelessWidget {
 
 /// Export/import the whole app state: settings, saved books, reading
 /// positions, instances. One JSON file, shareable or pickable.
-class _BackupSettingsWidget extends ConsumerWidget {
-  const _BackupSettingsWidget({required this.database});
+class _BackupSettingsWidget extends StatelessWidget {
+  const _BackupSettingsWidget({
+    required this.database,
+    required this.viewModel,
+  });
 
   final MyLibraryDb database;
+  final SettingsViewModel viewModel;
 
   Future<void> _export(BuildContext context) async {
     final service = BackupService(database: database);
@@ -1154,7 +1141,7 @@ class _BackupSettingsWidget extends ConsumerWidget {
     }
   }
 
-  Future<void> _import(BuildContext context, WidgetRef ref) async {
+  Future<void> _import(BuildContext context) async {
     final service = BackupService(database: database);
     final importL10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -1175,10 +1162,8 @@ class _BackupSettingsWidget extends ConsumerWidget {
         return;
       }
       // Imported preferences/instances must reach the live UI.
-      // ignore: unused_result
-      ref.refresh(myLibraryProvider);
-      // ignore: unused_result
-      ref.refresh(searchProviderToggles);
+      viewModel.refreshLibrary();
+      await viewModel.loadSources();
       if (context.mounted) {
         showSnackBar(
             context: context,
@@ -1191,7 +1176,7 @@ class _BackupSettingsWidget extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return _SettingsGroup(
       title: l10n.backupSection,
@@ -1206,7 +1191,7 @@ class _BackupSettingsWidget extends ConsumerWidget {
           title: l10n.importBackupTitle,
           subtitle: l10n.importBackupSubtitle,
           icon: Icons.file_download_outlined,
-          onTap: () => _import(context, ref),
+          onTap: () => _import(context),
         ),
       ],
     );
@@ -1229,22 +1214,22 @@ const _nativeLanguageNames = {
 
 /// Collapsed language row that expands into a two/three-column option grid
 /// only when tapped, keeping the appearance tab short by default.
-class _LanguageSelectorWidget extends ConsumerStatefulWidget {
-  const _LanguageSelectorWidget();
+class _LanguageSelectorWidget extends StatefulWidget {
+  const _LanguageSelectorWidget({required this.viewModel});
+
+  final SettingsViewModel viewModel;
 
   @override
-  ConsumerState<_LanguageSelectorWidget> createState() =>
+  State<_LanguageSelectorWidget> createState() =>
       _LanguageSelectorWidgetState();
 }
 
-class _LanguageSelectorWidgetState
-    extends ConsumerState<_LanguageSelectorWidget> {
+class _LanguageSelectorWidgetState extends State<_LanguageSelectorWidget> {
   bool _expanded = false;
 
   void _select(Locale? value) {
-    ref.read(localeOverrideProvider.notifier).state = value;
-    ref
-        .read(downloadManagerProvider)
+    widget.viewModel.setLocale(value);
+    getIt<DownloadRepository>()
         .setLocale(value ?? WidgetsBinding.instance.platformDispatcher.locale);
     MyLibraryDb.instance
         .savePreference('locale', value?.languageCode ?? '')
@@ -1256,7 +1241,7 @@ class _LanguageSelectorWidgetState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final locale = ref.watch(localeOverrideProvider);
+    final locale = widget.viewModel.locale;
     final l10n = AppLocalizations.of(context);
     final activeCode = Localizations.localeOf(context).languageCode;
     final systemNative = _nativeLanguageNames[activeCode] ?? activeCode;
@@ -1498,14 +1483,26 @@ class _LanguageRow extends StatelessWidget {
 
 /// Pick a theme by looking at it: three miniature app previews instead of
 /// a text dropdown.
-class _ThemeSelectorWidget extends ConsumerWidget {
+class _ThemeSelectorWidget extends StatelessWidget {
+  const _ThemeSelectorWidget({required this.viewModel});
+
+  final SettingsViewModel viewModel;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(themeModeProvider);
+  Widget build(BuildContext context) {
+    final mode = viewModel.themeMode;
     final l10n = AppLocalizations.of(context);
 
     void select(ThemeMode value) {
-      ref.read(themeModeProvider.notifier).setTheme(value);
+      viewModel.setThemeMode(value);
+      // AppSettings is the live source; the row is still this page's to
+      // persist, the way ThemeModeNotifier used to.
+      final saved = switch (value) {
+        ThemeMode.light => 'light',
+        ThemeMode.dark => 'dark',
+        ThemeMode.system => 'system',
+      };
+      unawaited(MyLibraryDb.instance.savePreference('themeMode', saved));
     }
 
     return Row(
@@ -1683,10 +1680,11 @@ class _ThemeSwatch extends StatelessWidget {
       );
 }
 
-class _FontSizeSelector extends ConsumerWidget {
-  const _FontSizeSelector({required this.dataBase});
+class _FontSizeSelector extends StatelessWidget {
+  const _FontSizeSelector({required this.dataBase, required this.viewModel});
 
   final MyLibraryDb dataBase;
+  final SettingsViewModel viewModel;
 
   static const _min = 0.8;
   static const _max = 2.0;
@@ -1699,15 +1697,15 @@ class _FontSizeSelector extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final scale = ref.watch(fontSizeScaleProvider);
+    final scale = viewModel.fontSizeScale;
 
     void select(double value) {
       final next = _normalize(value);
-      ref.read(fontSizeScaleProvider.notifier).state = next;
+      viewModel.setFontSizeScale(next);
     }
 
     return Padding(

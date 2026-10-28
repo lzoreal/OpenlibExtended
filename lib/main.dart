@@ -6,55 +6,41 @@ import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:openlib/ui/features/shell/views/home_page.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
-import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/services/database.dart' show MyLibraryDb;
-import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
-import 'package:openlib/data/services/webview_challenge_solver.dart';
+import 'package:openlib/data/services/database.dart' show MyLibraryDb;
+import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/services/download_notification.dart';
+import 'package:openlib/data/services/files.dart'
+    show moveFilesToAndroidInternalStorage;
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/update_checker.dart';
 import 'package:openlib/data/services/upgrade_detector.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
+import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/ui/core/components/tab_keep_alive.dart';
+import 'package:openlib/ui/core/motion.dart';
+import 'package:openlib/ui/core/themes.dart';
+import 'package:openlib/ui/features/library/views/download_center_page.dart';
+import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
+import 'package:openlib/ui/features/search/views/search_page.dart';
+import 'package:openlib/ui/features/settings/views/settings_page.dart';
+import 'package:openlib/ui/features/shell/view_models/shell_view_model.dart';
+import 'package:openlib/ui/features/shell/views/home_page.dart';
 import 'package:openlib/ui/features/shell/widgets/bottom_nav_bar.dart';
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/features/shell/widgets/swiss_grid_overlay.dart';
-import 'package:openlib/ui/core/components/tab_keep_alive.dart';
-import 'package:openlib/ui/features/library/views/download_center_page.dart';
-import 'package:openlib/ui/core/motion.dart';
-import 'package:openlib/ui/features/search/views/search_page.dart';
-import 'package:openlib/ui/features/settings/views/settings_page.dart';
-import 'package:openlib/ui/core/themes.dart';
-import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
 import 'package:openlib/ui/features/webview/views/challenge_solver_page.dart';
 import 'package:openlib/ui/features/whats_new/views/whats_new_page.dart';
-
-import 'package:openlib/data/services/files.dart'
-    show moveFilesToAndroidInternalStorage;
-import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/data/services/download_notification.dart';
-import 'package:openlib/data/services/instance_manager.dart';
-import 'package:openlib/state/state.dart'
-    show
-        ThemeModeNotifier,
-        selectedIndexProvider,
-        activeDownloadsProvider,
-        themeModeProvider,
-        fontSizeScaleProvider,
-        localeOverrideProvider,
-        showManualDownloadButtonProvider,
-        backgroundVerificationProvider,
-        userAgentProvider,
-        cookieProvider,
-        donationKeyProvider;
 
 void main(List<String> args) async {
   // Required for desktop_webview_window on Linux - must be called before ensureInitialized
@@ -74,7 +60,7 @@ void main(List<String> args) async {
 
   await DownloadManager().initialize();
 
-  ThemeMode startThemeMode = await ThemeModeNotifier.getInitialTheme();
+  ThemeMode startThemeMode = await getInitialTheme();
 
   final preferences = PreferencesRepository(database: dataBase);
   final settings = await AppSettings.load(
@@ -113,7 +99,7 @@ void main(List<String> args) async {
 
   if (Platform.isAndroid) {
     // Android-specific setup for system UI overlay colors
-    ThemeModeNotifier.updateSystemUi(startThemeMode);
+    updateSystemUi(startThemeMode);
     await moveFilesToAndroidInternalStorage();
   }
 
@@ -130,24 +116,9 @@ void main(List<String> args) async {
   };
 
   runApp(
-    ProviderScope(
-      overrides: [
-        themeModeProvider
-            .overrideWith((ref) => ThemeModeNotifier(startThemeMode)),
-        fontSizeScaleProvider.overrideWith((ref) => settings.fontSizeScale),
-        localeOverrideProvider.overrideWith((ref) => settings.locale),
-        showManualDownloadButtonProvider
-            .overrideWith((ref) => settings.showManualDownloadButton),
-        backgroundVerificationProvider
-            .overrideWith((ref) => settings.backgroundVerification),
-        donationKeyProvider.overrideWith((ref) => settings.donationKey),
-        userAgentProvider.overrideWith((ref) => settings.userAgent),
-        cookieProvider.overrideWith((ref) => settings.cookie),
-      ],
-      child: MyApp(
-        onboardingCompleted: onboardingCompleted,
-        upgrade: upgrade,
-      ),
+    MyApp(
+      onboardingCompleted: onboardingCompleted,
+      upgrade: upgrade,
     ),
   );
 }
@@ -172,74 +143,104 @@ class _SmoothScrollBehavior extends MaterialScrollBehavior {
 /// widget) can push the visible solver page from anywhere.
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
-class MyApp extends ConsumerWidget {
+class MyApp extends StatefulWidget {
   final bool onboardingCompleted;
 
   /// Non-null with [UpgradeCheck.isUpgrade] when this launch follows a
   /// version bump; drives the what's-new screen.
   final UpgradeCheck? upgrade;
-  const MyApp({super.key, this.onboardingCompleted = false, this.upgrade});
+
+  /// Test seam; production builds the shell view model from the DI container.
+  final ShellViewModel? viewModel;
+
+  const MyApp({
+    super.key,
+    this.onboardingCompleted = false,
+    this.upgrade,
+    this.viewModel,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      scrollBehavior: const _SmoothScrollBehavior(),
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: ref.watch(localeOverrideProvider),
-      builder: (context, child) {
-        final scale = ref.watch(fontSizeScaleProvider);
-        final content = MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(scale)),
-          child: child!,
-        );
-        if (!kDebugMode || !const bool.fromEnvironment('SWISS_GRID')) {
-          return content;
-        }
-        return Stack(
-          children: [
-            content,
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: SwissGridOverlay(
-                    dark: Theme.of(context).brightness == Brightness.dark,
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final ShellViewModel _viewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    // ShellViewModel is a DI singleton: several screens (onboarding,
+    // what's new, the root) can push MainScreen without duplication.
+    _viewModel = widget.viewModel ?? ShellViewModel.fromDi();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) => MaterialApp(
+        navigatorKey: _navigatorKey,
+        scrollBehavior: const _SmoothScrollBehavior(),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: _viewModel.locale,
+        builder: (context, child) {
+          final scale = _viewModel.fontSizeScale;
+          final content = MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          );
+          if (!kDebugMode || !const bool.fromEnvironment('SWISS_GRID')) {
+            return content;
+          }
+          return Stack(
+            children: [
+              content,
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: SwissGridOverlay(
+                      dark: Theme.of(context).brightness == Brightness.dark,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        );
-      },
-      debugShowCheckedModeBanner: false,
-      title: 'OpenlibExtended',
-      theme: lightTheme,
-      darkTheme: darkTheme,
-      themeMode: ref.watch(themeModeProvider),
-      home: !onboardingCompleted
-          ? const OnboardingPage()
-          : (upgrade?.isUpgrade ?? false)
-              ? WhatsNewPage(
-                  fromVersion: upgrade!.fromVersion,
-                  toVersion: upgrade!.toVersion,
-                )
-              : const MainScreen(),
+            ],
+          );
+        },
+        debugShowCheckedModeBanner: false,
+        title: 'OpenlibExtended',
+        theme: lightTheme,
+        darkTheme: darkTheme,
+        themeMode: _viewModel.themeMode,
+        home: !widget.onboardingCompleted
+            ? const OnboardingPage()
+            : (widget.upgrade?.isUpgrade ?? false)
+                ? WhatsNewPage(
+                    fromVersion: widget.upgrade!.fromVersion,
+                    toVersion: widget.upgrade!.toVersion,
+                  )
+                : MainScreen(viewModel: _viewModel),
+      ),
     );
   }
 }
 
-class MainScreen extends ConsumerStatefulWidget {
-  const MainScreen({super.key});
+class MainScreen extends StatefulWidget {
+  /// Test seam; production builds the shell view model from the DI container.
+  final ShellViewModel? viewModel;
+
+  const MainScreen({super.key, this.viewModel});
 
   @override
-  ConsumerState<ConsumerStatefulWidget> createState() => _MainScreenState();
+  State<MainScreen> createState() => _MainScreenState();
 }
 
 /// Moves the root PageView to [next] with the same slide the settings
@@ -258,25 +259,25 @@ void switchToTab(PageController controller, int next) {
   );
 }
 
-class _MainScreenState extends ConsumerState<MainScreen>
-    with WidgetsBindingObserver {
-  late final List<Widget> _pages = <Widget>[
-    const HomePage(),
-    SearchPage(onManageSources: () => _selectTab(3)),
-    DownloadCenterPage(onBrowseSearch: () => _selectTab(1)),
-    const SettingsPage(),
-  ];
-
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+  late final ShellViewModel _viewModel;
+  late int _lastTabIndex;
   late final PageController _pageController;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    _pageController =
-        PageController(initialPage: ref.read(selectedIndexProvider));
-    ref.listenManual<int>(selectedIndexProvider, (previous, next) {
-      switchToTab(_pageController, next);
-    });
+    _viewModel = widget.viewModel ?? ShellViewModel.fromDi();
+    _lastTabIndex = _viewModel.tabIndex;
+    _pages = <Widget>[
+      HomePage(onOpenSearch: () => _viewModel.selectTab(1)),
+      SearchPage(onManageSources: () => _viewModel.selectTab(3)),
+      DownloadCenterPage(onBrowseSearch: () => _viewModel.selectTab(1)),
+      const SettingsPage(),
+    ];
+    _pageController = PageController(initialPage: _viewModel.tabIndex);
+    _viewModel.addListener(_onViewModelChanged);
     WidgetsBinding.instance.addObserver(this);
     // Request notification permission after first frame (only on mobile)
     if (PlatformUtils.isMobile) {
@@ -295,6 +296,12 @@ class _MainScreenState extends ConsumerState<MainScreen>
     });
   }
 
+  void _onViewModelChanged() {
+    if (_viewModel.tabIndex == _lastTabIndex) return;
+    _lastTabIndex = _viewModel.tabIndex;
+    switchToTab(_pageController, _lastTabIndex);
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Android suspends the process soon after the user leaves the app,
@@ -302,13 +309,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
     // receiving data"). Coming back to the foreground, every paused or
     // failed download continues from its partial file instead of dying.
     if (state == AppLifecycleState.resumed) {
-      DownloadManager().resumeInterruptedDownloads();
+      _viewModel.resumeInterrupted();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _viewModel.removeListener(_onViewModelChanged);
     _pageController.dispose();
     super.dispose();
   }
@@ -420,51 +428,36 @@ class _MainScreenState extends ConsumerState<MainScreen>
     );
   }
 
-  void _selectTab(int index) {
-    ref.read(selectedIndexProvider.notifier).state = index;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = ref.watch(selectedIndexProvider);
-    // Only the badge count matters here; watching the whole task map made
-    // the scaffold and dock rebuild for every network chunk.
-    final downloadCount = ref.watch(activeDownloadsProvider.select(
-      (downloads) =>
-          (downloads.valueOrNull ?? const <String, DownloadTask>{})
-              .values
-              .where((task) =>
-                  task.status != DownloadStatus.completed &&
-                  task.status != DownloadStatus.cancelled)
-              .length,
-    ));
-
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: ContentWidth(
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              if (ref.read(selectedIndexProvider) != index) {
-                ref.read(selectedIndexProvider.notifier).state = index;
-              }
-            },
-            children: [
-              for (var index = 0; index < _pages.length; index++)
-                TabKeepAlive(
-                  active: index == selectedIndex,
-                  child: _pages[index],
-                ),
-            ],
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        final selectedIndex = _viewModel.tabIndex;
+        return Scaffold(
+          body: SafeArea(
+            bottom: false,
+            child: ContentWidth(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: _viewModel.selectTab,
+                children: [
+                  for (var index = 0; index < _pages.length; index++)
+                    TabKeepAlive(
+                      active: index == selectedIndex,
+                      child: _pages[index],
+                    ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: selectedIndex,
-        onSelected: _selectTab,
-        downloadCount: downloadCount,
-      ),
+          bottomNavigationBar: BottomNavBar(
+            selectedIndex: selectedIndex,
+            onSelected: _viewModel.selectTab,
+            downloadCount: _viewModel.activeDownloadCount,
+          ),
+        );
+      },
     );
   }
 }

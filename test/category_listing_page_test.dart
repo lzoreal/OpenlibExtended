@@ -2,14 +2,38 @@
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/goodreads.dart';
-import 'package:openlib/state/state.dart';
+import 'package:openlib/ui/features/trending/view_models/categories_view_model.dart';
 import 'package:openlib/ui/features/trending/views/categories_page.dart';
+
+import 'helpers/search_test_support.dart';
+
+/// Serves canned shelf data so the page never touches Goodreads.
+class _FakeSubCategories extends SubCategoriesTypeList {
+  _FakeSubCategories(this.books);
+
+  final List<CategoryBookData> books;
+
+  @override
+  Future<List<CategoryBookData>> categoriesBooks({required String url}) async =>
+      books;
+}
+
+CategoryListingPage _page(List<CategoryBookData> books) {
+  return CategoryListingPage(
+    url: 'list/tag/classics',
+    title: '经典',
+    viewModel: CategoriesViewModel(
+      url: 'list/tag/classics',
+      settings: testAppSettings(),
+      service: _FakeSubCategories(books),
+    ),
+  );
+}
 
 void main() {
   testWidgets('constrains the listing grid on wide screens', (tester) async {
@@ -27,18 +51,10 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getSubCategoryTypeList.overrideWith((ref, url) async => books),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const CategoryListingPage(
-          url: 'list/tag/classics',
-          title: '经典',
-        ),
-      ),
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: _page(books),
     ));
     await tester.pump();
 
@@ -53,27 +69,19 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getSubCategoryTypeList.overrideWith((ref, url) async => [
-              CategoryBookData(
-                title: '三体',
-                thumbnail: 'https://example.com/book.jpg',
-                link: 'https://example.com/book',
-                author: '刘慈欣',
-                rating: '4.3',
-                published: '2008',
-              ),
-            ]),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const CategoryListingPage(
-          url: 'list/tag/classics',
-          title: '经典',
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: _page([
+        CategoryBookData(
+          title: '三体',
+          thumbnail: 'https://example.com/book.jpg',
+          link: 'https://example.com/book',
+          author: '刘慈欣',
+          rating: '4.3',
+          published: '2008',
         ),
-      ),
+      ]),
     ));
     await tester.pump();
 
@@ -88,27 +96,19 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getSubCategoryTypeList.overrideWith((ref, url) async => [
-              CategoryBookData(
-                title: 'Pride and Prejudice (Hardcover)',
-                thumbnail: 'https://example.com/book.jpg',
-                link: 'https://example.com/book',
-                author: 'Jane Austen',
-                rating: '4.30',
-                published: '1813',
-              ),
-            ]),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const CategoryListingPage(
-          url: 'list/tag/classics',
-          title: '经典',
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: _page([
+        CategoryBookData(
+          title: 'Pride and Prejudice (Hardcover)',
+          thumbnail: 'https://example.com/book.jpg',
+          link: 'https://example.com/book',
+          author: 'Jane Austen',
+          rating: '4.30',
+          published: '1813',
         ),
-      ),
+      ]),
     ));
     await tester.pump();
 
@@ -127,31 +127,23 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getSubCategoryTypeList.overrideWith((ref, url) async => [
-              CategoryBookData(
-                title: 'Pride and Prejudice (Hardcover)',
-                thumbnail: 'https://example.com/book.jpg',
-                link: 'https://example.com/book',
-                author: 'Jane Austen',
-                rating: '4.30',
-                published: '1813',
-              ),
-            ]),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(2)),
-            child: const CategoryListingPage(
-              url: 'list/tag/classics',
-              title: '经典',
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Builder(
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2)),
+          child: _page([
+            CategoryBookData(
+              title: 'Pride and Prejudice (Hardcover)',
+              thumbnail: 'https://example.com/book.jpg',
+              link: 'https://example.com/book',
+              author: 'Jane Austen',
+              rating: '4.30',
+              published: '1813',
             ),
-          ),
+          ]),
         ),
       ),
     ));

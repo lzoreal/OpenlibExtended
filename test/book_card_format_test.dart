@@ -2,7 +2,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/state/state.dart' show fileType;
+import 'package:openlib/ui/core/filter_options.dart';
 import 'package:openlib/ui/core/components/book_card_widget.dart'
     show getFileType, getLanguage;
 

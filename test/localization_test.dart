@@ -13,7 +13,10 @@ import 'package:flutter_test/flutter_test.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/ui/features/settings/views/settings_page.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:openlib/app/di.dart' show resetDi;
+
+import 'helpers/test_di.dart';
 
 Map<String, dynamic> _readArb(String locale) {
   final file = File('lib/l10n/app_$locale.arb');
@@ -123,17 +126,14 @@ void main() {
 
   testWidgets('the language dropdown writes the locale preference',
       (tester) async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
+    await setupTestDi();
+    addTearDown(resetDi);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
+      MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: SettingsPage()),
-        ),
+        home: const Scaffold(body: SettingsPage()),
       ),
     );
     // The settings page polls mirror health, so it never settles; a fixed

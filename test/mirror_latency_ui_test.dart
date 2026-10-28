@@ -8,38 +8,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
-import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/instance_manager.dart';
-import 'package:openlib/data/services/mirror_latency.dart';
-import 'package:openlib/data/services/preference_store.dart';
-import 'package:openlib/data/services/slum_catalogue.dart';
-import 'package:openlib/state/repository_providers.dart'
-    show mirrorRepositoryProvider;
-import 'package:openlib/state/state.dart';
+import 'package:openlib/data/services/mirror_latency_controller.dart';
+import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/ui/features/instances/view_models/instances_view_model.dart';
 import 'package:openlib/ui/features/instances/views/instances_page.dart';
 
-class _FakeTester extends MirrorLatencyTester {
-  _FakeTester(this.onMeasure);
-
-  final Future<Map<String, int?>> Function(Iterable<String>) onMeasure;
-
-  @override
-  Future<Map<String, int?>> measure(Iterable<String> urls) => onMeasure(urls);
-}
-
-InstanceManager _manager(MemoryPreferenceStore store) =>
-    InstanceManager.forTest(
-      catalogue: SlumCatalogue(
-        store: store,
-        baseUrl: 'http://127.0.0.1:9',
-      ),
-      store: store,
-    );
+import 'helpers/instances_test_support.dart';
 
 InstanceView _view(
   String host, {
@@ -70,7 +46,7 @@ String _localText(WidgetTester tester, String host) {
 
 Future<void> _pumpPage(
   WidgetTester tester, {
-  required InstanceManager manager,
+  required InstancesMirrorRepository repository,
   required List<InstanceView> views,
   required Future<Map<String, int?>> Function(Iterable<String>) measure,
 }) async {
@@ -79,27 +55,18 @@ Future<void> _pumpPage(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  final repository = MirrorRepository(
-    manager: manager,
-    tester: _FakeTester(measure),
-  );
+  repository.views[MirrorService.zlibrary] = views;
+  repository.measureHandler = measure;
 
-  await tester.pumpWidget(ProviderScope(
-    overrides: [
-      mirrorRepositoryProvider.overrideWithValue(repository),
-      serviceInstancesProvider.overrideWith(
-        (ref, service) async =>
-            service == MirrorService.zlibrary ? views : const <InstanceView>[],
-      ),
-      mirrorLatencyProvider.overrideWith(
-        (ref) => MirrorLatencyNotifier(repository),
-      ),
-    ],
-    child: MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: const InstancesPage(),
-    ),
+  final latency = MirrorLatencyNotifier(repository);
+  final viewModel = InstancesViewModel(mirrors: repository, latency: latency);
+  addTearDown(latency.dispose);
+  addTearDown(viewModel.dispose);
+
+  await tester.pumpWidget(MaterialApp(
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: InstancesPage(viewModel: viewModel),
   ));
   await tester.pump();
   await tester.pump();
@@ -108,14 +75,13 @@ Future<void> _pumpPage(
 void main() {
   testWidgets('probes only enabled, non-down mirrors and shows the result',
       (tester) async {
-    final store = MemoryPreferenceStore();
-    final manager = _manager(store);
+    final repository = InstancesMirrorRepository();
     final completer = Completer<Map<String, int?>>();
     final requested = <String>[];
 
     await _pumpPage(
       tester,
-      manager: manager,
+      repository: repository,
       views: [
         _view('z-lib.gd'),
         _view('z-lib.gl', enabled: false),
@@ -145,7 +111,7 @@ void main() {
 
     expect(_localText(tester, 'z-lib.gd'), 'Local 85 ms · just now');
     expect(
-      (await manager.localLatencies())['z-lib.gd']?.milliseconds,
+      (await repository.localLatencies())['z-lib.gd']?.milliseconds,
       85,
     );
     expect(
@@ -156,13 +122,12 @@ void main() {
 
   testWidgets('marks protected mirrors as needing verification',
       (tester) async {
-    final store = MemoryPreferenceStore();
-    final manager = _manager(store);
-    await manager.saveLocalLatencies({'z-lib.gd': 85});
+    final repository = InstancesMirrorRepository();
+    await repository.saveLocalLatencies({'z-lib.gd': 85});
 
     await _pumpPage(
       tester,
-      manager: manager,
+      repository: repository,
       views: [
         _view('z-lib.gd', protection: Protection.cloudflare),
       ],
@@ -174,12 +139,11 @@ void main() {
   });
 
   testWidgets('shows a timeout as a tested local result', (tester) async {
-    final store = MemoryPreferenceStore();
-    final manager = _manager(store);
+    final repository = InstancesMirrorRepository();
 
     await _pumpPage(
       tester,
-      manager: manager,
+      repository: repository,
       views: [_view('z-lib.gd')],
       measure: (urls) async => {'z-lib.gd': null},
     );
@@ -195,16 +159,15 @@ void main() {
   });
 
   testWidgets('marks a reading older than 24 hours as expired', (tester) async {
-    final store = MemoryPreferenceStore();
-    final manager = _manager(store);
-    await manager.saveLocalLatencies(
+    final repository = InstancesMirrorRepository();
+    await repository.saveLocalLatencies(
       {'z-lib.gd': 120},
       testedAt: DateTime.now().subtract(const Duration(hours: 25)),
     );
 
     await _pumpPage(
       tester,
-      manager: manager,
+      repository: repository,
       views: [_view('z-lib.gd')],
       measure: (urls) async => {'z-lib.gd': 85},
     );
@@ -213,13 +176,12 @@ void main() {
   });
 
   testWidgets('explains that there is nothing enabled to test', (tester) async {
-    final store = MemoryPreferenceStore();
-    final manager = _manager(store);
+    final repository = InstancesMirrorRepository();
     var called = false;
 
     await _pumpPage(
       tester,
-      manager: manager,
+      repository: repository,
       views: [
         _view('z-lib.gl', enabled: false),
         _view('down.example', status: SlumStatus.down),
@@ -239,12 +201,11 @@ void main() {
 
   testWidgets('reports a failed probe without leaving the page spinning',
       (tester) async {
-    final store = MemoryPreferenceStore();
-    final manager = _manager(store);
+    final repository = InstancesMirrorRepository();
 
     await _pumpPage(
       tester,
-      manager: manager,
+      repository: repository,
       views: [_view('z-lib.gd')],
       measure: (urls) async => throw StateError('boom'),
     );

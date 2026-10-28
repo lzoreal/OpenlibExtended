@@ -1,8 +1,10 @@
 // Project imports:
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
+import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/models/search_result.dart';
+import 'package:openlib/data/repositories/book_info_repository.dart';
 import 'package:openlib/data/repositories/cover_repository.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
@@ -10,7 +12,10 @@ import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/repositories/trending_repository.dart';
+import 'package:openlib/data/services/mirror_latency_controller.dart';
 import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/ui/features/search/view_models/search_view_model.dart';
+import 'package:openlib/ui/features/shell/view_models/shell_view_model.dart';
 
 import 'search_test_support.dart';
 
@@ -26,6 +31,12 @@ Future<void> setupTestDi({
   PreferencesRepository? preferences,
   TrendingRepository? trending,
 }) async {
+  if (getIt.isRegistered<ShellViewModel>()) {
+    getIt<ShellViewModel>().dispose();
+  }
+  if (getIt.isRegistered<MirrorLatencyNotifier>()) {
+    getIt<MirrorLatencyNotifier>().dispose();
+  }
   await resetDi();
   getIt.registerSingleton<AppSettings>(settings ?? testAppSettings());
   getIt.registerSingleton<PreferencesRepository>(
@@ -42,6 +53,21 @@ Future<void> setupTestDi({
       () => covers ?? StubCoverRepository());
   getIt.registerLazySingleton<TrendingRepository>(
       () => trending ?? TestTrendingRepository());
+  getIt.registerLazySingleton<BookInfoRepository>(() => StubBookInfoRepository());
+  getIt.registerLazySingleton<MirrorLatencyNotifier>(
+      () => MirrorLatencyNotifier(getIt<MirrorRepository>()));
+  getIt.registerLazySingleton<ShellViewModel>(() => ShellViewModel(
+        settings: getIt<AppSettings>(),
+        downloads: getIt<DownloadRepository>(),
+      ));
+  getIt.registerFactory<SearchViewModel>(() => SearchViewModel(
+        search: getIt<SearchRepository>(),
+        preferences: getIt<PreferencesRepository>(),
+        settings: getIt<AppSettings>(),
+        mirrors: getIt<MirrorRepository>(),
+        mirrorLatency: getIt<MirrorLatencyNotifier>(),
+        trending: getIt<TrendingRepository>(),
+      ));
 }
 
 /// Answers every search with an empty page so pushed result routes settle.
@@ -83,4 +109,11 @@ class StubLibraryRepository extends LibraryRepository {
 class StubCoverRepository extends CoverRepository {
   @override
   Future<String?> coverFor(String url) async => null;
+}
+
+class StubBookInfoRepository extends BookInfoRepository {
+  @override
+  Future<BookInfoData> fetch(String url, {String donationKey = ''}) async {
+    throw StateError('StubBookInfoRepository has no details');
+  }
 }

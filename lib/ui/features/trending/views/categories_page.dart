@@ -1,9 +1,9 @@
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
@@ -13,8 +13,7 @@ import 'package:openlib/ui/core/components/error_widget.dart';
 import 'package:openlib/ui/core/components/inline_hint.dart';
 import 'package:openlib/ui/core/components/section_header.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
-import 'package:openlib/state/state.dart'
-    show getSubCategoryTypeList, appSettingsProvider;
+import 'package:openlib/ui/features/trending/view_models/categories_view_model.dart';
 
 class CategoryBook {
   final String title;
@@ -245,11 +244,11 @@ void _openCategory(BuildContext context, CategoryBook category) {
   );
 }
 
-class GenresPage extends ConsumerWidget {
+class GenresPage extends StatelessWidget {
   const GenresPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final categories = categoriesTypeValues(l10n);
     final tileHeight = _genreTileHeight(context);
@@ -420,18 +419,43 @@ class _GenreCard extends StatelessWidget {
   }
 }
 
-class CategoryListingPage extends ConsumerWidget {
+class CategoryListingPage extends StatefulWidget {
   const CategoryListingPage(
-      {super.key, required this.url, required this.title});
+      {super.key, required this.url, required this.title, this.viewModel});
   final String url;
   final String title;
 
+  /// Injected by tests; the page builds its own view model otherwise.
+  final CategoriesViewModel? viewModel;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<CategoryListingPage> createState() => _CategoryListingPageState();
+}
+
+class _CategoryListingPageState extends State<CategoryListingPage> {
+  late final CategoriesViewModel _viewModel;
+  late final bool _ownsViewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel =
+        widget.viewModel ?? CategoriesViewModel.fromDi(url: widget.url);
+    unawaited(_viewModel.load());
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    final booksBasedOnGenre = ref.watch(getSubCategoryTypeList(url));
     final width = MediaQuery.sizeOf(context).width;
     final contentWidth = (width > 840 ? 840.0 : width) - 32;
     final columns = width < 600
@@ -445,12 +469,26 @@ class CategoryListingPage extends ConsumerWidget {
     final textHeight = MediaQuery.textScalerOf(context).scale(72);
     final cardHeight = cardWidth * 1.5 + textHeight + 30;
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: Text(widget.title)),
       body: ContentWidth(
         maxWidth: 840,
-        child: booksBasedOnGenre.when(
-          skipLoadingOnRefresh: false,
-          data: (data) {
+        child: ListenableBuilder(
+          listenable: _viewModel,
+          builder: (context, _) {
+            if (_viewModel.loading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final error = _viewModel.error;
+            if (error != null) {
+              return CustomErrorWidget(
+                error: error,
+                stackTrace: _viewModel.errorStackTrace ?? StackTrace.empty,
+                contextLabel: AppLocalizations.of(context).genres,
+                contextDetails: '${widget.title} · ${widget.url}',
+                onRefresh: _viewModel.refresh,
+              );
+            }
+            final data = _viewModel.books;
             return CustomScrollView(
               slivers: [
                 SliverPadding(
@@ -476,9 +514,7 @@ class CategoryListingPage extends ConsumerWidget {
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
                             onTap: () {
-                              ref
-                                  .read(appSettingsProvider)
-                                  .setFiltersEnabled(false);
+                              _viewModel.prepareOpen();
                               Navigator.push(context, MaterialPageRoute(
                                   builder: (BuildContext context) {
                                 return ResultPage(searchQuery: book.title!);
@@ -560,18 +596,6 @@ class CategoryListingPage extends ConsumerWidget {
                 ),
               ],
             );
-          },
-          error: (error, stackTrace) {
-            return CustomErrorWidget(
-              error: error,
-              stackTrace: stackTrace,
-              contextLabel: AppLocalizations.of(context).genres,
-              contextDetails: '$title · $url',
-              onRefresh: () => ref.invalidate(getSubCategoryTypeList(url)),
-            );
-          },
-          loading: () {
-            return const Center(child: CircularProgressIndicator());
           },
         ),
       ),

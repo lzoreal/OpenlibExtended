@@ -31,6 +31,8 @@ class DownloadRepository {
 
   Future<void> resumeAll() => _manager.resumeAll();
 
+  Future<void> resumeInterrupted() => _manager.resumeInterruptedDownloads();
+
   Future<void> retry(String taskId) => _manager.retryDownload(taskId);
 
   Future<void> restartWithMirrors(String taskId, List<String> mirrors) =>

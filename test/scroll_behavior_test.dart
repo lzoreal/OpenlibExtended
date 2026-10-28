@@ -7,16 +7,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlib/main.dart' show MyApp;
 import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
+
+import 'package:openlib/app/di.dart' show resetDi;
+
+import 'helpers/test_di.dart';
 
 void main() {
   testWidgets('the app hands scrollables momentum-based physics',
       (tester) async {
-    await tester.pumpWidget(const ProviderScope(
-      child: MyApp(onboardingCompleted: false),
-    ));
+    await setupTestDi();
+    addTearDown(resetDi);
+    await tester.pumpWidget(const MyApp(onboardingCompleted: false));
     // Let the onboarding shell settle into a frame with a context we
     // can read - it lives under the MaterialApp, whose scrollBehavior
     // is what we are verifying.

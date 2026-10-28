@@ -6,7 +6,7 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/share_book.dart';
-import 'package:openlib/state/state.dart' show FileName;
+import 'package:openlib/data/models/file_name.dart';
 import 'package:openlib/ui/core/components/book_info_widget.dart';
 import 'package:openlib/ui/core/components/error_widget.dart';
 import 'package:openlib/ui/core/components/file_buttons_widget.dart';

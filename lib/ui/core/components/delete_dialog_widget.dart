@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
 // Project imports:
-import 'package:openlib/state/state.dart' show FileName;
+import 'package:openlib/data/models/file_name.dart';
 import 'package:openlib/ui/core/components/snack_bar_widget.dart';
 
 /// Confirms deletion, then hands the file identity to the caller: the page

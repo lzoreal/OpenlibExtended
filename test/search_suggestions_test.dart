@@ -2,14 +2,11 @@
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/app/di.dart' show resetDi;
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/services/download_manager.dart' show DownloadTask;
-import 'package:openlib/state/state.dart' show activeDownloadsProvider;
 import 'package:openlib/ui/features/results/views/results_page.dart';
 import 'package:openlib/ui/features/search/view_models/search_view_model.dart';
 import 'package:openlib/ui/features/search/views/search_page.dart';
@@ -43,19 +40,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          ...testSearchOverrides(viewModel: viewModel),
-          activeDownloadsProvider.overrideWith(
-            (ref) => Stream.value(const <String, DownloadTask>{}),
-          ),
-        ],
-        child: MaterialApp(
+      MaterialApp(
           locale: const Locale('zh'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: SearchPage(viewModel: viewModel)),
-        ),
       ),
     );
     await tester.pump();

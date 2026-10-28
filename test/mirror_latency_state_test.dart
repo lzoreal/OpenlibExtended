@@ -14,7 +14,7 @@ import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/data/services/slum_catalogue.dart';
-import 'package:openlib/state/state.dart';
+import 'package:openlib/data/services/mirror_latency_controller.dart';
 
 class _FakeTester extends MirrorLatencyTester {
   _FakeTester(this.onMeasure);

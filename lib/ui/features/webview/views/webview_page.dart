@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart'
     as desktop_webview;
@@ -18,7 +17,7 @@ import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/logger.dart';
 import 'package:openlib/data/services/ddos_protection_handler.dart';
 
-class Webview extends ConsumerStatefulWidget {
+class Webview extends StatefulWidget {
   const Webview({
     super.key,
     required this.url,
@@ -34,7 +33,7 @@ class Webview extends ConsumerStatefulWidget {
   _WebviewState createState() => _WebviewState();
 }
 
-class _WebviewState extends ConsumerState<Webview> {
+class _WebviewState extends State<Webview> {
   final GlobalKey webViewKey = GlobalKey();
   final AppLogger _logger = AppLogger();
 

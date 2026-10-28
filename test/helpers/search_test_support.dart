@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/app/app_settings.dart';
@@ -19,7 +18,6 @@ import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/mirror_latency_controller.dart';
 import 'package:openlib/data/services/recent_searches.dart';
 import 'package:openlib/data/services/search_manager.dart';
-import 'package:openlib/state/state.dart' show appSettingsProvider;
 import 'package:openlib/ui/features/search/view_models/search_view_model.dart';
 
 // Shared search-page fakes. The page takes its view model through the
@@ -143,9 +141,6 @@ AppSettings testAppSettings({
   );
 }
 
-final Expando<AppSettings> _settingsForViewModel =
-    Expando<AppSettings>('search view model settings');
-
 SearchViewModel testSearchViewModel({
   SearchRepository? search,
   PreferencesRepository? preferences,
@@ -168,19 +163,6 @@ SearchViewModel testSearchViewModel({
     recentStore: recentStore ?? TestRecentStore(),
     suggestionsApi: suggestionsApi ?? TestSuggestions(),
   );
-  _settingsForViewModel[viewModel] = resolvedSettings;
   return viewModel;
 }
 
-/// The page no longer reads the source/mirror providers, but the result page
-/// it pushes still reads its filters through [appSettingsProvider].
-List<Override> testSearchOverrides({
-  required SearchViewModel viewModel,
-  AppSettings? settings,
-}) {
-  final resolved =
-      settings ?? _settingsForViewModel[viewModel] ?? testAppSettings();
-  return [
-    appSettingsProvider.overrideWith((ref) => resolved),
-  ];
-}

@@ -1,16 +1,16 @@
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
-
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
-import 'package:openlib/state/repository_providers.dart'
-    show mirrorRepositoryProvider;
-import 'package:openlib/state/state.dart';
+import 'package:openlib/data/services/mirror_latency_controller.dart'
+    show MirrorLatencyState;
+import 'package:openlib/ui/features/instances/view_models/instances_view_model.dart';
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/core/components/settings_row.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
@@ -25,36 +25,43 @@ import 'package:openlib/ui/core/components/inline_hint.dart';
 /// first, then fastest); flipping the switch to manual lets the user
 /// reorder the mirrors themselves. A mirror SLUM reports DOWN is shown
 /// greyed out and is never contacted.
-class InstancesPage extends ConsumerStatefulWidget {
-  const InstancesPage({super.key});
+class InstancesPage extends StatefulWidget {
+  const InstancesPage({super.key, this.viewModel});
+
+  /// Test seam; production builds the view model from the DI container.
+  final InstancesViewModel? viewModel;
 
   @override
-  ConsumerState<InstancesPage> createState() => _InstancesPageState();
+  State<InstancesPage> createState() => _InstancesPageState();
 }
 
-class _InstancesPageState extends ConsumerState<InstancesPage> {
-  bool _refreshing = false;
+class _InstancesPageState extends State<InstancesPage> {
+  late final InstancesViewModel _viewModel;
+  late final bool _ownsViewModel;
 
   @override
   void initState() {
     super.initState();
-    // The manager persists the mode; the switch must show the value the
-    // manager will actually apply, or a restart in manual mode displays
-    // "Automatic mirror order" while using the user's pinned order.
-    ref.read(mirrorRepositoryProvider).isAutoMode().then((auto) {
-      if (mounted && auto != ref.read(instanceAutoModeProvider)) {
-        ref.read(instanceAutoModeProvider.notifier).state = auto;
-      }
-    });
-    ref.read(mirrorLatencyProvider).load();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ?? InstancesViewModel.fromDi();
+    unawaited(_viewModel.load());
   }
 
-  static const _serviceOrder = [
-    MirrorService.libgen,
-    MirrorService.zlibrary,
-    MirrorService.welib,
-    MirrorService.annasArchive,
-  ];
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
+
+  static String _statusLabel(AppLocalizations l10n, SlumStatus status) {
+    return switch (status) {
+      SlumStatus.up => l10n.mirrorStatusUp,
+      SlumStatus.degraded => l10n.mirrorStatusDegraded,
+      SlumStatus.protected => l10n.mirrorStatusProtected,
+      SlumStatus.down => l10n.mirrorStatusDown,
+      SlumStatus.unknown => l10n.unknown,
+    };
+  }
 
   static const _serviceTitles = {
     MirrorService.libgen: 'Library Genesis',
@@ -70,27 +77,12 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     MirrorService.annasArchive: 'AA',
   };
 
-  static String _statusLabel(AppLocalizations l10n, SlumStatus status) {
-    return switch (status) {
-      SlumStatus.up => l10n.mirrorStatusUp,
-      SlumStatus.degraded => l10n.mirrorStatusDegraded,
-      SlumStatus.protected => l10n.mirrorStatusProtected,
-      SlumStatus.down => l10n.mirrorStatusDown,
-      SlumStatus.unknown => l10n.unknown,
-    };
-  }
-
   Future<void> _refresh() async {
-    if (_refreshing) return;
-    setState(() => _refreshing = true);
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
     try {
-      final result = await ref.read(mirrorRepositoryProvider).refresh();
-      if (!mounted) return;
-      for (final service in _serviceOrder) {
-        ref.invalidate(serviceInstancesProvider(service));
-      }
+      final result = await _viewModel.refresh();
+      if (!mounted || result == null) return;
       if (!result.hasMirrorList) {
         // Nothing is known - saying "up to date" would claim the empty
         // list is SLUM's answer.
@@ -110,31 +102,16 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
       messenger.showSnackBar(SnackBar(
         content: Text(l10n.mirrorRefreshFailed('$e')),
       ));
-    } finally {
-      if (mounted) setState(() => _refreshing = false);
     }
   }
 
   Future<void> _testLatency() async {
-    if (ref.read(mirrorLatencyProvider).state.testing) return;
+    if (_viewModel.latency.testing) return;
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
-    final views = <InstanceView>[];
-    for (final service in _serviceOrder) {
-      try {
-        views.addAll(await ref.read(serviceInstancesProvider(service).future));
-      } catch (_) {
-        // A service with no catalogue answer simply has nothing to probe.
-      }
-    }
-    if (!mounted) return;
-
     try {
-      final result = await ref.read(mirrorLatencyProvider).test(views);
-      if (!mounted) return;
-      for (final service in _serviceOrder) {
-        ref.invalidate(serviceInstancesProvider(service));
-      }
+      final result = await _viewModel.testLatency();
+      if (!mounted || result == null) return;
       final String message;
       if (result.total == 0) {
         message = l10n.mirrorLatencyNoTargets;
@@ -162,55 +139,62 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final autoMode = ref.watch(instanceAutoModeProvider);
-    final latency = ref.watch(mirrorLatencyProvider).state;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.mirrorsAndProviders),
-        actions: [
-          IconButton(
-            key: const ValueKey('mirror-latency-test'),
-            onPressed: latency.testing ? null : _testLatency,
-            tooltip: l10n.mirrorLatencyTestTooltip,
-            icon: latency.testing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.speed_rounded, size: 20),
-          ),
-          IconButton(
-            onPressed: _refreshing ? null : _refresh,
-            tooltip: l10n.refreshMirrors,
-            icon: _refreshing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded, size: 20),
-          ),
-        ],
-      ),
-      body: ContentWidth(
-        maxWidth: 840,
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            children: [
-              InlineHint(
-                  message: l10n.mirrorFooterNote, icon: Icons.shield_outlined),
-              for (final service in _serviceOrder)
-                _serviceList(service, autoMode, latency),
-              const SizedBox(height: 16),
-              _buildModeCard(autoMode),
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        final autoMode = _viewModel.autoMode;
+        final latency = _viewModel.latency;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.mirrorsAndProviders),
+            actions: [
+              IconButton(
+                key: const ValueKey('mirror-latency-test'),
+                onPressed: latency.testing ? null : _testLatency,
+                tooltip: l10n.mirrorLatencyTestTooltip,
+                icon: latency.testing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.speed_rounded, size: 20),
+              ),
+              IconButton(
+                onPressed: _viewModel.refreshing ? null : _refresh,
+                tooltip: l10n.refreshMirrors,
+                icon: _viewModel.refreshing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 20),
+              ),
             ],
           ),
-        ),
-      ),
+          body: ContentWidth(
+            maxWidth: 840,
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                children: [
+                  InlineHint(
+                      message: l10n.mirrorFooterNote,
+                      icon: Icons.shield_outlined),
+                  for (final service in InstancesViewModel.serviceOrder)
+                    _serviceList(service, autoMode, latency),
+                  const SizedBox(height: 16),
+                  _buildModeCard(autoMode),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -227,11 +211,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
         trailing: Switch(
           value: autoMode,
           onChanged: (value) async {
-            await ref.read(mirrorRepositoryProvider).setAutoMode(value);
-            ref.read(instanceAutoModeProvider.notifier).state = value;
-            for (final service in _serviceOrder) {
-              ref.invalidate(serviceInstancesProvider(service));
-            }
+            await _viewModel.setAutoMode(value);
           },
         ),
       ),
@@ -241,36 +221,11 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
   Widget _serviceList(
       MirrorService service, bool autoMode, MirrorLatencyState latency) {
     final l10n = AppLocalizations.of(context);
-    final async = ref.watch(serviceInstancesProvider(service));
+    final views = _viewModel.instances[service];
+    final error = _viewModel.errorFor(service);
 
-    return async.when(
-      data: (views) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sectionLabel(service, views.length, l10n),
-            if (views.isEmpty)
-              Card(
-                child: SettingsRow(
-                  icon: Icons.cloud_off,
-                  title: l10n.noMirrorsReported,
-                  subtitle: l10n.noMirrorsReportedHint,
-                  trailing: IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _refresh,
-                  ),
-                ),
-              )
-            else
-              for (var i = 0; i < views.length; i++) ...[
-                _mirrorCard(
-                    service, views[i], i, views.length, autoMode, latency),
-                if (i < views.length - 1) const SizedBox(height: 8),
-              ],
-          ],
-        );
-      },
-      loading: () => Column(
+    if (_viewModel.isLoading(service)) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _sectionLabel(service, 0, l10n),
@@ -279,8 +234,11 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
             child: Center(child: CircularProgressIndicator()),
           ),
         ],
-      ),
-      error: (error, _) => Column(
+      );
+    }
+
+    if (error != null) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _sectionLabel(service, 0, l10n),
@@ -292,7 +250,32 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
             ),
           ),
         ],
-      ),
+      );
+    }
+
+    final list = views ?? const <InstanceView>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel(service, list.length, l10n),
+        if (list.isEmpty)
+          Card(
+            child: SettingsRow(
+              icon: Icons.cloud_off,
+              title: l10n.noMirrorsReported,
+              subtitle: l10n.noMirrorsReportedHint,
+              trailing: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _refresh,
+              ),
+            ),
+          )
+        else
+          for (var i = 0; i < list.length; i++) ...[
+            _mirrorCard(service, list[i], i, list.length, autoMode, latency),
+            if (i < list.length - 1) const SizedBox(height: 8),
+          ],
+      ],
     );
   }
 
@@ -397,10 +380,8 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                     onChanged: down
                         ? null
                         : (value) async {
-                            await ref
-                                .read(mirrorRepositoryProvider)
-                                .setEnabled(service, site.host, value);
-                            ref.invalidate(serviceInstancesProvider(service));
+                            await _viewModel.setEnabled(
+                                service, site.host, value);
                           },
                   ),
                 ],
@@ -455,11 +436,8 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                             onPressed: index == 0
                                 ? null
                                 : () async {
-                                    await ref
-                                        .read(mirrorRepositoryProvider)
-                                        .move(service, site.host, -1);
-                                    ref.invalidate(
-                                        serviceInstancesProvider(service));
+                                    await _viewModel.move(
+                                        service, site.host, -1);
                                   },
                           ),
                           IconButton(
@@ -470,11 +448,8 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                             onPressed: index == total - 1
                                 ? null
                                 : () async {
-                                    await ref
-                                        .read(mirrorRepositoryProvider)
-                                        .move(service, site.host, 1);
-                                    ref.invalidate(
-                                        serviceInstancesProvider(service));
+                                    await _viewModel.move(
+                                        service, site.host, 1);
                                   },
                           ),
                         ],

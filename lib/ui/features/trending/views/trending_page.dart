@@ -1,16 +1,17 @@
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
 
 // Package imports:
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/trending_book_data.dart'
     show TrendingBookData;
-import 'package:openlib/state/state.dart'
-    show getTrendingBooks, appSettingsProvider;
+import 'package:openlib/ui/features/trending/view_models/trending_view_model.dart';
 import 'package:openlib/ui/features/trending/views/categories_page.dart'
     show GenreShortcutSection;
 import 'package:openlib/ui/core/components/error_widget.dart';
@@ -18,18 +19,55 @@ import 'package:openlib/ui/core/components/section_header.dart';
 import 'package:openlib/ui/features/results/views/results_page.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
 
-class TrendingPage extends ConsumerWidget {
-  const TrendingPage({super.key});
+class TrendingPage extends StatefulWidget {
+  const TrendingPage({super.key, this.viewModel});
+
+  /// Injected by tests; the page builds its own view model otherwise.
+  final TrendingViewModel? viewModel;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<TrendingPage> createState() => _TrendingPageState();
+}
+
+class _TrendingPageState extends State<TrendingPage> {
+  late final TrendingViewModel _viewModel;
+  late final bool _ownsViewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ?? TrendingViewModel.fromDi();
+    unawaited(_viewModel.load());
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final trendingBooks = ref.watch(getTrendingBooks);
     final labelHeight = MediaQuery.textScalerOf(context).scale(32);
 
-    return trendingBooks.when(
-      skipLoadingOnRefresh: false,
-      data: (data) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        if (_viewModel.loading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final error = _viewModel.error;
+        if (error != null) {
+          return CustomErrorWidget(
+            error: error,
+            stackTrace: _viewModel.errorStackTrace ?? StackTrace.empty,
+            contextLabel: l10n.trending,
+            onRefresh: _viewModel.refresh,
+          );
+        }
+        final data = _viewModel.books;
         return CustomScrollView(
           slivers: [
             SliverPadding(
@@ -56,9 +94,7 @@ class TrendingPage extends ConsumerWidget {
                     return _TrendingBookCard(
                       book: book,
                       onTap: () {
-                        ref
-                            .read(appSettingsProvider)
-                            .setFiltersEnabled(false);
+                        _viewModel.prepareOpen(filtersEnabled: false);
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -78,20 +114,6 @@ class TrendingPage extends ConsumerWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
           ],
         );
-      },
-      error: (error, stackTrace) {
-        return CustomErrorWidget(
-          error: error,
-          stackTrace: stackTrace,
-          contextLabel: l10n.trending,
-          onRefresh: () {
-            // ignore: unused_result
-            ref.refresh(getTrendingBooks);
-          },
-        );
-      },
-      loading: () {
-        return const Center(child: CircularProgressIndicator());
       },
     );
   }

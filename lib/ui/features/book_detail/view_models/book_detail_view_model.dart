@@ -19,7 +19,7 @@ import 'package:openlib/data/services/download_target.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/search_manager.dart';
-import 'package:openlib/state/state.dart' show FileName;
+import 'package:openlib/data/models/file_name.dart';
 
 /// What the detail page should do after the user taps download.
 sealed class DownloadPlan {

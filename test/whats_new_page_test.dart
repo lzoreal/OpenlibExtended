@@ -3,20 +3,56 @@ import 'package:flutter/material.dart';
 
 // Package imports:
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
+import 'package:openlib/data/repositories/search_repository.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/ui/features/whats_new/view_models/whats_new_view_model.dart';
 import 'package:openlib/ui/features/whats_new/views/whats_new_page.dart';
 
+class _FakeMirrors extends MirrorRepository {
+  int refreshes = 0;
+
+  @override
+  Future<MirrorRefreshResult> refresh() async {
+    refreshes++;
+    return const MirrorRefreshResult(
+        changes: ['new-mirror.example'], hasMirrorList: true);
+  }
+}
+
+class _FakeSearchRepository extends SearchRepository {
+  _FakeSearchRepository() : super(manager: SearchManager(providers: const []));
+
+  int enableAllCalls = 0;
+
+  @override
+  Future<void> enableAllProviders() async {
+    enableAllCalls++;
+  }
+}
+
 void main() {
+  late _FakeMirrors mirrors;
+  late _FakeSearchRepository search;
+
+  setUp(() {
+    mirrors = _FakeMirrors();
+    search = _FakeSearchRepository();
+  });
+
   Widget pumpPage() {
-    return ProviderScope(
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const WhatsNewPage(fromVersion: '1.0.9', toVersion: '1.0.11'),
+    return MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: WhatsNewPage(
+        fromVersion: '1.0.9',
+        toVersion: '1.0.11',
+        viewModel: WhatsNewViewModel(mirrors: mirrors, search: search),
       ),
     );
   }
@@ -26,8 +62,7 @@ void main() {
     await tester.pumpWidget(pumpPage());
     await tester.pump();
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(WhatsNewPage)));
+    final l10n = AppLocalizations.of(tester.element(find.byType(WhatsNewPage)));
 
     expect(find.text(l10n.whatsNewTitle('1.0.11')), findsOneWidget);
     expect(find.text(l10n.whatsNewTabFeatures), findsOneWidget);
@@ -42,8 +77,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(WhatsNewPage)));
+    final l10n = AppLocalizations.of(tester.element(find.byType(WhatsNewPage)));
 
     // No markdown rendered, but every built-in note is visible.
     expect(find.byType(Markdown), findsNothing);
@@ -55,14 +89,31 @@ void main() {
     await tester.pumpWidget(pumpPage());
     await tester.pump();
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(WhatsNewPage)));
+    final l10n = AppLocalizations.of(tester.element(find.byType(WhatsNewPage)));
 
     await tester.tap(find.text(l10n.whatsNewTabSources));
     await tester.pumpAndSettle();
     expect(find.text(l10n.whatsNewProvidersHint), findsOneWidget);
     expect(find.text(l10n.whatsNewUpdateInstances), findsOneWidget);
     expect(find.text(l10n.whatsNewContinue), findsOneWidget);
+  });
+
+  testWidgets('updating instances refreshes mirrors and re-enables sources',
+      (tester) async {
+    await tester.pumpWidget(pumpPage());
+    await tester.pump();
+
+    final l10n = AppLocalizations.of(tester.element(find.byType(WhatsNewPage)));
+
+    await tester.tap(find.text(l10n.whatsNewTabSources));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.whatsNewUpdateInstances));
+    await tester.pumpAndSettle();
+
+    expect(mirrors.refreshes, 1);
+    expect(search.enableAllCalls, 1);
+    expect(find.text(l10n.whatsNewInstancesUpdated), findsOneWidget);
+    expect(find.text('new-mirror.example'), findsOneWidget);
   });
 
   testWidgets('markdown release notes render headings, lists and links',
@@ -93,8 +144,7 @@ See the [release page](https://github.com/lzoreal/OpenlibExtended/releases).
     // Links render as RichText spans, not Text widgets.
     final linkRendered = find
         .byWidgetPredicate((w) =>
-            w is RichText &&
-            w.text.toPlainText().contains('release page'))
+            w is RichText && w.text.toPlainText().contains('release page'))
         .evaluate()
         .isNotEmpty;
     expect(linkRendered, isTrue);

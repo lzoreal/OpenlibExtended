@@ -4,7 +4,6 @@ import 'dart:io';
 // Flutter imports:
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Package imports:
@@ -12,12 +11,32 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
+import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/data/models/search_filters.dart';
+import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/ui/features/onboarding/view_models/onboarding_view_model.dart';
 import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
 
 import 'helpers/fake_path_provider.dart';
 
 final _paths = FakePathProvider('onboarding');
+
+/// Onboarding only needs the refresh signal; the real constructor is fine
+/// because this test never touches records.
+class _FakeLibraryRepository extends LibraryRepository {}
+
+AppSettings _settings() => AppSettings(
+      themeMode: ThemeMode.system,
+      fontSizeScale: 1,
+      locale: null,
+      showManualDownloadButton: false,
+      backgroundVerification: true,
+      donationKey: '',
+      userAgent: '',
+      cookie: '',
+      filters: const SearchFilters(),
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,13 +64,17 @@ void main() {
     addTearDown(() => tester.binding.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null));
 
-    await tester.pumpWidget(ProviderScope(
-      child: MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const OnboardingPage(),
-      ),
+    final viewModel = OnboardingViewModel(
+      settings: _settings(),
+      library: _FakeLibraryRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('en'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: OnboardingPage(viewModel: viewModel),
     ));
     await tester.pump(const Duration(milliseconds: 200));
 

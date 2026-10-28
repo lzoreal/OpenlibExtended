@@ -1,35 +1,36 @@
+// Flutter imports:
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// Package imports:
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/services/download_manager.dart' show DownloadTask;
+
+// Project imports:
 import 'package:openlib/data/models/trending_book_data.dart'
     show TrendingBookData;
-import 'package:openlib/state/state.dart'
-    show
-        activeDownloadsProvider,
-        getTrendingBooks,
-        homePageSelectedIndexProvider;
-import 'package:openlib/ui/features/trending/views/categories_page.dart' show GenreShortcutSection;
-import 'package:openlib/ui/features/shell/views/home_page.dart';
+import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/ui/core/themes.dart';
+import 'package:openlib/ui/features/shell/views/home_page.dart';
+import 'package:openlib/ui/features/trending/views/categories_page.dart'
+    show GenreShortcutSection;
 import 'package:openlib/ui/features/trending/views/trending_page.dart';
+
+import 'helpers/search_test_support.dart' show TestTrendingRepository;
+import 'helpers/test_di.dart';
 
 void main() {
   testWidgets('trending poster is 128 wide with a 192-high cover',
       (tester) async {
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getTrendingBooks.overrideWith((ref) async => [
-              TrendingBookData(title: 'Book', thumbnail: ''),
-            ]),
-      ],
-      child: MaterialApp(
-        theme: lightTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const Scaffold(body: TrendingPage()),
-      ),
+    await setupTestDi(
+      trending: TestTrendingRepository([
+        TrendingBookData(title: 'Book', thumbnail: ''),
+      ]),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(body: TrendingPage()),
     ));
     await tester.pumpAndSettle();
 
@@ -43,19 +44,17 @@ void main() {
 
   testWidgets('home tabs use the settings pill track and swipe',
       (tester) async {
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getTrendingBooks.overrideWith((ref) async => const []),
-        activeDownloadsProvider.overrideWith(
-          (ref) => Stream.value(const <String, DownloadTask>{}),
-        ),
-      ],
-      child: MaterialApp(
-        theme: lightTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const Scaffold(body: HomePage()),
-      ),
+    await setupTestDi(
+      trending: TestTrendingRepository([
+        TrendingBookData(title: 'Book', thumbnail: ''),
+      ]),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(body: HomePage()),
     ));
     await tester.pump();
 
@@ -68,11 +67,7 @@ void main() {
     final tabBar = tester.widget<TabBar>(find.byType(TabBar));
     expect(tabBar.labelStyle?.fontSize, 12);
     expect(tabBar.labelStyle?.fontWeight, FontWeight.w800);
-
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(HomePage)),
-    );
-    expect(container.read(homePageSelectedIndexProvider), 0);
+    expect(tabBar.controller!.index, 0);
 
     await tester.fling(
       find.byType(TabBarView),
@@ -81,30 +76,27 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(container.read(homePageSelectedIndexProvider), 1);
+    expect(tester.widget<TabBar>(find.byType(TabBar)).controller!.index, 1);
   });
 
   testWidgets('home fits 200% text and keeps swipeable tabs', (tester) async {
+    await setupTestDi(
+      trending: TestTrendingRepository([
+        TrendingBookData(title: 'Book', thumbnail: ''),
+      ]),
+    );
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getTrendingBooks.overrideWith((ref) async => const []),
-        activeDownloadsProvider.overrideWith(
-          (ref) => Stream.value(const <String, DownloadTask>{}),
-        ),
-      ],
-      child: MaterialApp(
-        theme: lightTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(2)),
-            child: const Scaffold(body: HomePage()),
-          ),
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Builder(
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2)),
+          child: const Scaffold(body: HomePage()),
         ),
       ),
     ));
@@ -140,20 +132,19 @@ void main() {
 
   testWidgets('trending strip and genre tiles grow with 200% text',
       (tester) async {
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        getTrendingBooks.overrideWith((ref) async => [
-              TrendingBookData(title: 'Book', thumbnail: ''),
-            ]),
-      ],
-      child: MaterialApp(
-        theme: lightTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: MediaQuery(
-          data: const MediaQueryData(textScaler: TextScaler.linear(2)),
-          child: const Scaffold(body: TrendingPage()),
-        ),
+    await setupTestDi(
+      trending: TestTrendingRepository([
+        TrendingBookData(title: 'Book', thumbnail: ''),
+      ]),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: const Scaffold(body: TrendingPage()),
       ),
     ));
     await tester.pumpAndSettle();

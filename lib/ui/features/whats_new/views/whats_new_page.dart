@@ -2,16 +2,14 @@
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/main.dart' show MainScreen;
 import 'package:openlib/data/services/update_checker.dart';
-import 'package:openlib/state/repository_providers.dart'
-    show mirrorRepositoryProvider, searchRepositoryProvider;
 import 'package:openlib/ui/core/components/pill_tabs.dart';
+import 'package:openlib/ui/features/whats_new/view_models/whats_new_view_model.dart';
 
 /// Shown once after an app upgrade (not on first install): what's
 /// new, plus a tab that offers re-syncing the stored mirror list
@@ -20,9 +18,12 @@ import 'package:openlib/ui/core/components/pill_tabs.dart';
 /// The features tab prefers the GitHub release description of the
 /// running version (rendered as markdown, matching what the release
 /// page shows) and falls back to short built-in notes offline.
-class WhatsNewPage extends ConsumerStatefulWidget {
+class WhatsNewPage extends StatefulWidget {
   const WhatsNewPage(
-      {super.key, required this.fromVersion, required this.toVersion});
+      {super.key,
+      required this.fromVersion,
+      required this.toVersion,
+      this.viewModel});
 
   /// Version the user upgraded from ('' when unknown).
   final String fromVersion;
@@ -30,14 +31,19 @@ class WhatsNewPage extends ConsumerStatefulWidget {
   /// Version now running.
   final String toVersion;
 
+  /// Injected by tests; the page builds its own view model otherwise.
+  final WhatsNewViewModel? viewModel;
+
   @override
-  ConsumerState<WhatsNewPage> createState() => _WhatsNewPageState();
+  State<WhatsNewPage> createState() => _WhatsNewPageState();
 }
 
-class _WhatsNewPageState extends ConsumerState<WhatsNewPage>
+class _WhatsNewPageState extends State<WhatsNewPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController =
       TabController(length: 2, vsync: this);
+  late final WhatsNewViewModel _viewModel =
+      widget.viewModel ?? WhatsNewViewModel.fromDi();
 
   bool _instancesUpdated = false;
   List<String> _changes = const [];
@@ -64,10 +70,7 @@ class _WhatsNewPageState extends ConsumerState<WhatsNewPage>
   Future<void> _updateInstances() async {
     setState(() => _updating = true);
     try {
-      final result = await ref.read(mirrorRepositoryProvider).refresh();
-      // Upgraders get every search provider back on: a stale saved
-      // toggle list must not silently hide a new release's sources.
-      await ref.read(searchRepositoryProvider).enableAllProviders();
+      final result = await _viewModel.updateInstances();
       if (mounted) {
         setState(() {
           _instancesUpdated = true;
@@ -161,7 +164,7 @@ class _WhatsNewPageState extends ConsumerState<WhatsNewPage>
   }
 }
 
-class _FeaturesTab extends ConsumerWidget {
+class _FeaturesTab extends StatelessWidget {
   const _FeaturesTab({required this.releaseNotes});
 
   /// GitHub release description of the running version, '' when it
@@ -170,7 +173,7 @@ class _FeaturesTab extends ConsumerWidget {
   final String releaseNotes;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
@@ -218,7 +221,7 @@ class _FeaturesTab extends ConsumerWidget {
   }
 }
 
-class _SourcesTab extends ConsumerWidget {
+class _SourcesTab extends StatelessWidget {
   const _SourcesTab({
     required this.updated,
     required this.updating,
@@ -232,7 +235,7 @@ class _SourcesTab extends ConsumerWidget {
   final Future<void> Function() onUpdate;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 

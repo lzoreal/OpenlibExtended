@@ -1,36 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/services/download_manager.dart' show DownloadTask;
-import 'package:openlib/state/state.dart'
-    show activeDownloadsProvider, getTrendingBooks;
 import 'package:openlib/ui/features/shell/views/home_page.dart';
 import 'package:openlib/ui/features/search/views/search_page.dart';
 import 'package:openlib/ui/core/themes.dart';
 
+import 'package:openlib/app/di.dart' show resetDi;
+
 import 'helpers/search_test_support.dart';
+import 'helpers/test_di.dart';
 
 void main() {
+  setUp(() async {
+    await setupTestDi();
+  });
+
+  tearDown(() async {
+    await resetDi();
+  });
+
   testWidgets('search field is 52 high and tabs use the pill track',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final viewModel = testSearchViewModel();
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        ...testSearchOverrides(viewModel: viewModel),
-        activeDownloadsProvider.overrideWith(
-          (ref) => Stream.value(const <String, DownloadTask>{}),
-        ),
-      ],
-      child: MaterialApp(
-        theme: lightTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: SearchPage(viewModel: viewModel)),
-      ),
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(body: SearchPage(viewModel: viewModel)),
     ));
     await tester.pump();
 
@@ -57,23 +56,15 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final viewModel = testSearchViewModel();
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        ...testSearchOverrides(viewModel: viewModel),
-        activeDownloadsProvider.overrideWith(
-          (ref) => Stream.value(const <String, DownloadTask>{}),
-        ),
-      ],
-      child: MaterialApp(
+    await tester.pumpWidget(MaterialApp(
         theme: lightTheme,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(2)),
-            child: Scaffold(body: SearchPage(viewModel: viewModel)),
-          ),
+      home: Builder(
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2)),
+          child: Scaffold(body: SearchPage(viewModel: viewModel)),
         ),
       ),
     ));
@@ -98,21 +89,11 @@ void main() {
     final viewModel = testSearchViewModel();
 
     Future<void> pumpPage(Widget page) async {
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          ...testSearchOverrides(viewModel: viewModel),
-          // HomePage's trending tab resolves the repository through DI.
-          getTrendingBooks.overrideWith((ref) async => const []),
-          activeDownloadsProvider.overrideWith(
-            (ref) => Stream.value(const <String, DownloadTask>{}),
-          ),
-        ],
-        child: MaterialApp(
-          theme: lightTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: page),
-        ),
+      await tester.pumpWidget(MaterialApp(
+        theme: lightTheme,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: page),
       ));
       await tester.pump();
     }

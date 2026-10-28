@@ -2,7 +2,15 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
+// Dart imports:
+import 'dart:io';
+import 'dart:ui' as ui;
+
+// Flutter imports:
+import 'package:flutter/services.dart';
+
 // Project imports:
+import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
 
@@ -383,3 +391,44 @@ ThemeData _buildTheme(Brightness brightness) {
 
 final ThemeData lightTheme = _buildTheme(Brightness.light);
 final ThemeData darkTheme = _buildTheme(Brightness.dark);
+
+/// Reads the persisted theme mode, falling back to the legacy dark flag.
+Future<ThemeMode> getInitialTheme() async {
+  try {
+    final dataBase = MyLibraryDb.instance;
+    final themePref =
+        await dataBase.getPreference('themeMode').catchError((e) => null);
+    if (themePref != null && themePref is String) {
+      if (themePref == 'light') return ThemeMode.light;
+      if (themePref == 'dark') return ThemeMode.dark;
+      return ThemeMode.system;
+    } else {
+      final legacyDark =
+          await dataBase.getPreference('darkMode').catchError((e) => null);
+      if (legacyDark != null) {
+        return (legacyDark == 0) ? ThemeMode.light : ThemeMode.dark;
+      }
+    }
+  } catch (e) {
+    // Ignore: a broken preference must not block startup.
+  }
+  return ThemeMode.system;
+}
+
+/// Keeps the Android system bar in step with the MD3 surface palette.
+void updateSystemUi(ThemeMode mode) {
+  if (Platform.isAndroid) {
+    var isDark = mode == ThemeMode.dark;
+    if (mode == ThemeMode.system) {
+      isDark = ui.PlatformDispatcher.instance.platformBrightness ==
+          Brightness.dark;
+    }
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      systemNavigationBarColor:
+          isDark ? const Color(0xFF141218) : const Color(0xFFFEF7FF),
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+    ));
+  }
+}

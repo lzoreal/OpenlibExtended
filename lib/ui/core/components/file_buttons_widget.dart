@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
 // Project imports:
-import 'package:openlib/state/state.dart' show FileName;
+import 'package:openlib/data/models/file_name.dart';
 import 'package:openlib/ui/core/components/detail_bottom_bar.dart';
 import 'package:openlib/ui/core/components/delete_dialog_widget.dart';
 import 'package:openlib/ui/core/open_book.dart';

@@ -7,19 +7,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/repositories/mirror_repository.dart';
-import 'package:openlib/data/services/instance_manager.dart';
-import 'package:openlib/data/services/preference_store.dart';
-import 'package:openlib/state/repository_providers.dart'
-    show mirrorRepositoryProvider;
 import 'package:openlib/ui/features/trending/views/categories_page.dart';
 import 'package:openlib/ui/features/search/views/search_page.dart';
 
 import 'helpers/search_test_support.dart';
+import 'package:openlib/app/di.dart' show resetDi;
+
+import 'helpers/test_di.dart';
 
 void main() {
   test('genre cards use the localized title and description', () {
@@ -38,22 +35,15 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    await setupTestDi();
+    addTearDown(resetDi);
     final viewModel = testSearchViewModel();
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          ...testSearchOverrides(viewModel: viewModel),
-          // The page resolves its mirrors through DI; tests do not run initDi.
-          mirrorRepositoryProvider.overrideWithValue(MirrorRepository(
-            manager: InstanceManager.forTest(store: MemoryPreferenceStore()),
-          )),
-        ],
-        child: MaterialApp(
+      MaterialApp(
           locale: const Locale('zh'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: SearchPage(viewModel: viewModel)),
-        ),
+        home: Scaffold(body: SearchPage(viewModel: viewModel)),
       ),
     );
     await tester.pump();

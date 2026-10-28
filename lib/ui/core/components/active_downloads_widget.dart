@@ -1,17 +1,38 @@
 // Flutter imports:
 import 'package:flutter/material.dart';
-import 'package:openlib/l10n/app_localizations.dart';
-
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/state/state.dart';
+import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/ui/features/shell/view_models/active_downloads_view_model.dart';
 import 'package:openlib/ui/features/webview/views/webview_page.dart';
 
-class ActiveDownloadsWidget extends ConsumerWidget {
-  const ActiveDownloadsWidget({super.key});
+class ActiveDownloadsWidget extends StatefulWidget {
+  const ActiveDownloadsWidget({super.key, this.viewModel});
+
+  /// Test seam; production builds the view model from the DI container.
+  final ActiveDownloadsViewModel? viewModel;
+
+  @override
+  State<ActiveDownloadsWidget> createState() => _ActiveDownloadsWidgetState();
+}
+
+class _ActiveDownloadsWidgetState extends State<ActiveDownloadsWidget> {
+  late final ActiveDownloadsViewModel _viewModel;
+  late final bool _ownsViewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ?? ActiveDownloadsViewModel.fromDi();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
 
   String _bytesToFileSize(int bytes) {
     const int decimals = 1;
@@ -27,11 +48,11 @@ class ActiveDownloadsWidget extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final downloadsAsync = ref.watch(activeDownloadsProvider);
-
-    return downloadsAsync.when(
-      data: (downloads) {
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        final downloads = _viewModel.tasks;
         if (downloads.isEmpty) {
           return const SizedBox.shrink();
         }
@@ -92,9 +113,10 @@ class ActiveDownloadsWidget extends ConsumerWidget {
                     separatorBuilder: (context, index) =>
                         const Divider(height: 1, indent: 16, endIndent: 16),
                     itemBuilder: (context, index) {
-                      final task = downloads.values.elementAt(index);
+                      final task = downloads.elementAt(index);
                       return _DownloadItem(
                         task: task,
+                        viewModel: _viewModel,
                         bytesToFileSize: _bytesToFileSize,
                       );
                     },
@@ -105,26 +127,26 @@ class ActiveDownloadsWidget extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }
 
-class _DownloadItem extends ConsumerStatefulWidget {
+class _DownloadItem extends StatefulWidget {
   final DownloadTask task;
+  final ActiveDownloadsViewModel viewModel;
   final String Function(int) bytesToFileSize;
 
   const _DownloadItem({
     required this.task,
+    required this.viewModel,
     required this.bytesToFileSize,
   });
 
   @override
-  ConsumerState<_DownloadItem> createState() => _DownloadItemState();
+  State<_DownloadItem> createState() => _DownloadItemState();
 }
 
-class _DownloadItemState extends ConsumerState<_DownloadItem> {
+class _DownloadItemState extends State<_DownloadItem> {
   // Track if auto-verification has been triggered
   bool _autoVerificationTriggered = false;
   bool _isVerifying = false;
@@ -217,8 +239,6 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
       });
     }
 
-    final downloadRepository = ref.read(downloadManagerProvider);
-
     final List<String>? mirrors = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -230,7 +250,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
     );
 
     if (mirrors != null && mirrors.isNotEmpty && mounted) {
-      await downloadRepository.restartWithMirrors(task.id, mirrors);
+      await widget.viewModel.restartWithMirrors(task.id, mirrors);
     }
 
     if (mounted) {
@@ -245,7 +265,6 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final downloadRepository = ref.read(downloadManagerProvider);
     final task = widget.task;
 
     return Padding(
@@ -334,7 +353,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
-                    downloadRepository.pause(task.id);
+                    widget.viewModel.pause(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -350,7 +369,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
-                    downloadRepository.resume(task.id);
+                    widget.viewModel.resume(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -367,7 +386,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
-                    downloadRepository.cancel(task.id);
+                    widget.viewModel.cancel(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -489,7 +508,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     const SizedBox(width: 8),
                     TextButton(
                       onPressed: () {
-                        downloadRepository.retry(task.id);
+                        widget.viewModel.retry(task.id);
                       },
                       style: TextButton.styleFrom(
                         foregroundColor: scheme.onErrorContainer,

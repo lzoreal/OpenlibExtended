@@ -11,8 +11,7 @@ import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/trending_book_data.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/mirror_latency_controller.dart';
-import 'package:openlib/state/state.dart'
-    show fileType, languageValues, sortValues, typeValues, yearValues;
+import 'package:openlib/ui/core/filter_options.dart';
 import 'package:openlib/ui/core/components/active_downloads_widget.dart';
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/features/search/view_models/search_view_model.dart';

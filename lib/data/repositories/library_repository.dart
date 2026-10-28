@@ -38,9 +38,8 @@ class LibraryRepository extends ChangeNotifier {
   /// and may be missing: the record must still disappear when the folder or
   /// the file is gone.
   ///
-  /// `deleteFileWithDbData` in `data/services/files.dart` still takes a
-  /// Riverpod `Ref` for the legacy `deleteFileFromMyLib` bridge, so this
-  /// repeats its order without depending on Riverpod.
+  /// The legacy `deleteFileWithDbData` helper is gone; the repository owns
+  /// the order (file first, then the record) so no state layer is needed.
   Future<void> deleteWithFile(MyBook book) async {
     final directory = await _preferences.bookStorageDirectory();
     if (directory != null) {
@@ -59,4 +58,9 @@ class LibraryRepository extends ChangeNotifier {
     await _database.deleteBookState(book.getFileName());
     notifyListeners();
   }
+
+  /// Lets callers that write rows through [MyLibraryDb] directly (settings
+  /// import, storage changes) wake repository listeners without pretending
+  /// this repository performed the write.
+  void notifyChanged() => notifyListeners();
 }

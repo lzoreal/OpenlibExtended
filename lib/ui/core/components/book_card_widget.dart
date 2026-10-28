@@ -10,8 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/book_format.dart';
-import 'package:openlib/state/state.dart'
-    show languageCodeToDisplay, languageValues;
+import 'package:openlib/ui/core/filter_options.dart';
 import 'package:openlib/ui/core/components/language_names.dart';
 
 /// Badge label for the format embedded in a result's info string.

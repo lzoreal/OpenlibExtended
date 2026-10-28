@@ -1,26 +1,31 @@
+// Dart imports:
 import 'dart:io';
 
+// Flutter imports:
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/app/app_settings.dart';
-import 'package:openlib/app/di.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:openlib/main.dart' show MainScreen;
-import 'package:openlib/data/services/book_import.dart';
-import 'package:openlib/data/services/database.dart';
-import 'package:openlib/data/services/files.dart';
-import 'package:openlib/state/state.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class OnboardingPage extends ConsumerStatefulWidget {
-  const OnboardingPage({super.key});
+// Project imports:
+import 'package:openlib/data/services/book_import.dart';
+import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/services/files.dart';
+import 'package:openlib/main.dart' show MainScreen;
+import 'package:openlib/ui/features/onboarding/view_models/onboarding_view_model.dart';
+
+class OnboardingPage extends StatefulWidget {
+  const OnboardingPage({super.key, this.viewModel});
+
+  /// Tests inject one; the app builds the default so the page stays usable
+  /// when settings pushes it again.
+  final OnboardingViewModel? viewModel;
 
   @override
-  ConsumerState<OnboardingPage> createState() => _OnboardingPageState();
+  State<OnboardingPage> createState() => _OnboardingPageState();
 }
 
-class _OnboardingPageState extends ConsumerState<OnboardingPage> {
+class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   String _storagePath = '';
@@ -28,13 +33,23 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   bool _enableBetaUpdates = false;
   bool _enableNotifications = false;
   final TextEditingController _donationKeyController = TextEditingController();
+  late final OnboardingViewModel _viewModel;
+  late final bool _ownsViewModel;
 
   @override
   void initState() {
     super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ?? OnboardingViewModel.fromDi();
     _loadDefaultStorage();
     _loadDonationKey();
     _loadBetaUpdatesPref();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
   }
 
   Future<void> _loadBetaUpdatesPref() async {
@@ -64,7 +79,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       setState(() {
         _donationKeyController.text = key;
       });
-      ref.read(donationKeyProvider.notifier).state = key;
+      _viewModel.setDonationKey(key);
     }
   }
 
@@ -113,6 +128,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     await db.savePreference(
         'includePrereleaseUpdates', _enableBetaUpdates ? 1 : 0);
     await db.savePreference('donationKey', _donationKeyController.text);
+    await db.savePreference(
+        'themeMode',
+        _viewModel.themeMode == ThemeMode.light
+            ? 'light'
+            : _viewModel.themeMode == ThemeMode.dark
+                ? 'dark'
+                : 'system');
 
     if (mounted) {
       Navigator.of(context).pushReplacement(
@@ -144,8 +166,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         final db = MyLibraryDb.instance;
         final imported = await importBooksFromDirectory(_storagePath, db);
         if (imported > 0) {
-          // ignore: unused_result
-          ref.refresh(myLibraryProvider);
+          _viewModel.refreshLibrary();
         }
       }
     }
@@ -153,38 +174,43 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Only show notification page on mobile
-    final showNotificationPage = Platform.isAndroid || Platform.isIOS;
-    final displayPages = [
-      _buildWelcomePage(),
-      _buildStoragePage(),
-      _buildUpdatePage(),
-      _buildDonationPage(),
-      _buildSponsorPage(),
-      if (showNotificationPage) _buildNotificationPage(),
-      _buildThemePage(),
-    ];
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        // Only show notification page on mobile
+        final showNotificationPage = Platform.isAndroid || Platform.isIOS;
+        final displayPages = [
+          _buildWelcomePage(),
+          _buildStoragePage(),
+          _buildUpdatePage(),
+          _buildDonationPage(),
+          _buildSponsorPage(),
+          if (showNotificationPage) _buildNotificationPage(),
+          _buildThemePage(),
+        ];
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (page) {
-                  setState(() {
-                    _currentPage = page;
-                  });
-                },
-                children: displayPages,
-              ),
+        return Scaffold(
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    onPageChanged: (page) {
+                      setState(() {
+                        _currentPage = page;
+                      });
+                    },
+                    children: displayPages,
+                  ),
+                ),
+                _buildBottomBar(displayPages.length),
+              ],
             ),
-            _buildBottomBar(displayPages.length),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -399,8 +425,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               prefixIcon: const Icon(Icons.key_outlined),
             ),
             onChanged: (value) {
-              ref.read(donationKeyProvider.notifier).state = value;
-              getIt<AppSettings>().setDonationKey(value);
+              _viewModel.setDonationKey(value);
             },
           ),
         ],
@@ -478,7 +503,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   Widget _buildThemePage() {
     final theme = Theme.of(context);
-    final mode = ref.watch(themeModeProvider);
+    final mode = _viewModel.themeMode;
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
@@ -498,9 +523,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   icon: Icons.light_mode_rounded,
                   selected: mode == ThemeMode.light,
                   onTap: () {
-                    ref
-                        .read(themeModeProvider.notifier)
-                        .setTheme(ThemeMode.light);
+                    _viewModel.setThemeMode(ThemeMode.light);
+                    MyLibraryDb.instance.savePreference('themeMode', 'light');
                   }),
               const SizedBox(width: 16),
               _ThemeCard(
@@ -508,9 +532,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   icon: Icons.dark_mode_rounded,
                   selected: mode == ThemeMode.dark,
                   onTap: () {
-                    ref
-                        .read(themeModeProvider.notifier)
-                        .setTheme(ThemeMode.dark);
+                    _viewModel.setThemeMode(ThemeMode.dark);
+                    MyLibraryDb.instance.savePreference('themeMode', 'dark');
                   }),
             ],
           ),

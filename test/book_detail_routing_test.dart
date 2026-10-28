@@ -12,18 +12,12 @@ import 'dart:io';
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
-import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/book_detail_routing.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/data/services/slum_catalogue.dart';
-import 'package:openlib/state/repository_providers.dart'
-    show mirrorRepositoryProvider;
-import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
+import 'helpers/book_detail_test_support.dart';
 
 /// An open-slum.org page in the shape the catalogue parses.
 String _slumPage(List<String> origins) {
@@ -148,48 +142,41 @@ void main() {
       );
     });
 
-    test("the Anna's Archive button provider resolves the listed mirror",
-        () async {
+    test("the Anna's Archive button uses the listed mirror", () async {
       // The "open in site" button used to resolve this inside build(),
       // which started catalogue I/O that widget tests could not settle.
-      final container = ProviderContainer(
-        overrides: [
-          mirrorRepositoryProvider.overrideWithValue(
-              MirrorRepository(manager: managerFor(catalogue))),
-        ],
+      final vm = testBookDetailViewModel(
+        mirrors: FakeMirrorRepository(urls: const ['https://annas-archive.gl/']),
+        bookInfo: FakeBookInfoRepository(
+          handler: (_) async => throw StateError('no details in this test'),
+        ),
       );
-      addTearDown(container.dispose);
+      addTearDown(vm.dispose);
+
+      await vm.load();
+      await pumpEventQueue();
 
       expect(
-        await container.read(annaArchiveBaseUrlProvider.future),
+        vm.annaArchiveBaseUrl,
         'https://annas-archive.gl',
         reason: 'the button must use the mirror the catalogue lists',
       );
     });
 
-    test("the Anna's Archive button provider reports null without a mirror",
+    test("the Anna's Archive button stays disabled without a mirror",
         () async {
-      // A catalogue that lists no Anna's Archive mirror at all: the
-      // button must be disabled, never pointed at a guessed host.
-      final empty = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      empty.listen((request) async {
-        request.response
-          ..statusCode = HttpStatus.ok
-          ..headers.contentType = ContentType.html
-          ..write('<!doctype html><html><body></body></html>');
-        await request.response.close();
-      });
-      addTearDown(() async => empty.close());
-
-      final container = ProviderContainer(
-        overrides: [
-          mirrorRepositoryProvider
-              .overrideWithValue(MirrorRepository(manager: managerFor(empty))),
-        ],
+      final vm = testBookDetailViewModel(
+        mirrors: FakeMirrorRepository(urls: const []),
+        bookInfo: FakeBookInfoRepository(
+          handler: (_) async => throw StateError('no details in this test'),
+        ),
       );
-      addTearDown(container.dispose);
+      addTearDown(vm.dispose);
 
-      expect(await container.read(annaArchiveBaseUrlProvider.future), isNull);
+      await vm.load();
+      await pumpEventQueue();
+
+      expect(vm.annaArchiveBaseUrl, isNull);
     });
   });
 }
