@@ -7,8 +7,8 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/state/state.dart'
     show annaArchiveBaseUrlProvider, bookInfoProvider;
-import 'package:openlib/ui/book_info_page.dart';
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/features/book_detail/views/book_info_page.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 void main() {
   BookData preview() => BookData(

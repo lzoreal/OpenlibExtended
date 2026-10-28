@@ -11,7 +11,7 @@
 ## 1. 项目速览
 
 - Flutter 跨平台电子书客户端：Anna's Archive / LibGen / Z-Library / WeLib 搜索 → 下载中心 → 外部阅读器打开 EPUB/PDF。
-- 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；模型 `lib/data/models/`（`BookData`、`MyBook`、`SearchProviderId` 等）；服务 `lib/data/services/`；页面 `lib/ui/`；数据库 `lib/data/services/database.dart`（本轮先加 `lib/app/` 与 `lib/data/`，`lib/state/` 在 W7 前仍存在）。
+- 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；模型 `lib/data/models/`（`BookData`、`MyBook`、`SearchProviderId` 等）；服务 `lib/data/services/`；页面 `lib/ui/features/<feature>/{views,widgets}/`、共享主题与组件 `lib/ui/core/`；数据库 `lib/data/services/database.dart`（本轮先加 `lib/app/` 与 `lib/data/`，`lib/state/` 在 W7 前仍存在）。
 - 发布平台：Android、iOS（未签名侧载）、Windows、Linux。**Web 不可用**；macOS 有工程但未发布。
 - “我的书库”已重构为“下载中心”：标签、阅读状态筛选、排序/筛选、磁盘同步入口均已删除，不要恢复。
 - 主导航与子标签均支持左右滑动；镜像页支持本机测速并按本机延迟自动排序。
@@ -101,7 +101,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
     - CI 通过 secrets 注入签名材料。
 
 11. **UI 必须遵循 MD3 设计系统**
-    - 颜色/形状/文字样式只从 `Theme.of(context)` 取；主题源是 `lib/ui/themes.dart`（暖纸 + 翡翠绿 `#0F6B5C`，light/dark）。
+    - 颜色/形状/文字样式只从 `Theme.of(context)` 取；主题源是 `lib/ui/core/themes.dart`（暖纸 + 翡翠绿 `#0F6B5C`，light/dark）。
     - 使用语义角色：`primary`/`primaryContainer`、`onSurface`/`onSurfaceVariant`、`surfaceContainerLow/High/Highest`、`error`/`errorContainer`；不要新增硬编码 `Colors.*` 或十六进制色值（深色遮罩上的白字除外）。
     - 使用 MD3 组件：`Card`、`FilledButton`/`OutlinedButton`/`TextButton`、`FilterChip`、`SearchBar`、`AlertDialog`、`BottomSheet`；分段统一用 `PillTabs` + `TabBarView`。
     - 主导航用 `PageView`；发现/搜索/下载中心的子标签与设置页一样用 `PillTabs + TabBarView`。搜索、下载、设置的页头与标签固定，内容区独立滚动。
@@ -185,9 +185,9 @@ flutter test
 ## 7. 常见任务路径
 
 - **加书源**：`SearchProviderId` → 实现 `SearchProvider` → 注册 `SearchManager` → SLUM 服务映射 → `routeBookDetail` → 详情下载分支 → ARB/设置开关 → 测试。
-- **加设置项**：`lib/app/app_settings.dart` 字段、setter 与 `AppSettings.load` 读偏好 → `lib/main.dart` 把启动值 override 进 Riverpod（迁移期）→ `lib/ui/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
+- **加设置项**：`lib/app/app_settings.dart` 字段、setter 与 `AppSettings.load` 读偏好 → `lib/main.dart` 把启动值 override 进 Riverpod（迁移期）→ `lib/ui/features/settings/views/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
 - **加 l10n**：五份 ARB + `@description` → `flutter gen-l10n` → `AppLocalizations.of(context)`。
-- **改下载**：`DownloadManager` → `lib/data/services/download_target.dart` → `lib/ui/book_info_page.dart` → `download_manager_test`。
+- **改下载**：`DownloadManager` → `lib/data/services/download_target.dart` → `lib/ui/features/book_detail/views/book_info_page.dart` → `download_manager_test`。
 - **改镜像/本机测速**：`SlumCatalogue` / `InstanceManager` / `mirror_latency.dart` → `slum_catalogue_test` / `instance_manager_test` / `mirror_latency_*_test`；确认 24h 过期与自动排序。
 - **改更新**：`update_checker.dart` → `upgrade_detector`/What's New → 相关 widget 测试；注意 CI 产物命名约定。
 - **改发布**：`.github/workflows/build.yml` + `tool/update_scoop_manifest.py` + `bucket/openlibextended.json`；改产物名会破坏应用内更新识别。

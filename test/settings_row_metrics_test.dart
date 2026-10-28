@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/components/settings_row.dart';
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/core/components/settings_row.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 void main() {
   testWidgets('settings row is at least 64 high', (tester) async {

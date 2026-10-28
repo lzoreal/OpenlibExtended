@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/ui/components/tab_keep_alive.dart';
+import 'package:openlib/ui/core/components/tab_keep_alive.dart';
 
 class _Probe extends StatefulWidget {
   const _Probe({required this.index, required this.inits});

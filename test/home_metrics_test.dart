@@ -10,10 +10,10 @@ import 'package:openlib/state/state.dart'
         activeDownloadsProvider,
         getTrendingBooks,
         homePageSelectedIndexProvider;
-import 'package:openlib/ui/categories_page.dart' show GenreShortcutSection;
-import 'package:openlib/ui/home_page.dart';
-import 'package:openlib/ui/themes.dart';
-import 'package:openlib/ui/trending_page.dart';
+import 'package:openlib/ui/features/trending/views/categories_page.dart' show GenreShortcutSection;
+import 'package:openlib/ui/features/shell/views/home_page.dart';
+import 'package:openlib/ui/core/themes.dart';
+import 'package:openlib/ui/features/trending/views/trending_page.dart';
 
 void main() {
   testWidgets('trending poster is 128 wide with a 192-high cover',

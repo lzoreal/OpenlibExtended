@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/components/page_header.dart';
-import 'package:openlib/ui/components/pill_tabs.dart';
-import 'package:openlib/ui/components/section_header.dart';
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/core/components/page_header.dart';
+import 'package:openlib/ui/core/components/pill_tabs.dart';
+import 'package:openlib/ui/core/components/section_header.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 void main() {
   testWidgets('page header uses 16/16/16/12 and a 26/32 title', (tester) async {

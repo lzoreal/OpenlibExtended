@@ -21,7 +21,7 @@ import 'package:openlib/data/services/slum_catalogue.dart';
 import 'package:openlib/state/repository_providers.dart'
     show mirrorRepositoryProvider;
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/instances_page.dart';
+import 'package:openlib/ui/features/instances/views/instances_page.dart';
 
 class _FakeTester extends MirrorLatencyTester {
   _FakeTester(this.onMeasure);

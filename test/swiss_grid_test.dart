@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/ui/swiss_grid.dart';
+import 'package:openlib/ui/core/swiss_grid.dart';
 
 void main() {
   test('grid spans follow the 4-column board', () {

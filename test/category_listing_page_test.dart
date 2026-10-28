@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/goodreads.dart';
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/categories_page.dart';
+import 'package:openlib/ui/features/trending/views/categories_page.dart';
 
 void main() {
   testWidgets('constrains the listing grid on wide screens', (tester) async {

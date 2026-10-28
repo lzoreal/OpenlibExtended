@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 // Package imports:
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:openlib/ui/home_page.dart';
+import 'package:openlib/ui/features/shell/views/home_page.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 
@@ -24,18 +24,18 @@ import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/data/services/update_checker.dart';
 import 'package:openlib/data/services/upgrade_detector.dart';
-import 'package:openlib/ui/components/bottom_nav_bar.dart';
-import 'package:openlib/ui/components/content_width.dart';
-import 'package:openlib/ui/components/swiss_grid_overlay.dart';
-import 'package:openlib/ui/components/tab_keep_alive.dart';
-import 'package:openlib/ui/download_center_page.dart';
-import 'package:openlib/ui/motion.dart';
-import 'package:openlib/ui/search_page.dart';
-import 'package:openlib/ui/settings_page.dart';
-import 'package:openlib/ui/themes.dart';
-import 'package:openlib/ui/onboarding/onboarding_page.dart';
-import 'package:openlib/ui/challenge_solver_page.dart';
-import 'package:openlib/ui/whats_new_page.dart';
+import 'package:openlib/ui/features/shell/widgets/bottom_nav_bar.dart';
+import 'package:openlib/ui/features/shell/widgets/content_width.dart';
+import 'package:openlib/ui/features/shell/widgets/swiss_grid_overlay.dart';
+import 'package:openlib/ui/core/components/tab_keep_alive.dart';
+import 'package:openlib/ui/features/library/views/download_center_page.dart';
+import 'package:openlib/ui/core/motion.dart';
+import 'package:openlib/ui/features/search/views/search_page.dart';
+import 'package:openlib/ui/features/settings/views/settings_page.dart';
+import 'package:openlib/ui/core/themes.dart';
+import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
+import 'package:openlib/ui/features/webview/views/challenge_solver_page.dart';
+import 'package:openlib/ui/features/whats_new/views/whats_new_page.dart';
 
 import 'package:openlib/data/services/files.dart'
     show moveFilesToAndroidInternalStorage;

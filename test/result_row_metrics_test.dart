@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/components/search_result_card.dart';
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/features/results/widgets/search_result_card.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 void main() {
   testWidgets('result row is 96 high with a 56x80 cover', (tester) async {

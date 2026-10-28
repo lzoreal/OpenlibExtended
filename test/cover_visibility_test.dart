@@ -7,8 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/state/state.dart'
     show downloadedBookIdsProvider, resultCoverProvider;
-import 'package:openlib/ui/components/search_result_card.dart';
-import 'package:openlib/ui/components/visible_builder.dart';
+import 'package:openlib/ui/features/results/widgets/search_result_card.dart';
+import 'package:openlib/ui/features/results/widgets/visible_builder.dart';
 
 Widget _app(Widget child) => MaterialApp(
       locale: const Locale('en'),

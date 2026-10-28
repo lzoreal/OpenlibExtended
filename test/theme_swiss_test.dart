@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 void main() {
   test('text theme maps the nine Swiss tokens', () {

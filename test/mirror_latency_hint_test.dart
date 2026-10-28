@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/components/mirror_latency_hint.dart';
+import 'package:openlib/ui/features/search/widgets/mirror_latency_hint.dart';
 
 Widget _app(Widget child, {double textScale = 1.0}) => MaterialApp(
       locale: const Locale('en'),

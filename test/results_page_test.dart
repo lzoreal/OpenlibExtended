@@ -15,9 +15,9 @@ import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/components/search_result_card.dart';
-import 'package:openlib/ui/components/source_journey_card.dart';
-import 'package:openlib/ui/results_page.dart';
+import 'package:openlib/ui/features/results/widgets/search_result_card.dart';
+import 'package:openlib/ui/features/results/widgets/source_journey_card.dart';
+import 'package:openlib/ui/features/results/views/results_page.dart';
 
 List<BookData> _sourceBooks(String tag, String displayName, int page, int count) {
   return List.generate(

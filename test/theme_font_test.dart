@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 void main() {
   test('theme keeps Latin and CJK on one weight-consistent font', () {

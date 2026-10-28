@@ -173,7 +173,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 ### 4.3 MD3 设计系统
 
-- **主题源**：`lib/ui/themes.dart` 以暖纸背景 + 翡翠绿 `#0F6B5C` 为种子生成 light/dark 两套语义色；不再使用旧的紫色 `#6750A4`、红色 `#FB0101` 或纯白/纯黑硬编码。
+- **主题源**：`lib/ui/core/themes.dart` 以暖纸背景 + 翡翠绿 `#0F6B5C` 为种子生成 light/dark 两套语义色；不再使用旧的紫色 `#6750A4`、红色 `#FB0101` 或纯白/纯黑硬编码。
 - **语义色**：正文/标题用 `onSurface`，次要信息用 `onSurfaceVariant`，卡片用 `surface`/`surfaceContainerLow`，输入框用 `surfaceContainerHigh`，强调色用 `primary` / `primaryContainer`；禁止在新代码里写 `Colors.red`、`Colors.white` 等（深色遮罩上的白字除外）。
 - **排版**：保留 Nunito，但映射到 MD3 角色：页面标题 `headlineMedium`，卡片标题 `titleSmall`，正文 `bodyMedium`，辅助信息 `bodySmall`，按钮/标签 `labelLarge`。
 - **形状**：卡片 20dp 圆角 + 极浅描边，输入/选项 16dp，对话框 28dp，按钮与选项卡胶囊形；页面横向内边距统一 16dp。
@@ -217,7 +217,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 实现位置：AA `AnnasArchieve.searchBooks`（`lib/data/services/annas_archieve.dart`）；LibGen `LibgenProvider.search`；Z-Library `ZlibraryProvider.search`；WeLib `WelibProvider.search`（三者都在 `lib/data/services/search_manager.dart`）。
 
-每页搜索结果用 `SearchPageKey(query, page)` 作为 provider family key 缓存（`SearchPageKey` / `searchProvider`，`lib/state/state.dart`）；结果页滚动到距底部 200px 加载下一页（`lib/ui/results_page.dart:82-110`）。
+每页搜索结果用 `SearchPageKey(query, page)` 作为 provider family key 缓存（`SearchPageKey` / `searchProvider`，`lib/state/state.dart`）；结果页滚动到距底部 200px 加载下一页（`lib/ui/features/results/views/results_page.dart:82-110`）。
 
 ### 5.2 详情路由
 
@@ -232,14 +232,14 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 ### 5.3 下载
 
-入口在详情页“Download”（`lib/ui/book_info_page.dart:151-360`），流程：
+入口在详情页“Download”（`lib/ui/features/book_detail/views/book_info_page.dart:151-360`），流程：
 
 1. **LibGen**：`get.php` 直链，直接 `fast=true`。
 2. **Z-Library**：先 `resolveBookDownload()` 重新解析 `/dl/<id>`，处理 DiamWall、302 签名 CDN、204 死链；拿不到时保留镜像给出的拒绝原因（每日限额/需登录）。
 3. **WeLib**：`resolveDownload()` 解析 `a.js-partner-download-link` 或 `/fast_download`、`/auto_download`；保留 slow_download 页面用于过期后重新解析。
 4. **Anna's Archive**：若配置了 donation key，调用 `getFastDownloadUrl()` 获取直接下载地址。
 5. `chooseDownloadTarget()` 决定最终目标：只要拿到可用 URL 就用 URL；镜像明确拒绝且无 URL 时才显示拒绝原因（`lib/data/services/download_target.dart:38-47`）。
-6. Linux 且非快速链接：打开可见 WebView 页抓镜像后入队（`lib/ui/book_info_page.dart:249-294`）；其他平台交给 `DownloadManager` 后台抓镜像。
+6. Linux 且非快速链接：打开可见 WebView 页抓镜像后入队（`lib/ui/features/book_detail/views/book_info_page.dart:249-294`）；其他平台交给 `DownloadManager` 后台抓镜像。
 
 下载状态机（`lib/data/services/download_manager.dart:16-26`）：
 
@@ -275,7 +275,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 
 - AA / WeLib 的 Cloudflare / DDoS-Guard：Dio 先抓，识别到挑战 → `WebviewChallengeSolver.fetchHtmlAfterChallenge()`。
   - 移动：headless WebView 60 秒；失败回退到可见 `ChallengeSolverPage`（`lib/data/services/webview_challenge_solver.dart:102-128`）。
-  - 可见回退页：先显示全屏“正在验证访问权限”加载态（盾牌 + 进度），加载完成后切换为顶部“需要手动验证”提示 + 可交互 WebView；右上角刷新可重试（`lib/ui/challenge_solver_page.dart`）。
+  - 可见回退页：先显示全屏“正在验证访问权限”加载态（盾牌 + 进度），加载完成后切换为顶部“需要手动验证”提示 + 可交互 WebView；右上角刷新可重试（`lib/ui/features/webview/views/challenge_solver_page.dart`）。
   - 桌面：`desktop_webview_window` 可见窗口 3 分钟（`:244-314`）。
   - 成功后 HTML 存入 `ChallengeHtmlCache`，TTL 10 分钟（`lib/data/services/challenge_html_cache.dart:20-48`），后续解析直接命中缓存。
 - Z-Library DiamWall：解析 503 页面里的 seed，本地暴力 `SHA1(seed+i)` 求目标前缀，拿到 cookie 后重试（`lib/data/services/diamwall_solver.dart:41-111`）。
@@ -284,18 +284,18 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 ### 5.5 阅读
 
 - 应用不内置阅读器：`epub_view` / `pdfrx` / `epubx` / `flutter_tts` 依赖、内置阅读器页面和 TTS 服务均已删除。
-- 下载中心、书籍详情和文件按钮的“打开”统一走 `openBookExternally()`（`lib/ui/components/file_buttons_widget.dart`），把本地文件交给系统/第三方阅读器（`OpenFile.open`）；CBR/CBZ 也直接交给系统应用。
+- 下载中心、书籍详情和文件按钮的“打开”统一走 `openBookExternally()`（`lib/ui/core/components/file_buttons_widget.dart`），把本地文件交给系统/第三方阅读器（`OpenFile.open`）；CBR/CBZ 也直接交给系统应用。
 - 数据库仍保留 `bookposition` 表以兼容旧备份，但应用内不再写入阅读进度。
 
 ### 5.6 下载中心
 
-- 第三个 Tab，替换旧的“我的书库”。页面实现：`lib/ui/download_center_page.dart`。
+- 第三个 Tab，替换旧的“我的书库”。页面实现：`lib/ui/features/library/views/download_center_page.dart`。
 - **进行中/失败任务**来自 `DownloadManager` 的内存队列；**已完成记录**来自 `mybooks` 表，因此重启后仍在。
 - 页首进度卡聚合总进度、当前速度与预计剩余时间（UI 每秒采样已下载字节并做滑动平均，没有样本时隐藏速度/剩余）。
 - 筛选：全部 / 进行中 / 已完成 / 失败；顶部支持全部暂停 / 全部继续。
 - 已完成行点击进入书籍详情，“打开”按钮才调用外部阅读器；也可分享、在文件夹中显示（桌面）或删除记录；删除记录不删除本地文件。
 - 已移除书库专属功能：标签、阅读状态筛选、9 种排序、书库搜索、磁盘同步入口。数据库 schema 与书籍详情保持不变（`bookposition` 表保留用于备份兼容）。
-- 存储位置在“设置 → 高级 → 通用”中；切换目录会移动 pdf/epub/cbr/cbz 文件（目标已存在则保留源文件），然后扫描导入（`lib/ui/settings_page.dart`、`lib/data/services/files.dart`）。
+- 存储位置在“设置 → 高级 → 通用”中；切换目录会移动 pdf/epub/cbr/cbz 文件（目标已存在则保留源文件），然后扫描导入（`lib/ui/features/settings/views/settings_page.dart`、`lib/data/services/files.dart`）。
 
 ### 5.7 备份、更新、日志
 
@@ -408,7 +408,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 1. **下载队列不持久化**：`_activeDownloads` 是内存 Map（`lib/data/services/download_manager.dart:144`），进程被杀后任务全丢；`resumeInterruptedDownloads()` 只能恢复仍在本进程内的 paused/failed 任务（`:436-459`）。Android 没有前台 Service，退后台可能被挂起。
 2. **应用内更新无完整性校验**：只检查文件存在且 ≥10240 字节，没有 SHA-256/签名校验（`lib/data/services/update_checker.dart:566-585`）；Android 更新还固定优先 arm64，不检查设备 ABI（`:310-314`）。
 3. **版本号双轨**：`pubspec.yaml:19` 是 1.0.11+14，发布版本由 CI 注入；本地构建、About 页、更新比较都可能受旧版本号影响。
-4. **“自动更新”开关无效**：Onboarding 写入 `enableAutoUpdate`（`lib/ui/onboarding/onboarding_page.dart:106`），但没有任何代码读取它；启动时总会检查更新（`_checkForUpdatesOnStartup`，`lib/main.dart`）。真正生效的是 `includePrereleaseUpdates`。
+4. **“自动更新”开关无效**：Onboarding 写入 `enableAutoUpdate`（`lib/ui/features/onboarding/views/onboarding_page.dart:106`），但没有任何代码读取它；启动时总会检查更新（`_checkForUpdatesOnStartup`，`lib/main.dart`）。真正生效的是 `includePrereleaseUpdates`。
 5. **搜索是并行聚合**：所有启用书源同时查询，按配置顺序合并并跨源去重；结果页用来源卡片切换单源视图。新增书源时不要把 UI 假设改回“顺序兜底、首个命中即停”。
 6. **Z-Library 下载 MD5 校验必然失败**：Z-Library 的 `md5` 字段实际是 `/book/<id>` 的书籍 id（`ZlibraryProvider.parseResults`，`lib/data/services/search_manager.dart`），`_verifyFileCheckSum` 拿它和文件 MD5 比较必然不等（`lib/data/services/download_manager.dart:206-221`），完成通知可能显示 “checksum failed”，但文件仍会入库。
 7. **文件名清洗丢弃非 ASCII**：`removeSpecialChars` 删除所有非 ASCII（`lib/data/services/files.dart:24-31`），纯中文标题会退化为 md5 前 8 位；且文件名没有唯一后缀，同标题/同格式的书可能互相覆盖（`:17-108`）。
@@ -416,7 +416,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 9. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`、用 `Platform` 分支（`main()`），README 仍把 Web 列为 roadmap。
 10. **macOS 未进入发布流程**：有工程与 Podfile，但 CI 没有 macOS job，README Roadmap 仍列 “MacOs release”。
 11. **iOS 最低版本配置不一致**：Xcode 工程 deployment target 12.0，Podfile 强制 15.0（`ios/Podfile:8`）；CI 用 `nm` 检查 iOS 17-only Swift 符号作为回归护栏（`.github/workflows/build.yml:225-246`）。修改依赖/Pod 时要保持 Podfile 与工程一致。
-12. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/data/services/mirror_fetcher.dart:25-28`），详情页因此走可见 WebView 手动流程（`lib/ui/book_info_page.dart:249-294`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
+12. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/data/services/mirror_fetcher.dart:25-28`），详情页因此走可见 WebView 手动流程（`lib/ui/features/book_detail/views/book_info_page.dart:249-294`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
 13. **通知能力仅 Android**：`DownloadNotificationService` 只在 Android 初始化；通知点击目前只 `debugPrint`，不会打开应用/任务（`lib/data/services/download_notification.dart:56-82`）。
 14. **备份不含书籍文件**：仅备份数据库表，换机后需自行迁移书籍目录。
 15. **本地化覆盖**：5 个语言、531 个 key，测试强制五份 ARB key 完全一致（`test/localization_test.dart:31-52`）；仍有少量硬编码英文（如设置页部分说明、实例页）。
@@ -435,14 +435,14 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 2. 在 `SearchManager` 默认 provider 列表注册；顺序决定合并优先级与默认视图。
 3. 在 `MirrorService` / SLUM 页面映射中确认镜像归属（`lib/data/services/slum_catalogue.dart:22-30,171-177`）。
 4. 在 `routeBookDetail` 中加入详情路由规则（优先用目录 host，其次 URL 形状）。
-5. 在 `lib/ui/book_info_page.dart` 增加下载目标解析分支，必要时实现 `linkRefresher`。
+5. 在 `lib/ui/features/book_detail/views/book_info_page.dart` 增加下载目标解析分支，必要时实现 `linkRefresher`。
 6. 设置页书源开关、ARB 文案、解析器测试、下载测试。
 
 ### 新增一个设置项
 
 1. 在 `AppSettings`（`lib/app/app_settings.dart`）加字段与 setter，并在 `AppSettings.load` 里读偏好。
 2. `main()` 把 `AppSettings.load(...)` 的结果传给 `initDi()`（`lib/app/di.dart`）；迁移期 Riverpod 仍通过 `ProviderScope.overrides` 收到同一份启动值，页面再从 provider 取。
-3. 在 `lib/ui/settings_page.dart` 加 `_SettingsTile` / `_SettingsSwitchTile`，切换时写库。
+3. 在 `lib/ui/features/settings/views/settings_page.dart` 加 `_SettingsTile` / `_SettingsSwitchTile`，切换时写库。
 4. 若需要即时生效，同步更新对应服务的静态开关（参考 `backgroundVerification`）。
 5. 迁移期仍需在 `lib/state/state.dart` 定义 `StateProvider`，并在 `main.dart` 的 `ProviderScope` overrides 中接线；W6 后改由 SettingsViewModel 回写 `AppSettings`。
 
@@ -484,11 +484,11 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 | 过盾 | `lib/data/services/webview_challenge_solver.dart`、`lib/data/services/diamwall_solver.dart` |
 | 数据库 | `lib/data/services/database.dart` |
 | 文件/目录/同步 | `lib/data/services/files.dart` |
-| 详情页与下载按钮 | `lib/ui/book_info_page.dart` |
-| 下载中心 | `lib/ui/download_center_page.dart`、`lib/data/services/download_manager.dart` |
-| 搜索结果与来源切换 | `lib/ui/results_page.dart`、`lib/ui/components/source_journey_card.dart`、`lib/state/state.dart`（`initialSearchProvider`） |
-| 外部阅读入口 | `lib/ui/components/file_buttons_widget.dart` |
-| 设置 | `lib/ui/settings_page.dart` |
+| 详情页与下载按钮 | `lib/ui/features/book_detail/views/book_info_page.dart` |
+| 下载中心 | `lib/ui/features/library/views/download_center_page.dart`、`lib/data/services/download_manager.dart` |
+| 搜索结果与来源切换 | `lib/ui/features/results/views/results_page.dart`、`lib/ui/features/results/widgets/source_journey_card.dart`、`lib/state/state.dart`（`initialSearchProvider`） |
+| 外部阅读入口 | `lib/ui/core/components/file_buttons_widget.dart` |
+| 设置 | `lib/ui/features/settings/views/settings_page.dart` |
 | 更新 | `lib/data/services/update_checker.dart` |
 | CI/发布 | `.github/workflows/build.yml`、`tool/update_scoop_manifest.py` |
 | 测试约定 | `test/*_test.dart`、`analysis_options.yaml` |

@@ -14,7 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/book_detail_source.dart';
 import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
-import 'package:openlib/ui/components/book_info_widget.dart';
+import 'package:openlib/ui/core/components/book_info_widget.dart';
 
 class _FakeBookData implements BookDetailSource {
   @override

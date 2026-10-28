@@ -15,7 +15,7 @@ import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/download_manager.dart';
 import 'package:openlib/state/state.dart'
     show activeDownloadsProvider, downloadManagerProvider;
-import 'package:openlib/ui/download_center_page.dart';
+import 'package:openlib/ui/features/library/views/download_center_page.dart';
 
 void main() {
   Widget app({

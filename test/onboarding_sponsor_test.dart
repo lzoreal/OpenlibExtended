@@ -13,7 +13,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/onboarding/onboarding_page.dart';
+import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
 
 import 'helpers/fake_path_provider.dart';
 

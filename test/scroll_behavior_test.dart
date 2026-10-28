@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 // Project imports:
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlib/main.dart' show MyApp;
-import 'package:openlib/ui/onboarding/onboarding_page.dart';
+import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
 
 void main() {
   testWidgets('the app hands scrollables momentum-based physics',

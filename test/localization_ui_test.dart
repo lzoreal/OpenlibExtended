@@ -16,8 +16,8 @@ import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/state/repository_providers.dart'
     show mirrorRepositoryProvider;
-import 'package:openlib/ui/categories_page.dart';
-import 'package:openlib/ui/search_page.dart';
+import 'package:openlib/ui/features/trending/views/categories_page.dart';
+import 'package:openlib/ui/features/search/views/search_page.dart';
 
 void main() {
   test('genre cards use the localized title and description', () {

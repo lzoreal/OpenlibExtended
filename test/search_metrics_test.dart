@@ -10,9 +10,9 @@ import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/state/repository_providers.dart'
     show mirrorRepositoryProvider;
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/home_page.dart';
-import 'package:openlib/ui/search_page.dart';
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/features/shell/views/home_page.dart';
+import 'package:openlib/ui/features/search/views/search_page.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 /// The search page resolves its mirrors through DI; tests do not run initDi.
 Override _mirrorOverride() =>

@@ -146,7 +146,7 @@
 
 ### 5.1 常量
 
-`lib/ui/swiss_grid.dart`（新增一个常量文件，不引入依赖）：
+`lib/ui/core/swiss_grid.dart`（新增一个常量文件，不引入依赖）：
 
 ```dart
 abstract final class SwissGrid {
@@ -327,7 +327,7 @@ Scaffold(
 - [ ] 所有卡片、按钮组宽度 ∈ `{76, 160, 244, 328}`。
 - [ ] 所有固定高度、内外边距是 **4 的倍数**；常规间距是 8 的倍数。
 - [ ] 所有文字样式来自上表 9 级，`height = line / size`。
-- [ ] 颜色只来自 `Theme.of(context).colorScheme`（主题源 `lib/ui/themes.dart`）。
+- [ ] 颜色只来自 `Theme.of(context).colorScheme`（主题源 `lib/ui/core/themes.dart`）。
 - [ ] 圆角只用 `8 / 12 / 16 / 20 / 28 / pill` 六档（子元素 1–4 与机身 40 除外）。
 - [ ] 底部导航高 72，图标 20，标签 10/16。
 - [ ] 打开原型按 G，元素边缘与网格线重合。

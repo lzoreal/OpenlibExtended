@@ -16,8 +16,8 @@ import 'package:openlib/data/services/recent_searches.dart';
 import 'package:openlib/state/repository_providers.dart'
     show mirrorRepositoryProvider;
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/results_page.dart';
-import 'package:openlib/ui/search_page.dart';
+import 'package:openlib/ui/features/results/views/results_page.dart';
+import 'package:openlib/ui/features/search/views/search_page.dart';
 
 class _FakeSuggestions extends GoogleSuggestApi {
   _FakeSuggestions(this.values);

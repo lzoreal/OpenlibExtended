@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/components/error_widget.dart';
+import 'package:openlib/ui/core/components/error_widget.dart';
 
 Widget _app(Widget child) => MaterialApp(
       locale: const Locale('en'),

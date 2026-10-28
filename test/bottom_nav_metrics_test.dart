@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/components/bottom_nav_bar.dart';
-import 'package:openlib/ui/themes.dart';
+import 'package:openlib/ui/features/shell/widgets/bottom_nav_bar.dart';
+import 'package:openlib/ui/core/themes.dart';
 
 void main() {
   testWidgets('bottom navigation is 72 tall with a 56x32 indicator',

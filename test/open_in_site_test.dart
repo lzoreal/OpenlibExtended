@@ -9,7 +9,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
-import 'package:openlib/ui/components/book_info_widget.dart'
+import 'package:openlib/ui/core/components/book_info_widget.dart'
     show openInSiteUrl;
 
 void main() {

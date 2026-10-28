@@ -27,7 +27,7 @@ import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/settings_page.dart';
+import 'package:openlib/ui/features/settings/views/settings_page.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
 import 'helpers/fake_path_provider.dart';

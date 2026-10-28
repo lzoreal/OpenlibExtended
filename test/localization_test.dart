@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/settings_page.dart';
+import 'package:openlib/ui/features/settings/views/settings_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Map<String, dynamic> _readArb(String locale) {

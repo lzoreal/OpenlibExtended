@@ -8,7 +8,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/ui/whats_new_page.dart';
+import 'package:openlib/ui/features/whats_new/views/whats_new_page.dart';
 
 void main() {
   Widget pumpPage() {
