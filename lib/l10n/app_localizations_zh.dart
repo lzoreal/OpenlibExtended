@@ -1877,6 +1877,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadCenterRemoveFile => '同时移除文件';
 
   @override
+  String get downloadCenterSelect => '选择';
+
+  @override
+  String get downloadCenterSelectAll => '全选';
+
+  @override
+  String get downloadCenterDeselectAll => '取消全选';
+
+  @override
+  String downloadCenterSelectedCount(int count) {
+    return '已选 $count 项';
+  }
+
+  @override
+  String downloadCenterDeleteSelected(int count) {
+    return '删除 $count 项';
+  }
+
+  @override
   String get downloadCenterShowInFolder => '在文件夹中显示';
 
   @override

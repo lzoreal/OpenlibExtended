@@ -312,4 +312,63 @@ void main() {
 
     await disposePage(tester);
   });
+
+  testWidgets('selects completed records and deletes them as one batch',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    MyBook book(String id) => MyBook(
+          id: id,
+          title: '书 $id',
+          author: '作者',
+          thumbnail: null,
+          link: 'https://example.com/$id',
+          publisher: null,
+          info: null,
+          format: 'epub',
+          description: null,
+          fileName: '$id.epub',
+        );
+
+    await pumpCenter(tester, completed: [
+      CompletedDownload(
+        book: book('a'),
+        sizeBytes: 1024,
+        modifiedAt: DateTime(2026, 10, 28, 12),
+      ),
+      CompletedDownload(
+        book: book('b'),
+        sizeBytes: 1024,
+        modifiedAt: DateTime(2026, 10, 27, 12),
+      ),
+    ]);
+
+    await tester.tap(find.byTooltip('选择'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(Checkbox), findsNWidgets(2));
+    expect(find.text('已选 0 项'), findsOneWidget);
+
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
+    expect(find.text('已选 1 项'), findsOneWidget);
+
+    await tester.tap(find.text('删除 1 项'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.widgetWithText(FilledButton, '删除'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('书 a'), findsNothing);
+    expect(find.text('书 b'), findsOneWidget);
+    expect(find.text('已选 0 项'), findsNothing);
+
+    await disposePage(tester);
+  });
 }

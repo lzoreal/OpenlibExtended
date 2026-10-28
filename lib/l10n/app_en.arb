@@ -2644,6 +2644,32 @@
   "@downloadCenterRemoveFile": {
     "description": "Checkbox in the remove-record dialog that also deletes the downloaded file."
   },
+  "downloadCenterSelect": "Select",
+  "@downloadCenterSelect": {
+    "description": "UI text: downloadCenterSelect"
+  },
+  "downloadCenterSelectAll": "Select all",
+  "@downloadCenterSelectAll": {
+    "description": "UI text: downloadCenterSelectAll"
+  },
+  "downloadCenterDeselectAll": "Deselect all",
+  "@downloadCenterDeselectAll": {
+    "description": "UI text: downloadCenterDeselectAll"
+  },
+  "downloadCenterSelectedCount": "Selected: {count}",
+  "@downloadCenterSelectedCount": {
+    "description": "UI text: downloadCenterSelectedCount",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "downloadCenterDeleteSelected": "Delete {count}",
+  "@downloadCenterDeleteSelected": {
+    "description": "UI text: downloadCenterDeleteSelected",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "downloadCenterShowInFolder": "Show in folder",
   "@downloadCenterShowInFolder": {
     "description": "Menu action to reveal a downloaded file in the file manager."

@@ -1433,7 +1433,7 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
           <div class="btn primary" style="flex:0 0 auto"><svg class="ic"><use href="#i-down"/></svg>下载本书</div>
-          <div class="btn" style="flex:1;min-width:220px;border:1.5px solid var(--outline-v);color:var(--on-p-container);background:linear-gradient(90deg,var(--p-container) 42%,var(--surface) 42%)">
+          <div class="btn" style="flex:1;min-width:220px;border:0;color:var(--on-primary);background:linear-gradient(90deg,rgba(255,255,255,.18) 42%,rgba(255,255,255,0) 42%),var(--primary)">
             正在下载 42% · 点击暂停
           </div>
           <div class="btn outline" style="flex:0 0 auto"><svg class="ic"><use href="#i-book"/></svg>打开</div>
@@ -1624,6 +1624,35 @@
         </div>
         <figcaption><em>08</em>下载中心 · 完成与失败</figcaption>
       </figure>
+
+      <!-- 下载中心 · 多选删除（状态说明，不单列一屏） -->
+      <div class="card" style="grid-column:1/-1;width:100%;max-width:640px;justify-self:center">
+        <div class="card-head">
+          <div class="tile-icon"><svg class="ic"><use href="#i-check"/></svg></div>
+          <div class="grow"><b>下载中心 · 多选删除</b></div>
+          <span class="badge">已选 1</span>
+        </div>
+        <div style="margin-top:12px;border-radius:20px;border:1px solid var(--outline-v);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--p-container)">
+            <span style="width:20px;height:20px;border-radius:6px;background:var(--primary);color:var(--on-primary);display:grid;place-items:center;font-size:12px">✓</span>
+            <div class="grow"><b style="font-size:13px">三体</b><div style="font-size:11px;color:var(--muted);margin-top:2px">刘慈欣 · EPUB · 2.4 MB</div></div>
+            <span style="font-size:11px;color:var(--muted)">已完成</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--outline-v)">
+            <span style="width:20px;height:20px;border-radius:6px;border:1.5px solid var(--outline);background:var(--surface)"></span>
+            <div class="grow"><b style="font-size:13px">活着</b><div style="font-size:11px;color:var(--muted);margin-top:2px">余华 · EPUB · 1.1 MB</div></div>
+            <span style="font-size:11px;color:var(--muted)">已完成</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--outline-v);background:var(--surface)">
+            <span class="btn ghost sm" style="flex:0 0 auto">全选</span>
+            <span class="grow" style="font-size:11px;color:var(--muted)">已选 1 项</span>
+            <span class="btn sm" style="flex:0 0 auto;background:var(--error);color:var(--on-error)">删除 1 项</span>
+          </div>
+        </div>
+        <p class="desc" style="margin:10px 0 0">
+          页头“选择”进入多选，自动切到“已完成”；点行勾选，底部可全选/取消全选。删除时可选“同时移除文件”，一次处理所选记录。
+        </p>
+      </div>
 
       <!-- 09 空态 / 无结果 -->
       <figure class="frame">

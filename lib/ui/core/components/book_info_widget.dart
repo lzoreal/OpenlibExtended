@@ -86,12 +86,17 @@ class BookInfoWidget extends StatelessWidget {
   /// when no attemptable mirror is known.
   final String? annaArchiveBaseUrl;
 
+  /// A cover resolved elsewhere (results rows cache it in CoverRepository);
+  /// shown while the detail payload itself carries no thumbnail.
+  final String? coverUrl;
+
   const BookInfoWidget({
     super.key,
     required this.data,
     this.source,
     this.loading = false,
     this.annaArchiveBaseUrl,
+    this.coverUrl,
   });
 
   @override
@@ -115,7 +120,9 @@ class BookInfoWidget extends StatelessWidget {
             md5: data.md5 ?? '',
             annaArchiveBaseUrl: aaBaseUrl,
           );
-    final thumbnail = data.thumbnail ?? '';
+    final thumbnail = (coverUrl?.trim().isNotEmpty ?? false)
+        ? coverUrl!.trim()
+        : (data.thumbnail ?? '');
     final rawDescription = (data.description ?? '').trim();
     final description = rawDescription.length < 3
         ? l10n.noDescriptionAvailable

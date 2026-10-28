@@ -70,6 +70,22 @@ void main() {
     expect(downloads.retried, ['task-abc']);
   });
 
+  test('reuses the cover already resolved by the results row', () async {
+    final covers = FakeCoverRepository(cover: 'https://covers/abc.jpg');
+    final vm = testBookDetailViewModel(
+      preview: _preview(),
+      covers: covers,
+      bookInfo: FakeBookInfoRepository(handler: (_) async => _details()),
+    );
+    addTearDown(vm.dispose);
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(covers.requests, ['https://example.com/md5/abc']);
+    expect(vm.coverUrl, 'https://covers/abc.jpg');
+  });
+
   testWidgets('the action bar shows progress and pauses on tap', (tester) async {
     final downloads = FakeDownloadRepository(
       active: {'t': testDownloadTask(progress: 0.42)},

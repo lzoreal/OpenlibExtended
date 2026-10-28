@@ -11,6 +11,7 @@ import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/models/download_refusal.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/repositories/book_info_repository.dart';
+import 'package:openlib/data/repositories/cover_repository.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/mirror_repository.dart';
@@ -67,13 +68,16 @@ class BookDetailViewModel extends ChangeNotifier {
     required AppSettings settings,
     required BookInfoRepository bookInfo,
     required MirrorRepository mirrors,
+    required CoverRepository covers,
   })  : _preview = preview,
         _library = library,
         _downloads = downloads,
         _settings = settings,
         _bookInfo = bookInfo,
-        _mirrors = mirrors {
+        _mirrors = mirrors,
+        _covers = covers {
     _settings.addListener(_notify);
+    unawaited(_resolveCover());
     _task = _findTask(_downloads.active);
     _taskSubscription = throttleLatest(
       _downloads.updates,
@@ -95,6 +99,7 @@ class BookDetailViewModel extends ChangeNotifier {
       settings: getIt<AppSettings>(),
       bookInfo: getIt<BookInfoRepository>(),
       mirrors: getIt<MirrorRepository>(),
+      covers: getIt<CoverRepository>(),
     );
   }
 
@@ -113,6 +118,7 @@ class BookDetailViewModel extends ChangeNotifier {
   final AppSettings _settings;
   final BookInfoRepository _bookInfo;
   final MirrorRepository _mirrors;
+  final CoverRepository _covers;
 
   final ZlibraryProvider _zlibrary = ZlibraryProvider();
   final WelibProvider _welib = WelibProvider();
@@ -129,6 +135,7 @@ class BookDetailViewModel extends ChangeNotifier {
   bool _disposed = false;
   DownloadTask? _task;
   StreamSubscription<Map<String, DownloadTask>>? _taskSubscription;
+  String? _resolvedCover;
 
   /// The full detail page once it arrived, otherwise what the results row
   /// already knew - so a tap never lands on a blank spinner.
@@ -157,6 +164,24 @@ class BookDetailViewModel extends ChangeNotifier {
   /// The live queue entry for this book, if any. The action bar renders its
   /// progress instead of the download button while it is active.
   DownloadTask? get task => _task;
+
+  /// Search rows without a thumbnail resolve one lazily; the same cached
+  /// value is reused here so the detail page does not re-fetch the cover.
+  String? get coverUrl => _resolvedCover;
+
+  Future<void> _resolveCover() async {
+    if (_disposed || _resolvedCover != null) return;
+    final previewThumb = (_preview?.thumbnail ?? '').trim();
+    if (previewThumb.isNotEmpty) return;
+    try {
+      final cover = await _covers.coverFor(url);
+      if (_disposed || cover == null || cover.isEmpty) return;
+      _resolvedCover = cover;
+      _notify();
+    } catch (_) {
+      // A missing cover only falls back to the placeholder.
+    }
+  }
 
   bool get taskCompleted => _task?.status == DownloadStatus.completed;
 
@@ -438,6 +463,7 @@ class BookDetailViewModel extends ChangeNotifier {
       _errorStackTrace = null;
       _task = _findTask(_downloads.active);
       _notify();
+      if ((data.thumbnail ?? '').trim().isEmpty) unawaited(_resolveCover());
       await refreshMembership();
     } catch (error, stackTrace) {
       if (_disposed) return;

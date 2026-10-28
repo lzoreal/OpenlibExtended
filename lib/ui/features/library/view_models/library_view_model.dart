@@ -171,6 +171,30 @@ class LibraryViewModel extends ChangeNotifier {
     await _reload();
   }
 
+  /// Removes several records in one pass (batch selection) and reloads once.
+  Future<void> deleteBooks(
+    Iterable<MyBook> books, {
+    bool removeFile = true,
+  }) async {
+    final targets = books.toList(growable: false);
+    if (targets.isEmpty) return;
+    _busy = true;
+    _notify();
+    try {
+      for (final book in targets) {
+        if (removeFile) {
+          await _library.deleteWithFile(book);
+        } else {
+          await _library.deleteRecord(book);
+        }
+      }
+    } finally {
+      _busy = false;
+      _notify();
+    }
+    await _reload();
+  }
+
   Future<String?> coverFor(String? thumbnail, String link) {
     final direct = thumbnail?.trim() ?? '';
     if (direct.isNotEmpty) return Future.value(direct);

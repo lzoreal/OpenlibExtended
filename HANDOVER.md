@@ -297,6 +297,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 - 页首进度卡聚合总进度、当前速度与预计剩余时间（UI 每秒采样已下载字节并做滑动平均，没有样本时隐藏速度/剩余）。
 - 筛选：全部 / 进行中 / 已完成 / 失败；顶部支持全部暂停 / 全部继续。
 - 已完成行点击进入书籍详情，“打开”按钮才调用外部阅读器；也可分享、在文件夹中显示（桌面）或删除记录；删除记录不删除本地文件。
+- 已完成记录支持多选批量删除：页头“选择”进入多选并切到“已完成”，可全选/取消全选；删除时可勾选“同时移除文件”，走 `LibraryViewModel.deleteBooks()` 一次刷新。
 - 已移除书库专属功能：标签、阅读状态筛选、9 种排序、书库搜索、磁盘同步入口。数据库 schema 与书籍详情保持不变（`bookposition` 表保留用于备份兼容）。
 - 存储位置在“设置 → 高级 → 通用”中；切换目录会移动 pdf/epub/cbr/cbz 文件（目标已存在则保留源文件），然后扫描导入（`lib/ui/features/settings/views/settings_page.dart`、`lib/data/services/files.dart`）。
 

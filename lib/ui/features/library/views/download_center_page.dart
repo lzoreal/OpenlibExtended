@@ -63,6 +63,8 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
   bool _tabActive = false;
   String? _verifyingTaskId;
   _DownloadFilter _filter = _DownloadFilter.all;
+  bool _selecting = false;
+  final Set<String> _selectedBookIds = {};
   late final TabController _filterController;
 
   late final LibraryViewModel _viewModel;
@@ -103,9 +105,14 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
 
   void _syncFilter() {
     final next = _DownloadFilter.values[_filterController.index];
-    if (next != _filter) {
-      setState(() => _filter = next);
-    }
+    if (next == _filter) return;
+    setState(() {
+      _filter = next;
+      if (_selecting && next != _DownloadFilter.completed) {
+        _selecting = false;
+        _selectedBookIds.clear();
+      }
+    });
   }
 
   @override
@@ -303,6 +310,127 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
     await _viewModel.deleteBook(item.book, removeFile: deleteLocalFile);
   }
 
+  void _enterSelection() {
+    setState(() {
+      _selecting = true;
+      _selectedBookIds.clear();
+      _filter = _DownloadFilter.completed;
+    });
+    if (_filterController.index != _DownloadFilter.completed.index) {
+      _filterController.animateTo(_DownloadFilter.completed.index);
+    }
+  }
+
+  void _exitSelection() {
+    if (!_selecting) return;
+    setState(() {
+      _selecting = false;
+      _selectedBookIds.clear();
+    });
+  }
+
+  void _toggleSelected(MyBook book) {
+    setState(() {
+      if (!_selectedBookIds.add(book.id)) {
+        _selectedBookIds.remove(book.id);
+      }
+    });
+  }
+
+  void _toggleSelectAll(List<CompletedDownload> completed) {
+    setState(() {
+      final allSelected =
+          completed.isNotEmpty && _selectedBookIds.length == completed.length;
+      _selectedBookIds.clear();
+      if (!allSelected) {
+        _selectedBookIds.addAll(completed.map((item) => item.book.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelected(List<CompletedDownload> completed) async {
+    final books = [
+      for (final item in completed)
+        if (_selectedBookIds.contains(item.book.id)) item.book,
+    ];
+    if (books.isEmpty) return;
+    final removeFile = await _showBatchDeleteDialog(books.length);
+    if (removeFile == null || !mounted) return;
+    await _viewModel.deleteBooks(books, removeFile: removeFile);
+    if (!mounted) return;
+    setState(() {
+      _selecting = false;
+      _selectedBookIds.clear();
+    });
+  }
+
+  Future<bool?> _showBatchDeleteDialog(int count) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        var removeFile = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(l10n.downloadCenterDeleteSelected(count)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.downloadCenterRemoveRecordBody,
+                  style: SwissText.caption.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(SwissRadius.field),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: CheckboxListTile(
+                      value: removeFile,
+                      onChanged: (value) =>
+                          setDialogState(() => removeFile = value ?? false),
+                      title: Text(
+                        l10n.downloadCenterRemoveFile,
+                        style: SwissText.label.copyWith(
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 12),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, removeFile),
+                style: FilledButton.styleFrom(
+                  backgroundColor: scheme.error,
+                  foregroundColor: scheme.onError,
+                ),
+                child: Text(l10n.delete),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _deleteFileForBook(FileName fileName) async {
     for (final book in _viewModel.books) {
       if (book.id == fileName.md5) {
@@ -488,6 +616,9 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
                     ? (item) => _showInFolder(item)
                     : null,
                 onRemove: _removeRecord,
+                selecting: _selecting,
+                selectedIds: _selectedBookIds,
+                onToggle: _toggleSelected,
               ),
             ),
           if (showCompleted)
@@ -520,18 +651,49 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
               eyebrow: l10n.downloadEyebrow,
               title: l10n.downloadCenterTitle,
               padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
-              action: IconButton(
-                onPressed: _openStorageFolder,
-                tooltip: l10n.downloadCenterShowInFolder,
-                icon: const Icon(Icons.folder_outlined, size: 20),
-                style: IconButton.styleFrom(
-                  fixedSize: const Size(40, 40),
-                  padding: EdgeInsets.zero,
-                  shape: const CircleBorder(),
-                  backgroundColor: scheme.surface,
-                  foregroundColor: scheme.onSurface,
-                  side: BorderSide(color: scheme.outlineVariant),
-                ),
+              action: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (completed.isNotEmpty) ...[
+                    IconButton(
+                      onPressed: _selecting ? _exitSelection : _enterSelection,
+                      tooltip:
+                          _selecting ? l10n.cancel : l10n.downloadCenterSelect,
+                      icon: Icon(
+                        _selecting
+                            ? Icons.close_rounded
+                            : Icons.checklist_rounded,
+                        size: 20,
+                      ),
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size(40, 40),
+                        padding: EdgeInsets.zero,
+                        shape: const CircleBorder(),
+                        backgroundColor: _selecting
+                            ? scheme.primaryContainer
+                            : scheme.surface,
+                        foregroundColor: _selecting
+                            ? scheme.onPrimaryContainer
+                            : scheme.onSurface,
+                        side: BorderSide(color: scheme.outlineVariant),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  IconButton(
+                    onPressed: _openStorageFolder,
+                    tooltip: l10n.downloadCenterShowInFolder,
+                    icon: const Icon(Icons.folder_outlined, size: 20),
+                    style: IconButton.styleFrom(
+                      fixedSize: const Size(40, 40),
+                      padding: EdgeInsets.zero,
+                      shape: const CircleBorder(),
+                      backgroundColor: scheme.surface,
+                      foregroundColor: scheme.onSurface,
+                      side: BorderSide(color: scheme.outlineVariant),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -572,6 +734,64 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
                     ),
             ),
           ),
+          if (_selecting)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                border: Border(
+                  top: BorderSide(color: scheme.outlineVariant),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => _toggleSelectAll(completed),
+                      child: Text(
+                        completed.isNotEmpty &&
+                                _selectedBookIds.length == completed.length
+                            ? l10n.downloadCenterDeselectAll
+                            : l10n.downloadCenterSelectAll,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        l10n.downloadCenterSelectedCount(
+                          _selectedBookIds.length,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SwissText.micro.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: _selectedBookIds.isEmpty
+                          ? null
+                          : () => _deleteSelected(completed),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: scheme.error,
+                        foregroundColor: scheme.onError,
+                        minimumSize: const Size(0, 40),
+                        textStyle: SwissText.label
+                            .copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: Text(
+                        l10n.downloadCenterDeleteSelected(
+                          _selectedBookIds.length,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1362,6 +1582,9 @@ class _CompletedSliver extends StatelessWidget {
     required this.onShare,
     required this.onShowInFolder,
     required this.onRemove,
+    required this.selecting,
+    required this.selectedIds,
+    required this.onToggle,
   });
 
   final List<CompletedDownload> items;
@@ -1370,6 +1593,9 @@ class _CompletedSliver extends StatelessWidget {
   final Future<void> Function(CompletedDownload) onShare;
   final Future<void> Function(CompletedDownload)? onShowInFolder;
   final Future<void> Function(CompletedDownload) onRemove;
+  final bool selecting;
+  final Set<String> selectedIds;
+  final void Function(MyBook) onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -1397,6 +1623,9 @@ class _CompletedSliver extends StatelessWidget {
                 onShowInFolder:
                     onShowInFolder == null ? null : () => onShowInFolder!(item),
                 onRemove: () => onRemove(item),
+                selecting: selecting,
+                selected: selectedIds.contains(item.book.id),
+                onToggle: () => onToggle(item.book),
               ),
               if (index < items.length - 1)
                 const Divider(indent: 16, endIndent: 16),
@@ -1416,6 +1645,9 @@ class _CompletedRow extends StatelessWidget {
     required this.onShare,
     required this.onShowInFolder,
     required this.onRemove,
+    required this.selecting,
+    required this.selected,
+    required this.onToggle,
   });
 
   final CompletedDownload item;
@@ -1424,6 +1656,9 @@ class _CompletedRow extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback? onShowInFolder;
   final VoidCallback onRemove;
+  final bool selecting;
+  final bool selected;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -1446,7 +1681,7 @@ class _CompletedRow extends StatelessWidget {
     return InkWell(
       // The row opens the book's detail page; the explicit "open" button
       // is the only path that hands the file to an external reader.
-      onTap: onDetails,
+      onTap: selecting ? onToggle : onDetails,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
         child: Column(
@@ -1455,6 +1690,21 @@ class _CompletedRow extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (selecting) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 32),
+                    child: SizedBox(
+                      width: 28,
+                      child: Checkbox(
+                        value: selected,
+                        onChanged: (_) => onToggle(),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 _DownloadCover(
                   title: book.title,
                   thumbnail: book.thumbnail,
@@ -1495,74 +1745,75 @@ class _CompletedRow extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Spacer(),
-                // The completed state sits with the actions it describes,
-                // and shares their height so the row reads as one line.
-                _StatusPill(
-                  key: const ValueKey('completed-status-pill'),
-                  label: l10n.statusCompleted,
-                  color: scheme.secondary,
-                  icon: Icons.check_rounded,
-                  minHeight: 36,
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonal(
-                  key: const ValueKey('completed-open-button'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    minimumSize: const Size(0, 36),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    textStyle:
-                        SwissText.badge.copyWith(fontWeight: FontWeight.w800),
+            if (!selecting) const SizedBox(height: 12),
+            if (!selecting)
+              Row(
+                children: [
+                  const Spacer(),
+                  // The completed state sits with the actions it describes,
+                  // and shares their height so the row reads as one line.
+                  _StatusPill(
+                    key: const ValueKey('completed-status-pill'),
+                    label: l10n.statusCompleted,
+                    color: scheme.secondary,
+                    icon: Icons.check_rounded,
+                    minHeight: 36,
                   ),
-                  onPressed: onOpen,
-                  child: Text(l10n.open),
-                ),
-                PopupMenuButton<_CompletedAction>(
-                  tooltip: MaterialLocalizations.of(context).showMenuTooltip,
-                  icon: const Icon(Icons.more_vert, size: 18),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  onSelected: (action) {
-                    switch (action) {
-                      case _CompletedAction.details:
-                        onDetails();
-                        break;
-                      case _CompletedAction.share:
-                        onShare();
-                        break;
-                      case _CompletedAction.folder:
-                        onShowInFolder?.call();
-                        break;
-                      case _CompletedAction.remove:
-                        onRemove();
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: _CompletedAction.details,
-                      child: Text(l10n.downloadCenterBookDetails),
+                  const SizedBox(width: 8),
+                  FilledButton.tonal(
+                    key: const ValueKey('completed-open-button'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle:
+                          SwissText.badge.copyWith(fontWeight: FontWeight.w800),
                     ),
-                    PopupMenuItem(
-                      value: _CompletedAction.share,
-                      child: Text(l10n.share),
-                    ),
-                    if (onShowInFolder != null)
+                    onPressed: onOpen,
+                    child: Text(l10n.open),
+                  ),
+                  PopupMenuButton<_CompletedAction>(
+                    tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+                    icon: const Icon(Icons.more_vert, size: 18),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    onSelected: (action) {
+                      switch (action) {
+                        case _CompletedAction.details:
+                          onDetails();
+                          break;
+                        case _CompletedAction.share:
+                          onShare();
+                          break;
+                        case _CompletedAction.folder:
+                          onShowInFolder?.call();
+                          break;
+                        case _CompletedAction.remove:
+                          onRemove();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
                       PopupMenuItem(
-                        value: _CompletedAction.folder,
-                        child: Text(l10n.downloadCenterShowInFolder),
+                        value: _CompletedAction.details,
+                        child: Text(l10n.downloadCenterBookDetails),
                       ),
-                    PopupMenuItem(
-                      value: _CompletedAction.remove,
-                      child: Text(l10n.downloadCenterRemoveRecord),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                      PopupMenuItem(
+                        value: _CompletedAction.share,
+                        child: Text(l10n.share),
+                      ),
+                      if (onShowInFolder != null)
+                        PopupMenuItem(
+                          value: _CompletedAction.folder,
+                          child: Text(l10n.downloadCenterShowInFolder),
+                        ),
+                      PopupMenuItem(
+                        value: _CompletedAction.remove,
+                        child: Text(l10n.downloadCenterRemoveRecord),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
           ],
         ),
       ),

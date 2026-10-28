@@ -2004,6 +2004,25 @@ class AppLocalizationsFr extends AppLocalizations {
   String get downloadCenterRemoveFile => 'Supprimer aussi le fichier';
 
   @override
+  String get downloadCenterSelect => 'Sélectionner';
+
+  @override
+  String get downloadCenterSelectAll => 'Tout sélectionner';
+
+  @override
+  String get downloadCenterDeselectAll => 'Tout désélectionner';
+
+  @override
+  String downloadCenterSelectedCount(int count) {
+    return 'Sélection : $count';
+  }
+
+  @override
+  String downloadCenterDeleteSelected(int count) {
+    return 'Supprimer $count';
+  }
+
+  @override
   String get downloadCenterShowInFolder => 'Afficher dans le dossier';
 
   @override

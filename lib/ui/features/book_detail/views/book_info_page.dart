@@ -141,6 +141,7 @@ class _BookInfoPageState extends State<BookInfoPage> {
                     source: widget.source,
                     loading: loading,
                     annaArchiveBaseUrl: _vm.annaArchiveBaseUrl,
+                    coverUrl: _vm.coverUrl,
                   ),
                 ),
               ),
@@ -417,21 +418,19 @@ class _DownloadTaskButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final base =
-        failed ? scheme.errorContainer : scheme.surfaceContainerHighest;
+    // Match the "打开" button after completion: a primary pill whose fill is
+    // a lighter primary, so 100% looks like the same action.
+    final base = failed ? scheme.errorContainer : scheme.primary;
     final fill = failed
         ? scheme.error.withValues(alpha: 0.28)
-        : scheme.primaryContainer;
-    final foreground =
-        failed ? scheme.onErrorContainer : scheme.onPrimaryContainer;
+        : scheme.onPrimary.withValues(alpha: 0.18);
+    final foreground = failed ? scheme.onErrorContainer : scheme.onPrimary;
     return Material(
       color: base,
       shape: StadiumBorder(
-        side: BorderSide(
-          color: failed
-              ? scheme.error.withValues(alpha: 0.45)
-              : scheme.outlineVariant,
-        ),
+        side: failed
+            ? BorderSide(color: scheme.error.withValues(alpha: 0.45))
+            : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

@@ -1977,6 +1977,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadCenterRemoveFile => 'Also remove file';
 
   @override
+  String get downloadCenterSelect => 'Select';
+
+  @override
+  String get downloadCenterSelectAll => 'Select all';
+
+  @override
+  String get downloadCenterDeselectAll => 'Deselect all';
+
+  @override
+  String downloadCenterSelectedCount(int count) {
+    return 'Selected: $count';
+  }
+
+  @override
+  String downloadCenterDeleteSelected(int count) {
+    return 'Delete $count';
+  }
+
+  @override
   String get downloadCenterShowInFolder => 'Show in folder';
 
   @override

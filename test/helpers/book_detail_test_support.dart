@@ -13,6 +13,7 @@ import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/repositories/book_info_repository.dart';
+import 'package:openlib/data/repositories/cover_repository.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/mirror_repository.dart';
@@ -160,6 +161,19 @@ class FakeMirrorRepository extends MirrorRepository {
   }
 }
 
+class FakeCoverRepository extends CoverRepository {
+  FakeCoverRepository({this.cover});
+
+  final String? cover;
+  final List<String> requests = [];
+
+  @override
+  Future<String?> coverFor(String url) async {
+    requests.add(url);
+    return cover;
+  }
+}
+
 AppSettings testBookDetailSettings({
   bool showManualDownloadButton = false,
   String donationKey = '',
@@ -186,6 +200,7 @@ BookDetailViewModel testBookDetailViewModel({
   AppSettings? settings,
   BookInfoRepository? bookInfo,
   MirrorRepository? mirrors,
+  CoverRepository? covers,
 }) {
   return BookDetailViewModel(
     url: url,
@@ -196,5 +211,6 @@ BookDetailViewModel testBookDetailViewModel({
     settings: settings ?? testBookDetailSettings(),
     bookInfo: bookInfo ?? FakeBookInfoRepository(),
     mirrors: mirrors ?? FakeMirrorRepository(),
+    covers: covers ?? FakeCoverRepository(),
   );
 }

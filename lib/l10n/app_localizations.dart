@@ -3555,6 +3555,36 @@ abstract class AppLocalizations {
   /// **'Also remove file'**
   String get downloadCenterRemoveFile;
 
+  /// UI text: downloadCenterSelect
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get downloadCenterSelect;
+
+  /// UI text: downloadCenterSelectAll
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get downloadCenterSelectAll;
+
+  /// UI text: downloadCenterDeselectAll
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get downloadCenterDeselectAll;
+
+  /// UI text: downloadCenterSelectedCount
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {count}'**
+  String downloadCenterSelectedCount(int count);
+
+  /// UI text: downloadCenterDeleteSelected
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count}'**
+  String downloadCenterDeleteSelected(int count);
+
   /// Menu action to reveal a downloaded file in the file manager.
   ///
   /// In en, this message translates to:
