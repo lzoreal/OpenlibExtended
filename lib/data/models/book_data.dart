@@ -1,5 +1,5 @@
 // Project imports:
-import 'package:openlib/data/services/book_detail_source.dart';
+import 'package:openlib/data/models/book_detail_source.dart';
 
 class BookData implements BookDetailSource {
   @override
