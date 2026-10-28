@@ -28,6 +28,7 @@ import 'package:openlib/data/services/goodreads.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/download_manager.dart';
+import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/stream_throttle.dart';
 import 'package:openlib/state/repository_providers.dart';
 // Assuming OpenLibrary, Goodreads, PenguinRandomHouse, BookDigits, and SubCategoriesTypeList are defined
@@ -293,20 +294,18 @@ final instanceManagerProvider =
     Provider<InstanceManager>((ref) => InstanceManager());
 
 // Download Manager States
-final downloadManagerProvider = Provider<DownloadManager>((ref) {
-  final manager = DownloadManager();
-  ref.onDispose(() => manager.dispose());
-  return manager;
+final downloadManagerProvider = Provider<DownloadRepository>((ref) {
+  return ref.watch(downloadRepositoryProvider);
 });
 
 final activeDownloadsProvider =
     StreamProvider<Map<String, DownloadTask>>((ref) {
-  final manager = ref.watch(downloadManagerProvider);
+  final repository = ref.watch(downloadRepositoryProvider);
   // The manager emits per network chunk; 10 progress updates per second is
   // all any of the progress UIs can show, and coalescing here keeps every
   // listening page from rebuilding dozens of times per second.
   return throttleLatest(
-    manager.downloadsStream,
+    repository.updates,
     const Duration(milliseconds: 100),
   );
 });

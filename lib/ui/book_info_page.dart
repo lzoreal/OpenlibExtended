@@ -364,7 +364,7 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                             mirrors.isNotEmpty &&
                             context.mounted) {
                           // Start download with fetched mirrors
-                          final downloadManager =
+                          final downloadRepository =
                               ref.read(downloadManagerProvider);
                           final task = DownloadTask(
                             id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
@@ -380,7 +380,7 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                             mirrors: mirrors,
                           );
 
-                          await downloadManager.addDownload(task);
+                          await downloadRepository.add(task);
 
                           if (context.mounted) {
                             final message = isFastDownload
@@ -395,7 +395,7 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                         }
                       } else {
                         // Other platforms (or fast download on Linux): use background fetch
-                        final downloadManager =
+                        final downloadRepository =
                             ref.read(downloadManagerProvider);
                         final task = DownloadTask(
                           id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
@@ -430,7 +430,7 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                                   : null,
                         );
 
-                        await downloadManager.addDownloadWithMirrorUrl(
+                        await downloadRepository.addWithMirrorUrl(
                           task,
                           effectiveUrl,
                         );
@@ -494,7 +494,7 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                           mirrors.isNotEmpty &&
                           context.mounted) {
                         // Start download in background with fetched mirrors
-                        final downloadManager =
+                        final downloadRepository =
                             ref.read(downloadManagerProvider);
                         final task = DownloadTask(
                           id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
@@ -510,7 +510,7 @@ class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
                           mirrors: mirrors, // Use manually fetched mirrors
                         );
 
-                        await downloadManager.addDownload(task);
+                        await downloadRepository.add(task);
 
                         if (context.mounted) {
                           showSnackBar(

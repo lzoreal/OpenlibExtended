@@ -201,7 +201,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
   }
 
   void _sampleSpeeds() {
-    final downloads = ref.read(downloadManagerProvider).activeDownloads;
+    final downloads = ref.read(downloadManagerProvider).active;
     if (downloads.isEmpty && _lastBytes.isEmpty && _speeds.isEmpty) return;
 
     final now = DateTime.now();
@@ -273,7 +273,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
       ),
     );
     if (mirrors != null && mirrors.isNotEmpty && mounted) {
-      await manager.restartDownloadWithMirrors(task.id, mirrors);
+      await manager.restartWithMirrors(task.id, mirrors);
     }
     if (mounted) setState(() => _verifyingTaskId = null);
   }
@@ -1159,15 +1159,11 @@ class _ActiveSection extends ConsumerWidget {
             task: task,
             speed: speeds[task.id],
             verifying: verifyingTaskId == task.id,
-            onPause: () =>
-                ref.read(downloadManagerProvider).pauseDownload(task.id),
-            onResume: () =>
-                ref.read(downloadManagerProvider).resumeDownload(task.id),
-            onCancel: () =>
-                ref.read(downloadManagerProvider).cancelDownload(task.id),
-            onRetry: () => ref
-                .read(downloadManagerProvider)
-                .retryDownloadKeepingPartial(task.id),
+            onPause: () => ref.read(downloadManagerProvider).pause(task.id),
+            onResume: () => ref.read(downloadManagerProvider).resume(task.id),
+            onCancel: () => ref.read(downloadManagerProvider).cancel(task.id),
+            onRetry: () =>
+                ref.read(downloadManagerProvider).retryKeepingPartial(task.id),
             onVerify: () => onVerify(task),
           ),
       ],
@@ -1207,11 +1203,9 @@ class _FailedSection extends ConsumerWidget {
             verifying: verifyingTaskId == task.id,
             onPause: null,
             onResume: null,
-            onCancel: () =>
-                ref.read(downloadManagerProvider).cancelDownload(task.id),
-            onRetry: () => ref
-                .read(downloadManagerProvider)
-                .retryDownloadKeepingPartial(task.id),
+            onCancel: () => ref.read(downloadManagerProvider).cancel(task.id),
+            onRetry: () =>
+                ref.read(downloadManagerProvider).retryKeepingPartial(task.id),
             onVerify: () => onVerify(task),
           ),
       ],

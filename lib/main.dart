@@ -18,6 +18,7 @@ import 'package:openlib/app/di.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/database.dart' show MyLibraryDb;
 import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
@@ -96,7 +97,7 @@ void main(List<String> args) async {
 
   // Download notifications are posted by a service without a BuildContext;
   // give it the same locale the UI will resolve to.
-  DownloadManager().setLocale(
+  getIt<DownloadRepository>().setLocale(
       settings.locale ?? WidgetsBinding.instance.platformDispatcher.locale);
 
   // Check onboarding status

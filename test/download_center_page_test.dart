@@ -11,8 +11,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/my_book.dart';
+import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/state/state.dart' show activeDownloadsProvider;
+import 'package:openlib/state/state.dart'
+    show activeDownloadsProvider, downloadManagerProvider;
 import 'package:openlib/ui/download_center_page.dart';
 
 void main() {
@@ -24,6 +26,8 @@ void main() {
     return ProviderScope(
       overrides: [
         activeDownloadsProvider.overrideWith((ref) => Stream.value(downloads)),
+        // The page resolves the queue through DI; tests do not run initDi.
+        downloadManagerProvider.overrideWithValue(DownloadRepository()),
         completedDownloadsProvider.overrideWith((ref) async => completed),
       ],
       child: MaterialApp(

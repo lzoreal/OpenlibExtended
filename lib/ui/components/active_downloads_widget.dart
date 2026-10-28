@@ -217,7 +217,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
       });
     }
 
-    final downloadManager = ref.read(downloadManagerProvider);
+    final downloadRepository = ref.read(downloadManagerProvider);
 
     final List<String>? mirrors = await Navigator.push(
       context,
@@ -230,7 +230,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
     );
 
     if (mirrors != null && mirrors.isNotEmpty && mounted) {
-      await downloadManager.restartDownloadWithMirrors(task.id, mirrors);
+      await downloadRepository.restartWithMirrors(task.id, mirrors);
     }
 
     if (mounted) {
@@ -245,7 +245,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final downloadManager = ref.read(downloadManagerProvider);
+    final downloadRepository = ref.read(downloadManagerProvider);
     final task = widget.task;
 
     return Padding(
@@ -334,7 +334,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
-                    downloadManager.pauseDownload(task.id);
+                    downloadRepository.pause(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -350,7 +350,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
-                    downloadManager.resumeDownload(task.id);
+                    downloadRepository.resume(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -367,7 +367,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     color: scheme.onSurfaceVariant,
                   ),
                   onPressed: () {
-                    downloadManager.cancelDownload(task.id);
+                    downloadRepository.cancel(task.id);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -489,7 +489,7 @@ class _DownloadItemState extends ConsumerState<_DownloadItem> {
                     const SizedBox(width: 8),
                     TextButton(
                       onPressed: () {
-                        downloadManager.retryDownload(task.id);
+                        downloadRepository.retry(task.id);
                       },
                       style: TextButton.styleFrom(
                         foregroundColor: scheme.onErrorContainer,

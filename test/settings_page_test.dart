@@ -19,6 +19,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
 import 'package:openlib/data/models/search_result.dart';
+import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/settings_page.dart';
@@ -45,6 +46,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          // The page resolves the download queue through DI; tests do not
+          // run initDi.
+          downloadManagerProvider.overrideWithValue(DownloadRepository()),
+        ],
         child: MaterialApp(
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
