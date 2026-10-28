@@ -86,7 +86,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
    - 用 `PlatformUtils` 或 `dart:io` 的 `Platform`，保持现有分支。
    - 不要声称支持 Web；`main.dart` 依赖 `dart:io`。
    - Linux 后台 headless 抓镜像不可用，必须保留可见 WebView 手动流程。
-   - 过盾求解器：先静默（移动 headless / Windows 隐藏窗口），只有超过 20 秒预算仍未过盾才把可见页提到前台（挑战已清除、抓取偏慢再给 15 秒宽限）；Linux 插件无隐藏接口，保持可见窗口。不要缩短/移除其余超时与缓存逻辑。可见验证成功后必须经 `adoptSession()` 保留同 host 隐藏会话，让详情/下载复用，不要退回“每个 URL 各弹一次验证”。
+   - 过盾求解器：移动端先 headless 静默，超过 20 秒预算仍未过盾才把可见页提到前台（挑战已清除、抓取偏慢再给 15 秒宽限）；桌面端保持 `desktop_webview_window` 可见窗口，**不要先隐藏再 launch**（WebView2 会卡住）。不要缩短/移除其余超时与缓存逻辑。可见验证成功后必须经 `adoptSession()` 保留同 host 隐藏会话，让详情/下载复用，不要退回“每个 URL 各弹一次验证”。
 
 8. **不要随意升级钉死的依赖**
    - `html: 0.15.6`、`permission_handler_android: 13.0.1`、`sqlite3_flutter_libs: 0.5.42` 都有兼容性原因。

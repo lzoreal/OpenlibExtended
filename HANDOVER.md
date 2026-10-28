@@ -280,7 +280,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 - AA / WeLib 的 Cloudflare / DDoS-Guard：Dio 先抓，识别到挑战 → `WebviewChallengeSolver.fetchHtmlAfterChallenge()`。
   - 移动：headless WebView 静默运行，预算 20 秒（`headlessManualAfter`）；挑战仍未清除才回退到可见 `ChallengeSolverPage`。若预算到点时挑战**已清除**、只是抓取偏慢，再给 15 秒抓取宽限（`_captureGrace`）。静默超时不计入 headless 失败记录。注意：移动控制器是 `evaluateJavascript(source:)`，桌面窗口是 `evaluateJavaScript(String)`，写错会让 headless 永远抓不到 HTML、被误判成超时。
   - 可见回退页：先显示全屏“正在验证访问权限”加载态（盾牌 + 进度），加载完成后切换为顶部“需要手动验证”提示 + 可交互 WebView；右上角刷新可重试（`lib/ui/features/webview/views/challenge_solver_page.dart`）。
-  - Windows：`desktop_webview_window` **先隐藏创建**（`setWebviewWindowVisibility(false)`），静默过盾 3 分钟；超过 12 秒预算仍是挑战页时再 `show + bringToForeground()`。成功后关闭窗口。Linux 插件没有隐藏接口，窗口仍从创建起可见。
+  - 桌面（Windows/Linux）：`desktop_webview_window` 可见窗口 3 分钟。**不要先隐藏再 launch**：WebView2 在隐藏状态下首次导航会卡住，所有桌面挑战都会直接失败；隐藏窗口的方案已回退。
   - 成功后 HTML 存入 `ChallengeHtmlCache`，TTL 10 分钟（`lib/data/services/challenge_html_cache.dart:20-48`），后续解析直接命中缓存。
   - **一次验证覆盖整个流程**：可见验证成功后，`adoptSession()` 用同一 host 已写入的 cookie 静默拉起隐藏会话（8s 探测，失败按 host 记忆 30 分钟）；之后的搜索/详情/下载页经 `fetchWithSession()` 直接复用，不再逐页弹验证。会话仅移动端（桌面没有隐藏会话）。
 - Z-Library DiamWall：解析 503 页面里的 seed，本地暴力 `SHA1(seed+i)` 求目标前缀，拿到 cookie 后重试（`lib/data/services/diamwall_solver.dart:41-111`）。

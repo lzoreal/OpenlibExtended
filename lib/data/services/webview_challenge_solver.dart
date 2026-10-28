@@ -513,7 +513,11 @@ class WebviewChallengeSolver {
         }
       }
     } else if (tryHeadless) {
-      html = await _solveDesktopWindow(url, effectiveTimeout);
+      // Two gated sources challenged at once used to open two windows on
+      // the same WebView2 profile; the second one failed to initialise and
+      // showed a blank page. Only one verification window at a time.
+      html = await _oneDesktopWindowAtATime(
+          () => _solveDesktopWindow(url, effectiveTimeout));
     }
 
     if (tryHeadless && !headlessTimedOut) {
@@ -687,16 +691,28 @@ class WebviewChallengeSolver {
   // DESKTOP: visible desktop_webview_window
   // ------------------------------------------------------------------
 
+  static Future<void> _desktopWindowGate = Future<void>.value();
+
+  /// Runs [action] after every earlier desktop challenge window finished.
+  /// WebView2 allows one environment per user-data folder and the plugin
+  /// uses the same folder for every window.
+  static Future<T> _oneDesktopWindowAtATime<T>(
+      Future<T> Function() action) {
+    final previous = _desktopWindowGate;
+    final done = Completer<void>();
+    _desktopWindowGate = done.future;
+    return previous
+        .then((_) => action())
+        .whenComplete(() {
+      if (!done.isCompleted) done.complete();
+    });
+  }
+
   static Future<String?> _solveDesktopWindow(
       String url, Duration timeout) async {
     desktop_webview.Webview? webview;
     var closedByUser = false;
-    // Windows can create the window hidden, so the challenge passes without
-    // taking over the screen; the window only appears when the silent
-    // budget runs out and the page needs a human. Linux has no hide API in
-    // the plugin, so it starts visible there.
-    var hidden = false;
-    final startedAt = DateTime.now();
+    var solved = false;
     try {
       webview = await desktop_webview.WebviewWindow.create(
         configuration: const desktop_webview.CreateConfiguration(
@@ -709,20 +725,14 @@ class WebviewChallengeSolver {
       // The plugin cancels the first navigation and only re-issues it after a
       // Dart URL-request callback; without one the window stays about:blank.
       webview.setOnUrlRequestCallback((_) => true);
-      if (PlatformUtils.isWindows) {
-        try {
-          await webview.setWebviewWindowVisibility(false);
-          hidden = true;
-          _logger.debug('Challenge window hidden while it solves',
-              tag: 'ChallengeSolver', metadata: {'url': url});
-        } catch (_) {
-          // Older runtimes: keep the window visible.
-        }
-      }
+      // The window is created visible: WebView2 stalled when the window was
+      // hidden before its first navigation, which made every desktop
+      // challenge fail without even showing the page.
       webview.launch(url, triggerOnUrlRequestEvent: false);
 
       final deadline = DateTime.now().add(timeout);
       var titleOkPolls = 0;
+      var blankPolls = 0;
       while (DateTime.now().isBefore(deadline)) {
         await Future.delayed(const Duration(milliseconds: 1500));
         if (closedByUser) {
@@ -738,20 +748,29 @@ class WebviewChallengeSolver {
             ) ??
             '';
 
-        if (hidden &&
-            DateTime.now().difference(startedAt) > headlessManualAfter) {
-          _logger.info('Silent desktop solve needs a human; showing the window',
-              tag: 'ChallengeSolver', metadata: {'url': url});
-          hidden = false;
-          try {
-            await webview.setWebviewWindowVisibility(true);
-            await webview.bringToForeground();
-          } catch (_) {
-            // The user can still find the window in the task bar.
+        if (title.isEmpty && bodySnippet.isEmpty) {
+          blankPolls++;
+          // The plugin can drop the first navigation (WebView2 not ready
+          // yet); re-issue it a couple of times instead of showing
+          // about:blank for the whole timeout.
+          if (blankPolls == 3 || blankPolls == 6) {
+            _logger.info('Challenge window blank, re-issuing the navigation',
+                tag: 'ChallengeSolver',
+                metadata: {'url': url, 'polls': blankPolls});
+            try {
+              webview.launch(url, triggerOnUrlRequestEvent: false);
+            } catch (_) {}
           }
+          // A window that is still blank after ~15s is not coming back;
+          // close it (finally) so the next challenge can open cleanly.
+          if (blankPolls >= 10) {
+            _logger.warning('Challenge window stayed blank',
+                tag: 'ChallengeSolver', metadata: {'url': url});
+            return null;
+          }
+          continue;
         }
-
-        if (title.isEmpty && bodySnippet.isEmpty) continue;
+        blankPolls = 0;
 
         if (isChallengePage(title: title, bodySnippet: bodySnippet)) {
           titleOkPolls = 0;
@@ -786,6 +805,7 @@ class WebviewChallengeSolver {
           _logger.info('Challenge solved, captured page HTML',
               tag: 'ChallengeSolver',
               metadata: {'length': html.length, 'title': title});
+          solved = true;
           _closeSolvedWindow(webview);
           return html;
         }
@@ -798,7 +818,13 @@ class WebviewChallengeSolver {
       return null;
     } finally {
       // Closing programmatically crashed GTK in earlier versions; the user
-      // closes the window manually.
+      // closes the window manually there. Windows can close, and leaving an
+      // unsolved window behind keeps its WebView2 profile locked.
+      if (!solved && PlatformUtils.isWindows) {
+        try {
+          webview?.close();
+        } catch (_) {}
+      }
       webview = null;
     }
   }
