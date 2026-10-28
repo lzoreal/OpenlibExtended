@@ -13,10 +13,11 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 
 // Project imports:
+import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/app/di.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/database.dart' show MyLibraryDb;
 import 'package:openlib/services/platform_utils.dart';
-import 'package:openlib/services/preferences.dart';
 import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 import 'package:openlib/services/update_checker.dart';
@@ -78,61 +79,18 @@ void main(List<String> args) async {
 
   ThemeMode startThemeMode = await ThemeModeNotifier.getInitialTheme();
 
-  double fontSizeScale = 1.0;
-  try {
-    var pref =
-        await dataBase.getPreference('fontSizeScale').catchError((e) => 1.0);
-    if (pref is num) {
-      fontSizeScale = pref.toDouble();
-    } else if (pref is String) {
-      fontSizeScale = double.tryParse(pref) ?? 1.0;
-    }
-  } catch (e) {
-    fontSizeScale = 1.0;
-  }
-
-  bool showManualDownloadButton = await dataBase
-              .getPreference('showManualDownloadButton')
-              .catchError((e) => null) ==
-          0
-      ? false
-      : true;
+  final settings = await AppSettings.load(
+    initialThemeMode: startThemeMode,
+  );
+  await initDi(settings: settings);
 
   // Stored as 0 = off; anything else (or missing) = headless on.
-  bool backgroundVerification = await dataBase
-              .getPreference('backgroundVerification')
-              .catchError((e) => null) ==
-          0
-      ? false
-      : true;
-  WebviewChallengeSolver.headlessEnabled = backgroundVerification;
-
-  String browserUserAgent = await dataBase.getBrowserOptions('userAgent');
-  String browserCookie = await dataBase.getBrowserOptions('cookie');
-
-  final savedFilters =
-      await PreferencesService(database: dataBase).loadSearchFilters();
-
-  String savedDonationKey = await dataBase
-          .getPreference('donationKey')
-          .catchError((e) => '') as String? ??
-      '';
-
-  // Load saved language override; empty or unknown values follow the
-  // system locale.
-  final savedLocaleCode =
-      await dataBase.getPreference('locale').catchError((e) => '') as String? ??
-          '';
-  Locale? startLocale;
-  final supported = AppLocalizations.supportedLocales;
-  for (final locale in supported) {
-    if (locale.languageCode == savedLocaleCode) startLocale = locale;
-  }
+  WebviewChallengeSolver.headlessEnabled = settings.backgroundVerification;
 
   // Download notifications are posted by a service without a BuildContext;
   // give it the same locale the UI will resolve to.
   DownloadManager().setLocale(
-      startLocale ?? WidgetsBinding.instance.platformDispatcher.locale);
+      settings.locale ?? WidgetsBinding.instance.platformDispatcher.locale);
 
   // Check onboarding status
   bool onboardingCompleted = await dataBase
@@ -173,20 +131,20 @@ void main(List<String> args) async {
       overrides: [
         themeModeProvider
             .overrideWith((ref) => ThemeModeNotifier(startThemeMode)),
-        fontSizeScaleProvider.overrideWith((ref) => fontSizeScale),
-        localeOverrideProvider.overrideWith((ref) => startLocale),
+        fontSizeScaleProvider.overrideWith((ref) => settings.fontSizeScale),
+        localeOverrideProvider.overrideWith((ref) => settings.locale),
         showManualDownloadButtonProvider
-            .overrideWith((ref) => showManualDownloadButton),
+            .overrideWith((ref) => settings.showManualDownloadButton),
         backgroundVerificationProvider
-            .overrideWith((ref) => backgroundVerification),
-        donationKeyProvider.overrideWith((ref) => savedDonationKey),
-        userAgentProvider.overrideWith((ref) => browserUserAgent),
-        cookieProvider.overrideWith((ref) => browserCookie),
-        selectedTypeState.overrideWith((ref) => savedFilters.type),
-        selectedSortState.overrideWith((ref) => savedFilters.sort),
-        selectedFileTypeState.overrideWith((ref) => savedFilters.fileType),
-        selectedLanguageState.overrideWith((ref) => savedFilters.language),
-        selectedYearState.overrideWith((ref) => savedFilters.year),
+            .overrideWith((ref) => settings.backgroundVerification),
+        donationKeyProvider.overrideWith((ref) => settings.donationKey),
+        userAgentProvider.overrideWith((ref) => settings.userAgent),
+        cookieProvider.overrideWith((ref) => settings.cookie),
+        selectedTypeState.overrideWith((ref) => settings.filters.type),
+        selectedSortState.overrideWith((ref) => settings.filters.sort),
+        selectedFileTypeState.overrideWith((ref) => settings.filters.fileType),
+        selectedLanguageState.overrideWith((ref) => settings.filters.language),
+        selectedYearState.overrideWith((ref) => settings.filters.year),
       ],
       child: MyApp(
         onboardingCompleted: onboardingCompleted,

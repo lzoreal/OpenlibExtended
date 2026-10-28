@@ -185,7 +185,7 @@ flutter test
 ## 7. 常见任务路径
 
 - **加书源**：`SearchProviderId` → 实现 `SearchProvider` → 注册 `SearchManager` → SLUM 服务映射 → `routeBookDetail` → 详情下载分支 → ARB/设置开关 → 测试。
-- **加设置项**：`lib/app/app_settings.dart` 字段与 setter → `lib/main.dart` 读偏好并 override → `lib/ui/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
+- **加设置项**：`lib/app/app_settings.dart` 字段、setter 与 `AppSettings.load` 读偏好 → `lib/main.dart` 把启动值 override 进 Riverpod（迁移期）→ `lib/ui/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
 - **加 l10n**：五份 ARB + `@description` → `flutter gen-l10n` → `AppLocalizations.of(context)`。
 - **改下载**：`DownloadManager` → `lib/services/download_target.dart` → `lib/ui/book_info_page.dart` → `download_manager_test`。
 - **改镜像/本机测速**：`SlumCatalogue` / `InstanceManager` / `mirror_latency.dart` → `slum_catalogue_test` / `instance_manager_test` / `mirror_latency_*_test`；确认 24h 过期与自动排序。
