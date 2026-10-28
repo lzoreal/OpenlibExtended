@@ -4,14 +4,11 @@ import 'package:openlib/l10n/app_localizations.dart';
 
 // Package imports:
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:open_file/open_file.dart';
 
 // Project imports:
-import 'package:openlib/services/book_format.dart';
-import 'package:openlib/services/files.dart' show getFilePath;
 import 'package:openlib/ui/components/detail_bottom_bar.dart';
 import 'package:openlib/ui/components/delete_dialog_widget.dart';
-import 'package:openlib/ui/components/snack_bar_widget.dart';
+import 'package:openlib/ui/open_book.dart';
 
 class FileOpenAndDeleteButtons extends ConsumerWidget {
   final String id;
@@ -66,34 +63,5 @@ class FileOpenAndDeleteButtons extends ConsumerWidget {
         ),
       ],
     );
-  }
-}
-
-/// Opens a downloaded book with the system/third-party reader. The app
-/// deliberately has no built-in reader any more.
-Future<void> openBookExternally({
-  required String fileName,
-  required String format,
-  required BuildContext context,
-}) async {
-  final l10n = AppLocalizations.of(context);
-  String path;
-  try {
-    path = await getFilePath(fileName);
-  } catch (_) {
-    if (context.mounted) {
-      showSnackBar(
-          context: context, message: l10n.fileNotFoundDownloadFailed);
-    }
-    return;
-  }
-
-  final mime = bookFormatMimeType(format);
-  try {
-    await OpenFile.open(path, linuxByProcess: true, type: mime);
-  } catch (_) {
-    if (context.mounted) {
-      showSnackBar(context: context, message: l10n.unableToOpenFile);
-    }
   }
 }

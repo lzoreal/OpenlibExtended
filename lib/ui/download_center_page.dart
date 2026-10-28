@@ -18,6 +18,7 @@ import 'package:openlib/services/download_manager.dart';
 import 'package:openlib/services/files.dart' show deleteFile, getFilePath;
 import 'package:openlib/services/platform_utils.dart';
 import 'package:openlib/services/share_book.dart';
+import 'package:openlib/services/preferences.dart';
 import 'package:openlib/state/state.dart'
     show
         activeDownloadsProvider,
@@ -28,8 +29,7 @@ import 'package:openlib/ui/components/book_info_widget.dart'
     show sourceLabelForUrl;
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/inline_hint.dart';
-import 'package:openlib/ui/components/file_buttons_widget.dart'
-    show openBookExternally;
+import 'package:openlib/ui/open_book.dart';
 import 'package:openlib/ui/components/page_header.dart';
 import 'package:openlib/ui/components/pill_tabs.dart';
 import 'package:openlib/ui/components/section_header.dart';
@@ -62,7 +62,7 @@ final completedDownloadsProvider =
   final books = await ref.watch(myLibraryProvider.future);
   // Resolve the folder once: reading the preference per book turned
   // opening the tab into N database queries on top of N stat calls.
-  final storageDirectory = await _bookStorageDirectory();
+  final storageDirectory = await PreferencesService().bookStorageDirectory();
   final entries = await Future.wait(books.map((book) async {
     int? size;
     DateTime? modified;
@@ -131,16 +131,6 @@ final _activeSummaryProvider = Provider<_ActiveSummary>((ref) {
   }
   return _ActiveSummary(activeCount: active, failedCount: failed);
 });
-
-Future<String?> _bookStorageDirectory() async {
-  try {
-    final directory =
-        await MyLibraryDb.instance.getPreference('bookStorageDirectory');
-    return directory is String ? directory : null;
-  } catch (_) {
-    return null;
-  }
-}
 
 enum _DownloadFilter { all, active, completed }
 
@@ -398,8 +388,10 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
     if (deleteLocalFile) {
       try {
         final directory =
-            await MyLibraryDb.instance.getPreference('bookStorageDirectory');
-        await deleteFile('$directory/${item.fileName}');
+            await PreferencesService().bookStorageDirectory();
+        if (directory != null) {
+          await deleteFile('$directory/${item.fileName}');
+        }
       } catch (_) {
         // The record must still go away if the file or preference is missing.
       }
@@ -414,8 +406,8 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
   Future<void> _openStorageFolder() async {
     final l10n = AppLocalizations.of(context);
     try {
-      final directory =
-          await MyLibraryDb.instance.getPreference('bookStorageDirectory');
+      final directory = await PreferencesService().bookStorageDirectory();
+      if (directory == null) return;
       if (PlatformUtils.isWindows) {
         await Process.run('explorer.exe', [directory]);
       } else if (PlatformUtils.isMacOS) {
@@ -428,7 +420,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
         // ships, and it can be opened straight at the library folder.
         await FilePicker.getDirectoryPath(
           dialogTitle: l10n.downloadCenterShowInFolder,
-          initialDirectory: '$directory',
+          initialDirectory: directory,
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
