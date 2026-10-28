@@ -447,7 +447,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 2. `main()` 把 `AppSettings.load(...)` 的结果传给 `initDi()`（`lib/app/di.dart`）；页面通过 `fromDi()` 取得 ViewModel，再读 `AppSettings`。
 3. 在 `lib/ui/features/settings/views/settings_page.dart` 加 `_SettingsTile` / `_SettingsSwitchTile`，切换时写库。
 4. 若需要即时生效，同步更新对应服务的静态开关（参考 `backgroundVerification`）。
-5. 设置项统一写入 `AppSettings`（`lib/app/app_settings.dart`）并由 SettingsViewModel 暴露；不要再引入新的 provider 或 `ProviderScope` override。
+5. 设置项统一写入 `AppSettings`（`lib/app/app_settings.dart`）并由 SettingsViewModel 暴露；不要再引入 Riverpod provider 或 `ProviderScope` override。
 
 ### 新增/修改数据库字段
 

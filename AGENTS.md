@@ -11,7 +11,7 @@
 ## 1. 项目速览
 
 - Flutter 跨平台电子书客户端：Anna's Archive / LibGen / Z-Library / WeLib 搜索 → 下载中心 → 外部阅读器打开 EPUB/PDF。
-- 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；模型 `lib/data/models/`（`BookData`、`MyBook`、`SearchProviderId` 等）；服务 `lib/data/services/`；页面 `lib/ui/features/<feature>/{views,widgets}/`、共享主题与组件 `lib/ui/core/`；数据库 `lib/data/services/database.dart`（本轮先加 `lib/app/` 与 `lib/data/`，`lib/state/` 在 W7 前仍存在）。
+- 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；模型 `lib/data/models/`（`BookData`、`MyBook`、`SearchProviderId` 等）；服务 `lib/data/services/`；页面 `lib/ui/features/<feature>/{views,widgets}/`、共享主题与组件 `lib/ui/core/`；数据库 `lib/data/services/database.dart`。
 - 发布平台：Android、iOS（未签名侧载）、Windows、Linux。**Web 不可用**；macOS 有工程但未发布。
 - “我的书库”已重构为“下载中心”：标签、阅读状态筛选、排序/筛选、磁盘同步入口均已删除，不要恢复。
 - 主导航与子标签均支持左右滑动；镜像页支持本机测速并按本机延迟自动排序。
@@ -49,7 +49,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
 
 1. **镜像地址只能来自 SLUM**
    - 唯一允许硬编码的镜像相关 URL 是 `https://open-slum.org`（`lib/data/services/slum_catalogue.dart`）。
-   - 取镜像用 `InstanceManager().enabledUrls(...)`；不要在 provider/UI 里写 `z-lib.*`、`libgen.*`、AA host 常量。
+   - 取镜像用 `InstanceManager().enabledUrls(...)`；不要在 ViewModel/UI 里写 `z-lib.*`、`libgen.*`、AA host 常量。
    - DOWN 镜像永不请求；用户禁用和 `headlessOnly` 过滤必须保留。
    - 本机测速只在 `lib/data/services/mirror_latency.dart` 发起（HEAD → GET 回退，TTFB，6s 超时，最多 4 并发）；不要从 UI 直接做网络探测。
    - 测速结果用 `InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时；过期结果仅展示“已过期”，不再参与排序。
@@ -58,7 +58,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
 2. **书源协议**
    - 实现 `SearchProvider`：搜索成功但无结果返回 `[]`；不可达/解析失败抛异常。
    - `SearchManager` **并行查询所有启用书源**；书源顺序只决定合并顺序和默认显示，不再“首个非空即停”。
-   - 首屏用 `initialSearchProvider` 流式返回：快源先展示，慢源显示“搜索中…”并回填；结果页的“搜索来源”卡片点击可在“全部/单个来源”之间切换；分页只作用于当前视图。
+   - 首屏由 `ResultsViewModel` 经 `SearchRepository.watch()` 流式返回：快源先展示，慢源显示“搜索中…”并回填；结果页的“搜索来源”卡片点击可在“全部/单个来源”之间切换；分页只作用于当前视图。
    - 新增书源要同时处理详情路由与下载解析，并覆盖 `SearchSourceStatus.pending/hit/empty/failed`。
 
 3. **详情路由**
