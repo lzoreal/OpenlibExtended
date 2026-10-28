@@ -11,7 +11,7 @@
 ## 1. 项目速览
 
 - Flutter 跨平台电子书客户端：Anna's Archive / LibGen / Z-Library / WeLib 搜索 → 下载中心 → 外部阅读器打开 EPUB/PDF。
-- 入口 `lib/main.dart`；全局状态 `lib/state/state.dart`；服务 `lib/services/`；页面 `lib/ui/`；数据库 `lib/services/database.dart`。
+- 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；服务 `lib/data/services/`；页面 `lib/ui/`；数据库 `lib/data/services/database.dart`（本轮先加 `lib/app/` 与 `lib/data/`，`lib/state/` 在 W7 前仍存在）。
 - 发布平台：Android、iOS（未签名侧载）、Windows、Linux。**Web 不可用**；macOS 有工程但未发布。
 - “我的书库”已重构为“下载中心”：标签、阅读状态筛选、排序/筛选、磁盘同步入口均已删除，不要恢复。
 - 主导航与子标签均支持左右滑动；镜像页支持本机测速并按本机延迟自动排序。
@@ -125,7 +125,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
 - Import 分组沿用现有风格：Dart → Flutter → Package → Project（`main.dart` 等文件开头）。
 - 文件内注释只写“为什么”，不写“做了什么”；不要写多段 docstring。
 - 不为不可能发生的场景加防御性错误处理；但网络/解析边界要保留现有容错。
-- 不要新增抽象层、状态管理库、网络库或文件存储库；沿用 Riverpod + Dio + sqflite。
+- 状态管理用 ChangeNotifier + get_it，网络用 Dio，本地存储用 sqflite；不要新增其他状态管理库。
 - 不要顺手重构无关代码；一个变更只解决一个明确问题。
 - 新增依赖前先确认现有依赖能否完成，并在 PR 中说明 APK 体积影响（CONTRIBUTING 明确要求）。
 
@@ -185,7 +185,7 @@ flutter test
 ## 7. 常见任务路径
 
 - **加书源**：`SearchProviderId` → 实现 `SearchProvider` → 注册 `SearchManager` → SLUM 服务映射 → `routeBookDetail` → 详情下载分支 → ARB/设置开关 → 测试。
-- **加设置项**：`lib/state/state.dart` provider → `lib/main.dart` 读偏好并 override → `lib/ui/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
+- **加设置项**：`lib/app/app_settings.dart` 字段与 setter → `lib/main.dart` 读偏好并 override → `lib/ui/settings_page.dart` UI + 写库 → 即时生效则同步服务静态开关。
 - **加 l10n**：五份 ARB + `@description` → `flutter gen-l10n` → `AppLocalizations.of(context)`。
 - **改下载**：`DownloadManager` → `lib/services/download_target.dart` → `lib/ui/book_info_page.dart` → `download_manager_test`。
 - **改镜像/本机测速**：`SlumCatalogue` / `InstanceManager` / `mirror_latency.dart` → `slum_catalogue_test` / `instance_manager_test` / `mirror_latency_*_test`；确认 24h 过期与自动排序。
