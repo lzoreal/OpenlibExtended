@@ -44,6 +44,10 @@ class WebviewChallengeSolver {
   /// so tests can exercise the fallback without any webview.
   static bool guiEnabled = true;
 
+  @visibleForTesting
+  static Future<String?> Function(String url, Duration timeout)?
+      debugHeadlessSolver;
+
   /// When false (user turned "verify in background" off in settings), the
   /// headless attempt is skipped on mobile and the visible window runs
   /// straight away - some devices never finish an invisible webview.
@@ -252,8 +256,8 @@ class WebviewChallengeSolver {
     }
   }
 
-  static void _keepSession(
-      String url, HeadlessInAppWebView webview, InAppWebViewController? controller) {
+  static void _keepSession(String url, HeadlessInAppWebView webview,
+      InAppWebViewController? controller) {
     final host = Uri.tryParse(url)?.host;
     if (host == null || controller == null) {
       return;
@@ -321,8 +325,9 @@ class WebviewChallengeSolver {
   static Future<String?> fetchHtmlAfterChallenge(
     String url, {
     Duration? timeout,
+    bool Function()? shouldContinue,
   }) async {
-    if (!isSupported) return null;
+    if (!isSupported || shouldContinue?.call() == false) return null;
     if (_autoSolveRecentlyFailed(url)) {
       _addFailed(url);
       return null;
@@ -335,9 +340,10 @@ class WebviewChallengeSolver {
     // visible page: repeating a solve that cannot pass only made the user
     // wait the whole timeout again.
     final tryHeadless = shouldTryHeadless(url);
+    final headlessSolver = debugHeadlessSolver ?? _solveHeadless;
     var html = tryHeadless
         ? (_isMobile
-            ? await _solveHeadless(url, effectiveTimeout)
+            ? await headlessSolver(url, effectiveTimeout)
             : await _solveDesktopWindow(url, effectiveTimeout))
         : null;
 
@@ -348,6 +354,8 @@ class WebviewChallengeSolver {
         _headlessFailures.remove(Uri.tryParse(url)?.host ?? url);
       }
     }
+
+    if (shouldContinue?.call() == false) return null;
 
     if (html == null && _isMobile && visibleSolverFallback != null) {
       _logger.info('Headless solve failed, using visible fallback',

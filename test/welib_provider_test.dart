@@ -77,7 +77,8 @@ void main() {
 
   group('parseResults', () {
     test('reads the book cards welib renders (related books)', () {
-      final books = WelibProvider().parseResults(_fixture(), 'https://welib.org');
+      final books =
+          WelibProvider().parseResults(_fixture(), 'https://welib.org');
 
       // The captured page carries a full "related books" grid built from
       // the same book-card element the search page uses.
@@ -90,15 +91,16 @@ void main() {
     });
 
     test('every card has a distinct md5', () {
-      final books = WelibProvider().parseResults(_fixture(), 'https://welib.org');
+      final books =
+          WelibProvider().parseResults(_fixture(), 'https://welib.org');
       final ids = books.map((b) => b.md5).toSet();
       expect(ids.length, books.length,
           reason: 'a book id must identify one book');
     });
 
     test('ignores markup with no book cards', () {
-      final books = WelibProvider()
-          .parseResults('<html><body><p>empty</p></body></html>', 'https://welib.org');
+      final books = WelibProvider().parseResults(
+          '<html><body><p>empty</p></body></html>', 'https://welib.org');
       expect(books, isEmpty);
     });
   });
@@ -191,7 +193,8 @@ void main() {
         final provider = WelibProvider(
           mirrors: ['http://127.0.0.1:${server.port}'],
         );
-        final books = await provider.search(const SearchQuery(text: 'the score'));
+        final books =
+            await provider.search(const SearchQuery(text: 'the score'));
 
         expect(books, isNotEmpty);
       } finally {
@@ -304,16 +307,14 @@ void main() {
       });
 
       try {
-        final provider =
-            WelibProvider(dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
-        final books =
-            await provider.search(const SearchQuery(text: 'flutter'));
+        final provider = WelibProvider(
+            dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
+        final books = await provider.search(const SearchQuery(text: 'flutter'));
 
         expect(books, isNotEmpty,
             reason: 'the solved page must parse into real book cards');
         expect(books.first.md5, hasLength(32));
-        expect(solvedUrls,
-            ['http://127.0.0.1:${server.port}/search?q=flutter'],
+        expect(solvedUrls, ['http://127.0.0.1:${server.port}/search?q=flutter'],
             reason: 'the solver must be asked for the exact blocked URL');
         // The interstitial page is fetched once (then solved, not
         // re-fetched); the provider must never loop on it.
@@ -323,14 +324,91 @@ void main() {
       }
     }, timeout: const Timeout(Duration(seconds: 30)));
 
-    test('a solved page is reused from the cache on the next search',
+    test('does not open the visible solver after the search owner is gone',
         () async {
+      final (server, _) = await challengeServer(solvedAfter: 999);
+      var active = true;
+      var solverCalls = 0;
+      enableSolverSeam((url) async {
+        solverCalls++;
+        return bookPage;
+      });
+
+      try {
+        final provider = WelibProvider(
+            dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
+        final search = provider.search(SearchQuery(
+          text: 'flutter',
+          shouldContinue: () => active,
+        ));
+        active = false;
+        final books = await search;
+
+        expect(books, isEmpty);
+        expect(solverCalls, 0);
+      } finally {
+        await server.close();
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
+    test('does not open the visible solver after the detail owner is gone',
+        () async {
+      final (server, _) = await challengeServer(solvedAfter: 999);
+      var active = true;
+      var solverCalls = 0;
+      enableSolverSeam((url) async {
+        solverCalls++;
+        return bookPage;
+      });
+
+      try {
+        final provider = WelibProvider(
+            dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
+        final details = provider.bookInfo(
+          'https://welib.org/md5/$_md5',
+          shouldContinue: () => active,
+        );
+        active = false;
+
+        expect(await details, isNull);
+        expect(solverCalls, 0);
+      } finally {
+        await server.close();
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
+    test('does not open the visible solver after the download owner is gone',
+        () async {
+      final (server, _) = await challengeServer(solvedAfter: 999);
+      var active = true;
+      var solverCalls = 0;
+      enableSolverSeam((url) async {
+        solverCalls++;
+        return bookPage;
+      });
+
+      try {
+        final provider = WelibProvider(dio: smallDio());
+        final download = provider.resolveDownload(
+          'http://127.0.0.1:${server.port}/slow_download/$_md5/0/0',
+          shouldContinue: () => active,
+        );
+        active = false;
+
+        expect((await download).url, isNull);
+        expect(solverCalls, 0);
+      } finally {
+        await server.close();
+      }
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
+    test('a solved page is reused from the cache on the next search', () async {
       final (server, hits) = await challengeServer(solvedAfter: 999);
       enableSolverSeam((url) async => bookPage);
 
       try {
-        final provider =
-            WelibProvider(dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
+        final provider = WelibProvider(
+            dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
         await provider.search(const SearchQuery(text: 'flutter'));
         expect(hits.length, 1);
 
@@ -361,10 +439,9 @@ void main() {
       });
 
       try {
-        final provider =
-            WelibProvider(dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
-        final books =
-            await provider.search(const SearchQuery(text: 'flutter'));
+        final provider = WelibProvider(
+            dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
+        final books = await provider.search(const SearchQuery(text: 'flutter'));
 
         expect(books, isEmpty, reason: 'no solver means no results, no throw');
         expect(hits.length, 1,
@@ -374,8 +451,7 @@ void main() {
       }
     });
 
-    test('a 403 without challenge signals is not mistaken for one',
-        () async {
+    test('a 403 without challenge signals is not mistaken for one', () async {
       // The real shape AA's download mirrors serve (captured live):
       // a plain 403 and normal text, no header, no interstitial.
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -401,15 +477,13 @@ void main() {
       });
 
       try {
-        final provider =
-            WelibProvider(dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
-        final books =
-            await provider.search(const SearchQuery(text: 'flutter'));
+        final provider = WelibProvider(
+            dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
+        final books = await provider.search(const SearchQuery(text: 'flutter'));
 
         expect(books, isEmpty,
             reason: 'a mirror that refuses is not searched further on');
-        expect(solverCalls, 0,
-            reason: 'no interstitial means no solver run');
+        expect(solverCalls, 0, reason: 'no interstitial means no solver run');
       } finally {
         await server.close();
         ChallengeHtmlCache.clear();
@@ -445,15 +519,13 @@ void main() {
       });
 
       try {
-        final provider =
-            WelibProvider(dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
-        final books =
-            await provider.search(const SearchQuery(text: 'flutter'));
+        final provider = WelibProvider(
+            dio: smallDio(), mirrors: ['http://127.0.0.1:${server.port}']);
+        final books = await provider.search(const SearchQuery(text: 'flutter'));
 
         expect(books, isNotEmpty,
             reason: 'a 200 page with a Turnstile widget is content');
-        expect(solverCalls, 0,
-            reason: 'no interstitial means no solver run');
+        expect(solverCalls, 0, reason: 'no interstitial means no solver run');
       } finally {
         await server.close();
         ChallengeHtmlCache.clear();
@@ -467,8 +539,8 @@ void main() {
     /// `<div class="mb-4 text-xl font-bold">` (Anna's Archive puts that
     /// class on a `<p>`), next to the in-app-browser warning template.
     /// There is no login gate on the markup - the file link is there.
-    final partnerPage = File('test/fixtures/welib_download_page.html')
-        .readAsStringSync();
+    final partnerPage =
+        File('test/fixtures/welib_download_page.html').readAsStringSync();
 
     /// Serves one page and returns the provider pointed at it.
     Future<(HttpServer, WelibProvider)> pageServer(String html,
@@ -584,6 +656,60 @@ void main() {
         await server.close();
       }
     });
+
+    test('follows a countdown to the download link on the next response',
+        () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requests = 0;
+      server.listen((request) async {
+        requests++;
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.html
+          ..write(requests == 1
+              ? '<html><body><span class="js-partner-countdown">0</span>'
+                  '</body></html>'
+              : '<html><body><a href="https://cdn.example/x/book.epub">'
+                  'Download now</a></body></html>');
+        await request.response.close();
+      });
+      final provider = WelibProvider();
+      try {
+        final pageUrl =
+            'http://127.0.0.1:${server.port}/slow_download/$_md5/0/0';
+        final result = await provider.resolveDownload(pageUrl);
+
+        expect(result.url, 'https://cdn.example/x/book.epub');
+        expect(result.refusal, isNull);
+        expect(requests, 2);
+      } finally {
+        await server.close();
+      }
+    });
+
+    test('stops after a bounded number of countdown responses', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requests = 0;
+      server.listen((request) async {
+        requests++;
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.html
+          ..write('<html><body><span class="js-partner-countdown">0</span>'
+              '</body></html>');
+        await request.response.close();
+      });
+      final provider = WelibProvider();
+      try {
+        final result = await provider.resolveDownload(
+            'http://127.0.0.1:${server.port}/slow_download/$_md5/0/0');
+
+        expect(result.url, isNull);
+        expect(requests, 3);
+      } finally {
+        await server.close();
+      }
+    });
   });
 
   group('isWelibUrl', () {
@@ -597,7 +723,8 @@ void main() {
     test('rejects the other sources\' download pages', () {
       // Anna's Archive serves the same /slow_download/ path; only the
       // host decides which parser runs.
-      expect(isWelibUrl('https://annas-archive.gl/slow_download/$_md5'), isFalse);
+      expect(
+          isWelibUrl('https://annas-archive.gl/slow_download/$_md5'), isFalse);
       expect(isWelibUrl('https://z-lib.gd/dl/abc'), isFalse);
       expect(isWelibUrl('https://libgen.la/get.php?md5=$_md5'), isFalse);
     });
@@ -608,5 +735,4 @@ void main() {
       expect(isWelibUrl('not a url'), isFalse);
     });
   });
-
 }

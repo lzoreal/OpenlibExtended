@@ -26,7 +26,7 @@ OpenlibExtended 是一个 Flutter 跨平台电子书客户端，从 Anna's Archi
 
 - **搜索**：四个书源并行搜索；结果页可按“全部/单个来源”切换结果；语言/格式/年份/类型/排序筛选；作者/出版社高级检索；搜索建议；分页。
 - **发现**：Trending（Goodreads + Penguin Random House + BookDigits 合并打乱）、28 个硬编码分类。
-- **详情与下载**：按 URL 路由到正确书源；LibGen 直链、Z-Library DiamWall 解挑战后取签名 CDN、WeLib slow_download 解析、Anna's Archive donation key 快速下载；多镜像回退。
+- **详情与下载**：按 URL 路由到正确书源；LibGen 直链、Z-Library DiamWall 解挑战后取签名 CDN、WeLib 打开来源下载页抓链接、Anna's Archive donation key 快速下载；多镜像回退。
 - **下载管理**：队列、暂停/继续/重试/取消、HTTP Range 断点续传、镜像间回退、瞬时错误退避、过期链接自动刷新、MD5 校验、系统通知、回到前台自动续传。
 - **下载中心**：进行中任务的聚合进度/速度/剩余时间、全部/进行中/已完成三个可滑动标签（失败归入已完成）、批量暂停/继续；已完成记录点行进入书籍详情，点“打开”才交给外部阅读器；也可分享、在文件夹中显示（桌面）或删除记录（不删文件）。书库的标签、阅读状态、排序/筛选和磁盘同步入口已移除。
 - **阅读**：仅通过外部阅读器打开 EPUB/PDF/CBR/CBZ；应用不再提供内置阅读入口。
@@ -238,7 +238,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 1. **LibGen**：`get.php` 直链，直接 `fast=true`。
 2. **Z-Library**：先 `resolveBookDownload()` 重新解析 `/dl/<id>`，处理 DiamWall、302 签名 CDN、204 死链；拿不到时保留镜像给出的拒绝原因（每日限额/需登录）。
-3. **WeLib**：`resolveDownload()` 解析 `a.js-partner-download-link` 或 `/fast_download`、`/auto_download`；保留 slow_download 页面用于过期后重新解析。
+3. **WeLib**：不解析直链，直接把 `mirror`（`/slow_download/<md5>/0/0`）交给可见 WebView；用户在来源页过盾并触发下载，页面抓取器识别 `a.js-partner-download-link`（或 AA 的 `p.mb-4` 锚点）后自动返回并入队。WeLib 页面的遮罩关闭，保证验证页/下载按钮可交互。
 4. **Anna's Archive**：若配置了 donation key，调用 `getFastDownloadUrl()` 获取直接下载地址。
 5. `chooseDownloadTarget()` 决定最终目标：只要拿到可用 URL 就用 URL；镜像明确拒绝且无 URL 时才显示拒绝原因（`lib/data/services/download_target.dart:38-47`）。
 6. Linux 且非快速链接：打开可见 WebView 页抓镜像后入队（`lib/ui/features/book_detail/views/book_info_page.dart:249-294`）；其他平台交给 `DownloadManager` 后台抓镜像。
@@ -257,7 +257,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 - **同书去重**：同一 `md5` 只允许一个进行中的任务，避免写同一文件互相破坏（`:241-264`）。
 - **断点续传**：文件已存在则发 `Range: bytes=N-`；服务端忽略 Range 返回 200 时截断重下；416 视为已完成（`:781-899`）。
 - **重试**：429/500/502/503/504/超时/连接错误在同一镜像上退避重试，最多 3 次；403 等永久错误直接换镜像（`:227-236,654-732`）。
-- **链接刷新**：Z-Library/WeLib 的签名链接过期后，通过 `linkRefresher` 重新解析，最多 2 轮（`:739-769`）。
+- **链接刷新**：Z-Library 的签名 CDN 链接过期后，通过 `linkRefresher` 重新解析，最多 2 轮（`:739-769`）。WeLib 的 partner 链接在页面抓取时刚生成，任务不再带 `linkRefresher`。
 - **完成**：校验 MD5（仅当来源 id 是 32 位十六进制；`:249-266`）→ 写入 `mybooks` → 状态 completed → 30 秒后从活动列表移除（`:994-1063`）。
 - **中断恢复**：回到前台时恢复 paused/failed 任务；failed 任务保留部分文件以 Range 续传（`:503-526`）。
 

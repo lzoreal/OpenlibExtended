@@ -74,6 +74,7 @@ class SearchQuery {
   final String publisher;
   final bool filtersEnabled;
   final int page;
+  final bool Function()? shouldContinue;
 
   /// Restricts this page to one source. The first results page queries
   /// every enabled source in parallel; the results page uses this only
@@ -91,6 +92,7 @@ class SearchQuery {
     this.publisher = '',
     this.filtersEnabled = false,
     this.page = 1,
+    this.shouldContinue,
     this.source,
   });
 
@@ -146,6 +148,7 @@ class AnnasArchiveProvider implements SearchProvider {
       publisher: query.publisher,
       enableFilters: query.filtersEnabled,
       page: query.page,
+      shouldContinue: query.shouldContinue,
     );
   }
 }
@@ -178,6 +181,7 @@ class LibgenProvider implements SearchProvider {
     return (_instanceManager ?? InstanceManager())
         .isLocallyUnreachable(MirrorService.libgen);
   }
+
   final AppLogger _logger = AppLogger();
 
   @override
@@ -540,8 +544,8 @@ class ZlibraryProvider implements SearchProvider {
             response.statusCode ?? 0, response.data.toString())) {
           // DiamWall 503: solve the embedded SHA1 proof-of-work,
           // attach the resulting cookies and retry once.
-          final cookies = await _solveAndRemember(
-              mirror, response.data.toString());
+          final cookies =
+              await _solveAndRemember(mirror, response.data.toString());
           if (cookies != null) {
             _logger.debug('DiamWall solved, retrying with cookies',
                 tag: 'ZlibraryProvider', metadata: {'mirror': mirror});
@@ -736,8 +740,7 @@ class ZlibraryProvider implements SearchProvider {
     // it too before giving up on this mirror.
     if (_solver.looksLikeChallenge(
         response.statusCode ?? 0, response.data.toString())) {
-      final again =
-          await _solveAndRemember(mirror, response.data.toString());
+      final again = await _solveAndRemember(mirror, response.data.toString());
       if (again != null) {
         response = await _dio.get(
           url,
@@ -1100,7 +1103,10 @@ class WelibProvider implements SearchProvider {
 
     for (final mirror in mirrors) {
       try {
-        final html = await _fetchHtml('$mirror/search${_queryString(query)}');
+        final html = await _fetchHtml(
+          '$mirror/search${_queryString(query)}',
+          shouldContinue: query.shouldContinue,
+        );
         if (html == null) continue;
         final books = await _parseOffMain(html, mirror);
         if (books.isNotEmpty) return books;
@@ -1122,11 +1128,18 @@ class WelibProvider implements SearchProvider {
   /// from Dart is challenged while the same request from curl is not).
   /// Without a solver the page is simply unavailable, so this returns
   /// null rather than pretending.
-  Future<String?> _fetchHtml(String url) async => (await _fetchPage(url)).html;
+  Future<String?> _fetchHtml(
+    String url, {
+    bool Function()? shouldContinue,
+  }) async =>
+      (await _fetchPage(url, shouldContinue: shouldContinue)).html;
 
   /// [_fetchHtml] with the HTTP status kept, so a caller can tell a rate
   /// limit (429) apart from a page that simply carried no link.
-  Future<({String? html, int? status})> _fetchPage(String url) async {
+  Future<({String? html, int? status})> _fetchPage(
+    String url, {
+    bool Function()? shouldContinue,
+  }) async {
     // A page the solver already captured in a real browser is the best
     // possible answer for exactly this URL - and skipping the request
     // avoids a fresh 403 round trip and another solve. (Same policy as
@@ -1169,7 +1182,10 @@ class WelibProvider implements SearchProvider {
           tag: 'WelibProvider', metadata: {'url': url});
       return (html: null, status: status);
     }
-    final html = await WebviewChallengeSolver.fetchHtmlAfterChallenge(url);
+    final html = await WebviewChallengeSolver.fetchHtmlAfterChallenge(
+      url,
+      shouldContinue: shouldContinue,
+    );
     return (
       html: (html != null && html.length > 1000) ? html : null,
       status: status,
@@ -1275,27 +1291,41 @@ class WelibProvider implements SearchProvider {
   /// Fetches a welib `/md5/<id>` page and returns it as [BookInfoData].
   /// Null when the page cannot be fetched (no attemptable mirror, or
   /// Cloudflare with no solver) or does not parse.
-  Future<BookInfoData?> bookInfo(String url) async {
+  Future<BookInfoData?> bookInfo(
+    String url, {
+    bool Function()? shouldContinue,
+  }) async {
     final mirrors = _mirrors ?? await _resolveMirrors();
     final id = _bookIdFromHref(url);
     if (id == null) return null;
 
     final winner = await hedgeFirst<BookInfoData>(
-      [for (final mirror in mirrors) () => _fetchBookInfo(mirror, id)],
+      [
+        for (final mirror in mirrors)
+          () => _fetchBookInfo(mirror, id, shouldContinue: shouldContinue),
+      ],
     );
     if (winner != null) return winner;
 
     for (final mirror in mirrors.skip(2)) {
-      final data = await _fetchBookInfo(mirror, id);
+      final data = await _fetchBookInfo(
+        mirror,
+        id,
+        shouldContinue: shouldContinue,
+      );
       if (data != null) return data;
     }
     return null;
   }
 
-  Future<BookInfoData?> _fetchBookInfo(String mirror, String id) async {
+  Future<BookInfoData?> _fetchBookInfo(
+    String mirror,
+    String id, {
+    bool Function()? shouldContinue,
+  }) async {
     try {
       final pageUrl = '$mirror/md5/$id';
-      final html = await _fetchHtml(pageUrl);
+      final html = await _fetchHtml(pageUrl, shouldContinue: shouldContinue);
       if (html == null) return null;
       return parseBookPage(html, mirror, pageUrl);
     } catch (e) {
@@ -1399,55 +1429,74 @@ class WelibProvider implements SearchProvider {
   /// The page also renders the same "private content" badges and an
   /// in-app-browser warning template for anonymous visitors; neither
   /// gates the file - the link is in the HTML.
-  Future<WelibDownload> resolveDownload(String pageUrl) async {
-    final page = await _fetchPage(pageUrl);
-    if (page.html == null) {
-      // WeLib throttles anonymous clients by IP; a 429 is temporary.
-      if (page.status == 429) {
-        return const WelibDownload(
-          refusal: DownloadRefusal.welibRateLimit,
-        );
+  Future<WelibDownload> resolveDownload(
+    String pageUrl, {
+    bool Function()? shouldContinue,
+  }) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final page = await _fetchPage(
+        pageUrl,
+        shouldContinue: shouldContinue,
+      );
+      if (page.html == null) {
+        // WeLib throttles anonymous clients by IP; a 429 is temporary.
+        if (page.status == 429) {
+          return const WelibDownload(
+            refusal: DownloadRefusal.welibRateLimit,
+          );
+        }
+        // 403/503 is Cloudflare holding this client: the page is there, the
+        // bot check just did not clear (no solver, or the window was closed).
+        // Say that instead of blaming the book for having no link.
+        if (page.status == 403 || page.status == 503) {
+          return const WelibDownload(
+            refusal: DownloadRefusal.welibBotCheck,
+          );
+        }
+        return const WelibDownload();
       }
-      // 403/503 is Cloudflare holding this client: the page is there, the
-      // bot check just did not clear (no solver, or the window was closed).
-      // Say that instead of blaming the book for having no link.
-      if (page.status == 403 || page.status == 503) {
-        return const WelibDownload(
-          refusal: DownloadRefusal.welibBotCheck,
-        );
-      }
-      return const WelibDownload();
-    }
 
-    final html = page.html!;
-    // The page is a /slow_download/<md5>/... URL, so the /md5/ helper
-    // does not see the id - read it straight out of either shape.
-    final md5 = RegExp(r'/(?:md5|slow_download|fast_download|auto_download)/'
-            r'([0-9a-fA-F]{32})')
-        .firstMatch(pageUrl)
-        ?.group(1);
-    final origin = Uri.tryParse(pageUrl)?.origin ?? '';
-    final document = html_parser.parse(html);
+      final html = page.html!;
+      // The page is a /slow_download/<md5>/... URL, so the /md5/ helper
+      // does not see the id - read it straight out of either shape.
+      final md5 = RegExp(r'/(?:md5|slow_download|fast_download|auto_download)/'
+              r'([0-9a-fA-F]{32})')
+          .firstMatch(pageUrl)
+          ?.group(1);
+      final origin = Uri.tryParse(pageUrl)?.origin ?? '';
+      final document = html_parser.parse(html);
 
-    // WeLib's own hook first: the partner-server file anchor.
-    final partnerHref = document
-        .querySelector('a.js-partner-download-link[href]')
-        ?.attributes['href'];
-    if (partnerHref != null && partnerHref.isNotEmpty) {
-      return WelibDownload(
-          url: partnerHref.startsWith('http')
-              ? partnerHref
-              : '$origin$partnerHref');
-    }
-
-    // Fallback for a page whose markup varies: this book's own download
-    // route, or a direct file URL.
-    for (final a in document.querySelectorAll('a[href]')) {
-      final href = a.attributes['href'] ?? '';
-      if (_isBookDownloadLink(href, md5)) {
+      // WeLib's own hook first: the partner-server file anchor.
+      final partnerHref = document
+          .querySelector('a.js-partner-download-link[href]')
+          ?.attributes['href'];
+      if (partnerHref != null && partnerHref.isNotEmpty) {
         return WelibDownload(
-            url: href.startsWith('http') ? href : '$origin$href');
+            url: partnerHref.startsWith('http')
+                ? partnerHref
+                : '$origin$partnerHref');
       }
+
+      // Fallback for a page whose markup varies: this book's own download
+      // route, or a direct file URL.
+      for (final a in document.querySelectorAll('a[href]')) {
+        final href = a.attributes['href'] ?? '';
+        if (_isBookDownloadLink(href, md5)) {
+          return WelibDownload(
+              url: href.startsWith('http') ? href : '$origin$href');
+        }
+      }
+
+      final countdown = int.tryParse(
+          document.querySelector('span.js-partner-countdown')?.text.trim() ??
+              '');
+      if (countdown == null ||
+          countdown < 0 ||
+          countdown > 30 ||
+          attempt == 2) {
+        return const WelibDownload();
+      }
+      await Future<void>.delayed(Duration(seconds: countdown));
     }
     return const WelibDownload();
   }
@@ -1613,16 +1662,17 @@ class SearchManager {
       try {
         final active = await _activeProviders(query);
         if (active.isEmpty) {
-          controller.add(
-              const SearchManagerResult(books: [], failedProviders: []));
+          controller
+              .add(const SearchManagerResult(books: [], failedProviders: []));
           await controller.close();
           return;
         }
         final skipped = forceLocalTimeouts
             ? <SearchProviderId>{}
             : await _locallyUnreachable(active);
-        final queried =
-            active.where((p) => !skipped.contains(p.id)).toList(growable: false);
+        final queried = active
+            .where((p) => !skipped.contains(p.id))
+            .toList(growable: false);
         final logger = _logStart(query, active);
         final outcomes = List<_Outcome?>.filled(active.length, null);
 
@@ -1653,9 +1703,9 @@ class SearchManager {
               if (result.books.isEmpty &&
                   result.failedProviders.length == queried.length &&
                   skipped.isEmpty) {
-                controller.addError(Exception(
-                    'All search sources are unreachable: '
-                    '${result.failedProviders.join(', ')}'));
+                controller
+                    .addError(Exception('All search sources are unreachable: '
+                        '${result.failedProviders.join(', ')}'));
               } else {
                 controller.add(result);
               }
@@ -1704,11 +1754,11 @@ class SearchManager {
 
   AppLogger _logStart(SearchQuery query, List<SearchProvider> active) {
     final logger = AppLogger();
-    logger.info('Searching sources in parallel', tag: 'SearchManager',
-        metadata: {
-          'query': query.text,
-          'providers': [for (final p in active) p.displayName],
-        });
+    logger
+        .info('Searching sources in parallel', tag: 'SearchManager', metadata: {
+      'query': query.text,
+      'providers': [for (final p in active) p.displayName],
+    });
     return logger;
   }
 

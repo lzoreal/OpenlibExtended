@@ -251,6 +251,7 @@ class ResultsViewModel extends ChangeNotifier {
       publisher: _settings.searchPublisher,
       filtersEnabled: _settings.filtersEnabled,
       page: page,
+      shouldContinue: () => !_disposed,
       source: source,
     );
   }

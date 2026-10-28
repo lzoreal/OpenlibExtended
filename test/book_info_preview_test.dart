@@ -95,6 +95,7 @@ void main() {
       find.byKey(const ValueKey('detail-description-skeleton')),
       findsNothing,
     );
-    expect(find.byType(CircularProgressIndicator), findsWidgets);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byKey(const ValueKey('detail-loading-download')), findsNothing);
   });
 }

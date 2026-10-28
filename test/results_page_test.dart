@@ -368,6 +368,29 @@ void main() {
     expect(find.text('LibGen 1-0'), findsNothing);
   });
 
+  testWidgets('invalidates automatic verification when the page closes',
+      (tester) async {
+    final repository = ScriptedSearchRepository()
+      ..pageHandler = (key) async => multiSourcePage(key.page);
+    final viewModel = testResultsViewModel(
+      query: 'docker',
+      search: repository,
+    );
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: ResultPage(searchQuery: 'docker', viewModel: viewModel),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final shouldContinue = repository.watchCalls.first.query.shouldContinue!;
+
+    expect(shouldContinue(), isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    viewModel.dispose();
+    expect(shouldContinue(), isFalse);
+  });
+
   testWidgets('format and language filters are single multi-select capsules',
       (tester) async {
     SearchManagerResult infoPage(int page) {

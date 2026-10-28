@@ -37,6 +37,21 @@ class _WebviewState extends State<Webview> {
   final GlobalKey webViewKey = GlobalKey();
   final AppLogger _logger = AppLogger();
 
+  /// The file link on a download page. Anna's Archive puts its anchor in a
+  /// paragraph; WeLib marks it with a class inside a div. One snippet for
+  /// both, so the desktop and mobile pollers cannot drift apart.
+  static const _downloadAnchorJs = '''
+    var anchor = document.querySelector('a.js-partner-download-link[href]');
+    if (anchor == null) {
+      var paragraph = document.querySelector('p[class="mb-4 text-xl font-bold"]');
+      anchor = paragraph == null ? null : paragraph.querySelector('a[href]');
+    }
+    if (anchor == null) {
+      var box = document.querySelector('div.mb-4.text-xl.font-bold');
+      anchor = box == null ? null : box.querySelector('a[href]');
+    }
+  ''';
+
   InAppWebViewController? webViewController;
   bool _isDesktopWebviewOpen = false;
   bool _linksFound = false;
@@ -185,12 +200,8 @@ class _WebviewState extends State<Webview> {
         if (urlStr.contains("slow_download")) {
           // Extract slow_download link
           final result = await webview.evaluateJavaScript("""(function() {
-              var paragraphTag = document.querySelector('p[class="mb-4 text-xl font-bold"]');
-              if (paragraphTag) {
-                var anchor = paragraphTag.querySelector('a');
-                if (anchor && anchor.href) return anchor.href;
-              }
-              return null;
+              $_downloadAnchorJs
+              return anchor ? anchor.href : null;
             })()""").catchError((_) => null);
 
           if (result != null &&
@@ -299,9 +310,8 @@ class _WebviewState extends State<Webview> {
       if (currentUrl.contains('slow_download')) {
         final result = await controller.evaluateJavascript(source: '''
           (function() {
-            var paragraph = document.querySelector('p[class="mb-4 text-xl font-bold"]');
-            var anchor = paragraph == null ? null : paragraph.querySelector('a[href]');
-            return anchor == null ? null : anchor.href;
+            $_downloadAnchorJs
+            return anchor ? anchor.href : null;
           })()
         ''');
         if (result is String && result.startsWith('http')) links.add(result);

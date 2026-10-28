@@ -42,15 +42,27 @@ class BookInfoRepository {
   /// The detail page for [url], served from [BookInfoCache] when a fresh
   /// entry exists. A cache miss re-fetches and stores the result; cache
   /// writes never fail the page.
-  Future<BookInfoData> fetch(String url, {String donationKey = ''}) async {
+  Future<BookInfoData> fetch(
+    String url, {
+    String donationKey = '',
+    bool Function()? shouldContinue,
+  }) async {
     final cached = await _readCache(url);
     if (cached != null) return cached;
-    final data = await _fetch(url, donationKey: donationKey);
+    final data = await _fetch(
+      url,
+      donationKey: donationKey,
+      shouldContinue: shouldContinue,
+    );
     await _writeCache(url, data);
     return data;
   }
 
-  Future<BookInfoData> _fetch(String url, {required String donationKey}) async {
+  Future<BookInfoData> _fetch(
+    String url, {
+    required String donationKey,
+    bool Function()? shouldContinue,
+  }) async {
     final route = await _route(url);
     switch (route) {
       case BookDetailRoute.libgen:
@@ -66,13 +78,20 @@ class BookInfoRepository {
         }
         return data;
       case BookDetailRoute.welib:
-        final data = await _welib.bookInfo(url);
+        final data = await _welib.bookInfo(
+          url,
+          shouldContinue: shouldContinue,
+        );
         if (data == null) {
           throw Exception('Could not read this WeLib book page');
         }
         return data;
       case BookDetailRoute.annasArchive:
-        return _annasArchive.bookInfo(url: url, donationKey: donationKey);
+        return _annasArchive.bookInfo(
+          url: url,
+          donationKey: donationKey,
+          shouldContinue: shouldContinue,
+        );
     }
   }
 }

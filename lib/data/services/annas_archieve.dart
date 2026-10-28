@@ -18,7 +18,6 @@ import 'package:openlib/data/services/network_error.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 
-
 // ====================================================================
 // ANNA'S ARCHIVE SERVICE (ALL FIXES APPLIED)
 // ====================================================================
@@ -479,8 +478,7 @@ class AnnasArchieve {
     if (html.length < _isolateParseThreshold) {
       return Future.value(_parser(html, fileType, baseUrl));
     }
-    return Isolate.run(
-        () => AnnasArchieve()._parser(html, fileType, baseUrl));
+    return Isolate.run(() => AnnasArchieve()._parser(html, fileType, baseUrl));
   }
 
   /// Test-only wrappers around the private parsers so tests can verify real
@@ -667,7 +665,8 @@ class AnnasArchieve {
       String author = "",
       String publisher = "",
       bool enableFilters = true,
-      int page = 1}) async {
+      int page = 1,
+      bool Function()? shouldContinue}) async {
     _logger.info('Searching books', tag: 'AnnasArchive', metadata: {
       'query': searchQuery,
       'content': content,
@@ -777,7 +776,9 @@ class AnnasArchieve {
             tag: 'AnnasArchive');
 
         final html = await WebviewChallengeSolver.fetchHtmlAfterChallenge(
-            networkErr.blockedUrl!);
+          networkErr.blockedUrl!,
+          shouldContinue: shouldContinue,
+        );
         if (html != null && html.length > 1000) {
           _logger.info('Challenge solved, parsing results from webview HTML',
               tag: 'AnnasArchive');
@@ -851,8 +852,11 @@ class AnnasArchieve {
     }
   }
 
-  Future<BookInfoData> bookInfo(
-      {required String url, String? donationKey}) async {
+  Future<BookInfoData> bookInfo({
+    required String url,
+    String? donationKey,
+    bool Function()? shouldContinue,
+  }) async {
     _logger.info('Fetching book info',
         tag: 'AnnasArchive', metadata: {'url': url});
 
@@ -961,8 +965,10 @@ class AnnasArchieve {
             tag: 'AnnasArchive');
 
         final targetUrl = networkErr.blockedUrl!;
-        final html =
-            await WebviewChallengeSolver.fetchHtmlAfterChallenge(targetUrl);
+        final html = await WebviewChallengeSolver.fetchHtmlAfterChallenge(
+          targetUrl,
+          shouldContinue: shouldContinue,
+        );
         if (html != null && html.length > 1000) {
           _logger.info('Challenge solved, parsing bookInfo from webview HTML',
               tag: 'AnnasArchive');

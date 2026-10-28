@@ -68,7 +68,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
 4. **下载只能走 DownloadManager**
    - UI 不要直接写文件或发下载请求；构造 `DownloadTask` 后调用 `addDownload` / `addDownloadWithMirrorUrl`。
    - 保留以下行为：同 md5 单任务、HTTPS 优先/IPFS 最后、Range 续传、瞬时错误退避、`linkRefresher`、完成前 MD5 校验、完成后写库。
-   - Z-Library/WeLib 的签名链接会过期，必须保留 `linkRefresher`。
+   - Z-Library 的签名链接会过期，必须保留 `linkRefresher`；WeLib 的下载按钮固定打开来源下载页（`/slow_download/...`，可见 WebView 抓链接），不要改回无头解析直链。
    - 下载队列是内存态；不要假装重启后可恢复。
 
 5. **持久化只走 MyLibraryDb**

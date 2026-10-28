@@ -88,7 +88,8 @@ void main() {
       );
     });
 
-    test('a successful manual solve clears the failure and the banner', () async {
+    test('a successful manual solve clears the failure and the banner',
+        () async {
       const url = 'https://annas-archive.pk/search?q=manual';
       WebviewChallengeSolver.debugRememberAutoSolveFailure(url);
       WebviewChallengeSolver.visibleSolverFallback =
@@ -215,7 +216,39 @@ void main() {
       expect(ChallengeHtmlCache.get(url), '<html>solved visibly</html>');
     });
 
-    test('visible success clears the headless failure for later URLs', () async {
+    test('does not open the visible solver after its owner is gone', () async {
+      var active = true;
+      var fallbackCalls = 0;
+      WebviewChallengeSolver.guiEnabled = true;
+      WebviewChallengeSolver.overrideIsMobile = true;
+      WebviewChallengeSolver.debugHeadlessSolver = (url, timeout) async {
+        active = false;
+        return null;
+      };
+      WebviewChallengeSolver.visibleSolverFallback = (url) async {
+        fallbackCalls++;
+        return '<html>too late</html>';
+      };
+      addTearDown(() {
+        WebviewChallengeSolver.guiEnabled = true;
+        WebviewChallengeSolver.overrideIsMobile = null;
+        WebviewChallengeSolver.debugHeadlessSolver = null;
+        WebviewChallengeSolver.visibleSolverFallback = null;
+      });
+
+      const url = 'https://annas-archive.gl/search?q=disposed';
+      final html = await WebviewChallengeSolver.fetchHtmlAfterChallenge(
+        url,
+        shouldContinue: () => active,
+      );
+
+      expect(html, isNull);
+      expect(fallbackCalls, 0);
+      expect(WebviewChallengeSolver.autoSolveRecentlyFailed(url), isFalse);
+    });
+
+    test('visible success clears the headless failure for later URLs',
+        () async {
       WebviewChallengeSolver.overrideIsMobile = true;
       WebviewChallengeSolver.clearHeadlessFailures();
       WebviewChallengeSolver.visibleSolverFallback =
@@ -344,8 +377,7 @@ void main() {
       );
     });
 
-    test('the requested visible solve caches its HTML and runs once',
-        () async {
+    test('the requested visible solve caches its HTML and runs once', () async {
       ChallengeHtmlCache.clear();
       var calls = 0;
       final started = Completer<void>();

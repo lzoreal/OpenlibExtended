@@ -53,7 +53,8 @@ Future<void> setupTestDi({
       () => covers ?? StubCoverRepository());
   getIt.registerLazySingleton<TrendingRepository>(
       () => trending ?? TestTrendingRepository());
-  getIt.registerLazySingleton<BookInfoRepository>(() => StubBookInfoRepository());
+  getIt.registerLazySingleton<BookInfoRepository>(
+      () => StubBookInfoRepository());
   getIt.registerLazySingleton<MirrorLatencyNotifier>(
       () => MirrorLatencyNotifier(getIt<MirrorRepository>()));
   getIt.registerLazySingleton<ShellViewModel>(() => ShellViewModel(
@@ -113,7 +114,11 @@ class StubCoverRepository extends CoverRepository {
 
 class StubBookInfoRepository extends BookInfoRepository {
   @override
-  Future<BookInfoData> fetch(String url, {String donationKey = ''}) async {
+  Future<BookInfoData> fetch(
+    String url, {
+    String donationKey = '',
+    bool Function()? shouldContinue,
+  }) async {
     throw StateError('StubBookInfoRepository has no details');
   }
 }

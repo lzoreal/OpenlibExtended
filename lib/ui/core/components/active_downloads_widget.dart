@@ -114,10 +114,25 @@ class _ActiveDownloadsWidgetState extends State<ActiveDownloadsWidget> {
                         const Divider(height: 1, indent: 16, endIndent: 16),
                     itemBuilder: (context, index) {
                       final task = downloads.elementAt(index);
-                      return _DownloadItem(
+                      final item = _DownloadItem(
                         task: task,
                         viewModel: _viewModel,
                         bytesToFileSize: _bytesToFileSize,
+                      );
+                      if (task.status != DownloadStatus.failed) return item;
+                      return Dismissible(
+                        key: ValueKey('active-download-${task.id}'),
+                        direction: DismissDirection.horizontal,
+                        background: _dismissBackground(
+                          context,
+                          Alignment.centerLeft,
+                        ),
+                        secondaryBackground: _dismissBackground(
+                          context,
+                          Alignment.centerRight,
+                        ),
+                        onDismissed: (_) => _viewModel.cancel(task.id),
+                        child: item,
                       );
                     },
                   ),
@@ -127,6 +142,23 @@ class _ActiveDownloadsWidgetState extends State<ActiveDownloadsWidget> {
           ),
         );
       },
+    );
+  }
+
+  Widget _dismissBackground(BuildContext context, Alignment alignment) {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: scheme.errorContainer,
+      child: Align(
+        alignment: alignment,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Icon(
+            Icons.delete_outline_rounded,
+            color: scheme.onErrorContainer,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -8,6 +8,7 @@ import 'package:openlib/l10n/app_localizations.dart';
 // Project imports:
 import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/models/download_refusal.dart';
+import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/share_book.dart';
 import 'package:openlib/ui/core/components/book_info_widget.dart';
 import 'package:openlib/ui/features/book_detail/view_models/book_detail_view_model.dart';
@@ -148,7 +149,9 @@ class _BookInfoPageState extends State<BookInfoPage> {
           ),
           bottomNavigationBar: _vm.details != null
               ? _DetailActionBar(viewModel: _vm)
-              : const _DetailLoadingBar(),
+              : _vm.hasError
+                  ? null
+                  : const _DetailLoadingBar(),
         );
       },
     );
@@ -274,8 +277,7 @@ class _DetailActionBar extends StatelessWidget {
             child: _DownloadTaskButton(
               label: label,
               progress: viewModel.taskProgress,
-              indeterminate:
-                  viewModel.taskPreparing || viewModel.taskVerifying,
+              indeterminate: viewModel.taskPreparing || viewModel.taskVerifying,
               failed: viewModel.taskFailed,
               onTap: viewModel.taskCompleted ? null : viewModel.toggleTask,
             ),
@@ -373,7 +375,12 @@ class _DetailActionBar extends StatelessWidget {
     return Navigator.push<List<String>>(
       context,
       MaterialPageRoute(
-        builder: (BuildContext context) => Webview(url: url),
+        builder: (BuildContext context) => Webview(
+          url: url,
+          // WeLib's page is the download step and can sit behind its bot
+          // check; the overlay would cover both.
+          showOverlay: !isWelibUrl(url),
+        ),
       ),
     );
   }

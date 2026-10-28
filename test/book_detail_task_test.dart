@@ -38,6 +38,21 @@ BookInfoData _details() => BookInfoData(
     );
 
 void main() {
+  test('invalidates automatic verification when the detail owner is disposed',
+      () async {
+    final bookInfo = FakeBookInfoRepository(handler: (_) async => _details());
+    final vm = testBookDetailViewModel(
+      preview: _preview(),
+      bookInfo: bookInfo,
+    );
+
+    await vm.load();
+    final shouldContinue = bookInfo.continuations.single!;
+    expect(shouldContinue(), isTrue);
+    vm.dispose();
+    expect(shouldContinue(), isFalse);
+  });
+
   test('tracks the task by md5 and toggles pause, resume and retry', () async {
     final downloads = FakeDownloadRepository(
       active: {'t': testDownloadTask(progress: 0.4)},
@@ -57,13 +72,15 @@ void main() {
     await vm.toggleTask();
     expect(downloads.paused, ['task-abc']);
 
-    downloads.emit({'t': testDownloadTask(status: DownloadStatus.paused, progress: 0.4)});
+    downloads.emit(
+        {'t': testDownloadTask(status: DownloadStatus.paused, progress: 0.4)});
     await Future<void>.delayed(const Duration(milliseconds: 150));
     expect(vm.taskPaused, isTrue);
     await vm.toggleTask();
     expect(downloads.resumed, ['task-abc']);
 
-    downloads.emit({'t': testDownloadTask(status: DownloadStatus.failed, progress: 0.2)});
+    downloads.emit(
+        {'t': testDownloadTask(status: DownloadStatus.failed, progress: 0.2)});
     await Future<void>.delayed(const Duration(milliseconds: 150));
     expect(vm.taskFailed, isTrue);
     await vm.toggleTask();
@@ -86,7 +103,8 @@ void main() {
     expect(vm.coverUrl, 'https://covers/abc.jpg');
   });
 
-  testWidgets('the action bar shows progress and pauses on tap', (tester) async {
+  testWidgets('the action bar shows progress and pauses on tap',
+      (tester) async {
     final downloads = FakeDownloadRepository(
       active: {'t': testDownloadTask(progress: 0.42)},
     );
@@ -128,5 +146,35 @@ void main() {
     await tester.tap(find.text('已暂停 42% · 点击继续'));
     await tester.pump();
     expect(downloads.resumed, ['task-abc']);
+  });
+
+  testWidgets('detail failure does not leave a loading download button',
+      (tester) async {
+    final vm = testBookDetailViewModel(
+      preview: _preview(),
+      bookInfo: FakeBookInfoRepository(
+        handler: (_) async => throw StateError('offline'),
+      ),
+    );
+    addTearDown(vm.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      locale: const Locale('zh'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: BookInfoPage(
+        url: 'https://example.com/md5/abc',
+        source: 'LibGen',
+        preview: _preview(),
+        viewModel: vm,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('无法加载书籍详情'), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-loading-download')), findsNothing);
+    expect(find.text('下载本书'), findsNothing);
+    expect(find.text('重试'), findsOneWidget);
   });
 }

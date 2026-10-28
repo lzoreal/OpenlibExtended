@@ -8,7 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/book_data.dart';
-import 'package:openlib/data/models/download_refusal.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/repositories/book_info_repository.dart';
 import 'package:openlib/data/repositories/cover_repository.dart';
@@ -103,13 +102,6 @@ class BookDetailViewModel extends ChangeNotifier {
     );
   }
 
-  /// WeLib refusals the view model cannot localize; the page maps these
-  /// codes back to its own strings.
-  static const welibNoDownloadLinkRefusal =
-      DownloadRefusal.welibNoDownloadLink;
-  static const welibPageUnreadableRefusal =
-      DownloadRefusal.welibPageUnreadable;
-
   final String url;
   final String? source;
   final BookData? _preview;
@@ -121,7 +113,6 @@ class BookDetailViewModel extends ChangeNotifier {
   final CoverRepository _covers;
 
   final ZlibraryProvider _zlibrary = ZlibraryProvider();
-  final WelibProvider _welib = WelibProvider();
   final AnnasArchieve _annasArchive = AnnasArchieve();
 
   BookInfoData? _data;
@@ -296,6 +287,12 @@ class BookDetailViewModel extends ChangeNotifier {
     var isDirectLink = downloadUrl != null && downloadUrl.contains('/get.php?');
     if (isDirectLink) isFastDownload = true;
 
+    // WeLib keeps the file link on its public-server page, so that page is
+    // the download step - the same thing "open at source" does. Resolving it
+    // headlessly first only hid the page (and the Cloudflare check) from the
+    // user.
+    if (isWelibUrl(downloadUrl)) return DownloadNeedsMirrors(downloadUrl!);
+
     // Z-Library /dl/ links sit behind a DiamWall proof-of-work and a 302 to
     // a signed CDN URL; a cached detail page keeps no signed mirror, so the
     // book page itself is the signal to resolve one.
@@ -315,28 +312,6 @@ class BookDetailViewModel extends ChangeNotifier {
       } catch (_) {
         // Fall through to the slow AA-style flow, which cannot work for
         // zlib; the refusal snackbar below fires.
-      }
-    }
-
-    // WeLib's public-server page carries the partner file link, but with
-    // the class on a <div> where the Anna's Archive scraper looks for a
-    // <p>, so it needs WeLib's own parser. The signed file URL expires, so
-    // the page URL is kept for the task's linkRefresher.
-    final isWelib = isWelibUrl(downloadUrl);
-    final welibPageUrl = isWelib ? downloadUrl : null;
-    String? welibRefusal;
-    if (welibPageUrl != null && !isDirectLink) {
-      try {
-        final resolved = await _welib.resolveDownload(welibPageUrl);
-        if (resolved.url != null) {
-          downloadUrl = resolved.url;
-          isDirectLink = true;
-          isFastDownload = true;
-        } else {
-          welibRefusal = resolved.refusal ?? welibNoDownloadLinkRefusal;
-        }
-      } catch (_) {
-        welibRefusal = welibPageUnreadableRefusal;
       }
     }
 
@@ -364,7 +339,7 @@ class BookDetailViewModel extends ChangeNotifier {
     final target = chooseDownloadTarget(
       url: downloadUrl,
       fast: isDirectLink || donationFastLink,
-      refusal: zlibRefusal ?? welibRefusal,
+      refusal: zlibRefusal,
     );
     if (!target.hasUrl) return DownloadRefused(target.refusal);
     final effectiveUrl = target.url!;
@@ -389,14 +364,12 @@ class BookDetailViewModel extends ChangeNotifier {
       mirrors: const [], // Fetched in the background from the mirror URL.
       mirrorUrl: effectiveUrl,
       isDirectLink: isFastDownload,
-      // z-lib's signed CDN link and WeLib's partner link both expire; the
-      // manager re-resolves a fresh one from the page instead of failing.
+      // z-lib's signed CDN link expires; the manager re-resolves a fresh one
+      // from the book page instead of failing.
       linkRefresher: isZlib
           ? (pageUrl) async =>
               (await _zlibrary.resolveBookDownload(pageUrl)).url
-          : welibPageUrl != null
-              ? (_) async => (await _welib.resolveDownload(welibPageUrl)).url
-              : null,
+          : null,
     );
 
     await _downloads.addWithMirrorUrl(task, effectiveUrl);
@@ -455,8 +428,11 @@ class BookDetailViewModel extends ChangeNotifier {
     if (_fetching) return;
     _fetching = true;
     try {
-      final data =
-          await _bookInfo.fetch(url, donationKey: _settings.donationKey);
+      final data = await _bookInfo.fetch(
+        url,
+        donationKey: _settings.donationKey,
+        shouldContinue: () => !_disposed,
+      );
       if (_disposed) return;
       _data = data;
       _error = null;

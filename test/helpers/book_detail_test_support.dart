@@ -68,6 +68,7 @@ class FakeDownloadRepository extends DownloadRepository {
   final List<String> paused = [];
   final List<String> resumed = [];
   final List<String> retried = [];
+  final List<String> cancelled = [];
 
   @override
   Map<String, DownloadTask> get active => Map.unmodifiable(_active);
@@ -92,8 +93,14 @@ class FakeDownloadRepository extends DownloadRepository {
   Future<void> resume(String taskId) async => resumed.add(taskId);
 
   @override
-  Future<void> retryKeepingPartial(String taskId) async =>
-      retried.add(taskId);
+  Future<void> retryKeepingPartial(String taskId) async => retried.add(taskId);
+
+  @override
+  void cancel(String taskId) {
+    cancelled.add(taskId);
+    _active.removeWhere((_, task) => task.id == taskId);
+    _controller.add(Map.of(_active));
+  }
 
   void emit(Map<String, DownloadTask> tasks) {
     _active
@@ -128,11 +135,17 @@ class FakeBookInfoRepository extends BookInfoRepository {
   final Future<BookInfoData> Function(String url)? handler;
   final List<String> requested = [];
   final List<String> donationKeys = [];
+  final List<bool Function()?> continuations = [];
 
   @override
-  Future<BookInfoData> fetch(String url, {String donationKey = ''}) {
+  Future<BookInfoData> fetch(
+    String url, {
+    String donationKey = '',
+    bool Function()? shouldContinue,
+  }) {
     requested.add(url);
     donationKeys.add(donationKey);
+    continuations.add(shouldContinue);
     final handler = this.handler;
     if (handler == null) {
       return Future<BookInfoData>.error(
