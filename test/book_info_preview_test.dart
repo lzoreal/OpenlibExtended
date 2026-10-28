@@ -1,14 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/book_data.dart';
-import 'package:openlib/state/state.dart'
-    show annaArchiveBaseUrlProvider, bookInfoProvider;
 import 'package:openlib/ui/features/book_detail/views/book_info_page.dart';
 import 'package:openlib/ui/core/themes.dart';
+
+import 'helpers/book_detail_test_support.dart';
 
 void main() {
   BookData preview() => BookData(
@@ -33,20 +32,19 @@ void main() {
         description: 'The real description.',
       );
 
-  Widget app(Future<BookInfoData> Function() load) => ProviderScope(
-        overrides: [
-          annaArchiveBaseUrlProvider.overrideWith((ref) async => null),
-          bookInfoProvider.overrideWith((ref, url) => load()),
-        ],
-        child: MaterialApp(
-          theme: lightTheme,
-          locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: BookInfoPage(
+  Widget app(Future<BookInfoData> Function() load) => MaterialApp(
+        theme: lightTheme,
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BookInfoPage(
+          url: 'https://example.com/md5/abc',
+          source: 'LibGen',
+          preview: preview(),
+          viewModel: testBookDetailViewModel(
             url: 'https://example.com/md5/abc',
-            source: 'LibGen',
             preview: preview(),
+            bookInfo: FakeBookInfoRepository(handler: (_) => load()),
           ),
         ),
       );

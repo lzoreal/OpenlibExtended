@@ -1,19 +1,15 @@
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
 import 'package:openlib/data/models/book_data.dart';
-import 'package:openlib/data/services/annas_archieve.dart';
-import 'package:openlib/data/services/download_target.dart';
-import 'package:openlib/data/services/search_manager.dart';
-import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/share_book.dart';
 import 'package:openlib/ui/core/components/book_info_widget.dart';
+import 'package:openlib/ui/features/book_detail/view_models/book_detail_view_model.dart';
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/core/components/detail_bottom_bar.dart';
 import 'package:openlib/ui/core/components/error_widget.dart';
@@ -22,22 +18,14 @@ import 'package:openlib/ui/core/components/share_icon.dart';
 import 'package:openlib/ui/core/components/snack_bar_widget.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
 import 'package:openlib/ui/features/webview/views/webview_page.dart';
-import 'package:openlib/state/state.dart'
-    show
-        bookInfoProvider,
-        checkIdExists,
-        getBookByIdProvider,
-        myLibraryProvider,
-        showManualDownloadButtonProvider,
-        downloadManagerProvider,
-        donationKeyProvider;
 
-class BookInfoPage extends ConsumerWidget {
+class BookInfoPage extends StatefulWidget {
   const BookInfoPage({
     super.key,
     required this.url,
     this.source,
     this.preview,
+    this.viewModel,
   });
 
   final String url;
@@ -48,87 +36,120 @@ class BookInfoPage extends ConsumerWidget {
   /// for the seconds a mirror takes.
   final BookData? preview;
 
+  /// Tests inject their own instance; the app builds one from DI.
+  final BookDetailViewModel? viewModel;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final bookInfo = ref.watch(bookInfoProvider(url));
-    final data = bookInfo.valueOrNull;
-    final book = data ?? preview;
+  State<BookInfoPage> createState() => _BookInfoPageState();
+}
 
-    if (book == null) {
-      if (bookInfo.hasError) {
-        return Scaffold(
-          appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
-          body: ContentWidth(
-            maxWidth: 840,
-            child: CustomErrorWidget(
-              error: bookInfo.error!,
-              stackTrace: bookInfo.stackTrace ?? StackTrace.empty,
-              contextLabel: l10n.bookDetailsTitle,
-              contextDetails: 'url=$url',
-              onRefresh: () {
-                ref.invalidate(bookInfoProvider(url));
-              },
-            ),
-          ),
+class _BookInfoPageState extends State<BookInfoPage> {
+  late final BookDetailViewModel _vm;
+  late final bool _ownsVm;
+
+  @override
+  void initState() {
+    super.initState();
+    _vm = widget.viewModel ??
+        BookDetailViewModel.fromDi(
+          url: widget.url,
+          source: widget.source,
+          preview: widget.preview,
         );
-      }
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
-        body: const Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
+    _ownsVm = widget.viewModel == null;
+    unawaited(_vm.load());
+  }
 
-    final loading = data == null && !bookInfo.hasError;
+  @override
+  void dispose() {
+    if (_ownsVm) _vm.dispose();
+    super.dispose();
+  }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.bookDetailsTitle),
-        actions: [
-          IconButton(
-            icon: ShareIcon(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            onPressed: () async {
-              final outcome = await shareBook(
-                  book.title, book.link, book.thumbnail ?? '',
-                  format: data?.format,
-                  message: l10n.shareBookMessage(book.title, book.link));
-              if (context.mounted && outcome == ShareOutcome.pathCopied) {
-                showSnackBar(context: context, message: l10n.copiedBookLink);
-              }
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (bookInfo.hasError && data == null)
-            _DetailErrorStrip(
-              onRetry: () => ref.invalidate(bookInfoProvider(url)),
-            ),
-          if (loading) const LinearProgressIndicator(minHeight: 2),
-          Expanded(
-            child: ContentWidth(
-              maxWidth: 840,
-              child: BookInfoWidget(
-                data: book,
-                source: source,
-                loading: loading,
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ListenableBuilder(
+      listenable: _vm,
+      builder: (context, _) {
+        final book = _vm.book;
+
+        if (book == null) {
+          if (_vm.hasError) {
+            return Scaffold(
+              appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
+              body: ContentWidth(
+                maxWidth: 840,
+                child: CustomErrorWidget(
+                  error: _vm.error!,
+                  stackTrace: _vm.errorStackTrace ?? StackTrace.empty,
+                  contextLabel: l10n.bookDetailsTitle,
+                  contextDetails: 'url=${widget.url}',
+                  onRefresh: _vm.retry,
+                ),
+              ),
+            );
+          }
+          return Scaffold(
+            appBar: AppBar(title: Text(l10n.bookDetailsTitle)),
+            body: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
+          );
+        }
+
+        final loading = _vm.loading;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.bookDetailsTitle),
+            actions: [
+              IconButton(
+                icon: ShareIcon(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                onPressed: () async {
+                  final outcome = await shareBook(
+                      book.title, book.link, book.thumbnail ?? '',
+                      format: book.format,
+                      message: l10n.shareBookMessage(book.title, book.link));
+                  if (context.mounted && outcome == ShareOutcome.pathCopied) {
+                    showSnackBar(
+                        context: context, message: l10n.copiedBookLink);
+                  }
+                },
+              ),
+            ],
           ),
-        ],
-      ),
-      bottomNavigationBar: data != null
-          ? ActionButtonWidget(data: data)
-          : const _DetailLoadingBar(),
+          body: Column(
+            children: [
+              if (_vm.hasError)
+                _DetailErrorStrip(
+                  onRetry: _vm.retry,
+                ),
+              if (loading) const LinearProgressIndicator(minHeight: 2),
+              Expanded(
+                child: ContentWidth(
+                  maxWidth: 840,
+                  child: BookInfoWidget(
+                    data: book,
+                    source: widget.source,
+                    loading: loading,
+                    annaArchiveBaseUrl: _vm.annaArchiveBaseUrl,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: _vm.details != null
+              ? _DetailActionBar(viewModel: _vm)
+              : const _DetailLoadingBar(),
+        );
+      },
     );
   }
 }
@@ -206,336 +227,134 @@ class _DetailLoadingBar extends StatelessWidget {
   }
 }
 
-class ActionButtonWidget extends ConsumerStatefulWidget {
-  const ActionButtonWidget({super.key, required this.data});
-  final BookInfoData data;
+class _DetailActionBar extends StatelessWidget {
+  const _DetailActionBar({required this.viewModel});
 
-  @override
-  ConsumerState<ConsumerStatefulWidget> createState() =>
-      _ActionButtonWidgetState();
-}
+  final BookDetailViewModel viewModel;
 
-class _ActionButtonWidgetState extends ConsumerState<ActionButtonWidget> {
   @override
   Widget build(BuildContext context) {
-    final isBookExist = ref.watch(checkIdExists(widget.data.md5));
-    final bookData = ref.watch(getBookByIdProvider(widget.data.md5));
+    final l10n = AppLocalizations.of(context);
+    final details = viewModel.details!;
+    final inLibrary = viewModel.inLibrary;
 
-    return isBookExist.when(
-      data: (isExists) {
-        if (isExists) {
-          // Get fileName from database for existing books
-          final fileName = bookData.whenOrNull(data: (book) => book?.fileName);
-          return FileOpenAndDeleteButtons(
-            id: widget.data.md5,
-            format: widget.data.format!,
-            fileName: fileName,
-            onDelete: () async {
-              await Future.delayed(const Duration(seconds: 1));
-              // ignore: unused_result
-              ref.refresh(checkIdExists(widget.data.md5));
-              // ignore: unused_result
-              ref.refresh(getBookByIdProvider(widget.data.md5));
-            },
-          );
-        } else {
-          final showManualButton = ref.watch(showManualDownloadButtonProvider);
+    // Membership is still loading (or the lookup failed): the old card
+    // rendered nothing in both cases.
+    if (inLibrary == null) return const SizedBox.shrink();
 
-          return DetailBottomBar(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () async {
-                    final l10n = AppLocalizations.of(context);
-                    String? downloadUrl = widget.data.mirror;
-                    bool isFastDownload = widget.data.isFastDownload;
+    if (inLibrary) {
+      return FileOpenAndDeleteButtons(
+        id: details.md5,
+        format: details.format!,
+        fileName: viewModel.libraryBook?.fileName,
+        onDeleteFile: viewModel.deleteFile,
+      );
+    }
 
-                    // Libgen serves its files directly (get.php -> CDN);
-                    // no mirror scraping or donation key applies.
-                    var isDirectLink = downloadUrl != null &&
-                        downloadUrl.contains('/get.php?');
-                    if (isDirectLink) {
-                      isFastDownload = true;
-                    }
+    return DetailBottomBar(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: () => _startDownload(context),
+            icon: const Icon(Icons.download_rounded),
+            label: Text(l10n.downloadThisBook),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              textStyle: SwissText.label.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        // Button for "Manual Download" (opens webview for captcha) - only
+        // shown if the setting is enabled.
+        if (viewModel.showManualButton) ...[
+          const SizedBox(width: 8),
+          IconButton.outlined(
+            tooltip: l10n.manualDownloadAction,
+            style: IconButton.styleFrom(
+              fixedSize: const Size(48, 48),
+              side: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant),
+              shape: const CircleBorder(),
+            ),
+            onPressed: () => _startManualDownload(context),
+            icon: const Icon(Icons.open_in_browser_outlined),
+          ),
+        ],
+      ],
+    );
+  }
 
-                    // Z-Library /dl/ links sit behind a DiamWall
-                    // proof-of-work and a 302 to a signed CDN URL, and
-                    // some ids answer 204 forever; re-fetch the page for
-                    // the live ids and resolve the first working one.
-                    // A cached detail page keeps no signed mirror, so the
-                    // book page itself is the signal to resolve one.
-                    final isZlib = (downloadUrl?.contains('/dl/') ?? false) ||
-                        (downloadUrl == null &&
-                            widget.data.link.contains('/book/'));
-                    String? zlibRefusal;
-                    if (isZlib && !isDirectLink) {
-                      try {
-                        final resolved = await ZlibraryProvider()
-                            .resolveBookDownload(widget.data.link);
-                        if (resolved.url != null) {
-                          downloadUrl = resolved.url;
-                          isDirectLink = true;
-                          isFastDownload = true;
-                        } else {
-                          zlibRefusal = resolved.refusal;
-                        }
-                      } catch (e) {
-                        // Fall through to the slow AA-style flow, which
-                        // cannot work for zlib; the snackbar below fires.
-                      }
-                    }
-
-                    // WeLib's public-server page carries the partner
-                    // file link, but with the class on a <div> where the
-                    // Anna's Archive scraper looks for a <p>. That is
-                    // why the old path hung on "detecting the download
-                    // link"; resolve it with WeLib's own parser instead.
-                    final isWelib = isWelibUrl(downloadUrl);
-                    // The signed file URL expires within hours, so keep
-                    // the public-server page around: the download
-                    // manager re-resolves a fresh URL from it when the
-                    // stored one dies, exactly like z-lib's /dl/ hop.
-                    final welibPageUrl = isWelib ? downloadUrl : null;
-                    String? welibRefusal;
-                    if (welibPageUrl != null && !isDirectLink) {
-                      try {
-                        final resolved =
-                            await WelibProvider().resolveDownload(welibPageUrl);
-                        if (resolved.url != null) {
-                          downloadUrl = resolved.url;
-                          isDirectLink = true;
-                          isFastDownload = true;
-                        } else {
-                          welibRefusal =
-                              resolved.refusal ?? l10n.welibNoDownloadLink;
-                        }
-                      } catch (e) {
-                        welibRefusal = l10n.welibPageUnreadable;
-                      }
-                    }
-
-                    // Try to fetch fast download link if key is present and not already fast
-                    final donationKey =
-                        isDirectLink ? '' : ref.read(donationKeyProvider);
-                    var donationFastLink = false;
-                    if (donationKey.isNotEmpty && !isFastDownload) {
-                      try {
-                        final annasArchive = AnnasArchieve();
-                        final fastLink = await annasArchive.getFastDownloadUrl(
-                            widget.data.md5, donationKey);
-                        if (fastLink != null) {
-                          downloadUrl = fastLink;
-                          isFastDownload = true;
-                          donationFastLink = true;
-                        }
-                      } catch (e) {
-                        // Fallback to normal mirror
-                      }
-                    }
-
-                    // Every route has run. A mirror that stated why it
-                    // withheld the file ("daily limit reached", "sign in
-                    // required") only wins when nothing else produced a
-                    // link - starting a download against the refused /dl/
-                    // hop could only fail, hiding that message.
-                    final target = chooseDownloadTarget(
-                      url: downloadUrl,
-                      fast: isDirectLink || donationFastLink,
-                      refusal: zlibRefusal ?? welibRefusal,
-                    );
-                    downloadUrl = target.url;
-
-                    if (target.hasUrl) {
-                      final effectiveUrl = downloadUrl!;
-                      // On Linux, use WebView UI flow since headless webview is not supported
-                      // Unless it is a fast download (isDirectLink), which doesn't need scraping
-                      if (PlatformUtils.isLinux && !isFastDownload) {
-                        // Navigate to webview page to get mirrors
-                        if (!context.mounted) return;
-                        final List<String>? mirrors = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (BuildContext context) =>
-                                Webview(url: effectiveUrl),
-                          ),
-                        );
-
-                        if (mirrors != null &&
-                            mirrors.isNotEmpty &&
-                            context.mounted) {
-                          // Start download with fetched mirrors
-                          final downloadRepository =
-                              ref.read(downloadManagerProvider);
-                          final task = DownloadTask(
-                            id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
-                            md5: widget.data.md5,
-                            title: widget.data.title,
-                            author: widget.data.author,
-                            thumbnail: widget.data.thumbnail,
-                            publisher: widget.data.publisher,
-                            info: widget.data.info,
-                            format: widget.data.format!,
-                            description: widget.data.description,
-                            link: widget.data.link,
-                            mirrors: mirrors,
-                          );
-
-                          await downloadRepository.add(task);
-
-                          if (context.mounted) {
-                            final message = isFastDownload
-                                ? l10n.fastDownloadStarted
-                                : l10n.downloadStartedBackground;
-                            showSnackBar(
-                              context: context,
-                              message: message,
-                            );
-                          }
-                          ref.invalidate(myLibraryProvider);
-                        }
-                      } else {
-                        // Other platforms (or fast download on Linux): use background fetch
-                        final downloadRepository =
-                            ref.read(downloadManagerProvider);
-                        final task = DownloadTask(
-                          id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
-                          md5: widget.data.md5,
-                          title: widget.data.title,
-                          author: widget.data.author,
-                          thumbnail: widget.data.thumbnail,
-                          publisher: widget.data.publisher,
-                          info: widget.data.info,
-                          format: widget.data.format!,
-                          description: widget.data.description,
-                          link: widget.data.link,
-                          mirrors: [], // Will be fetched in background
-                          // Store mirror URL for retry
-                          mirrorUrl: effectiveUrl,
-                          isDirectLink: isFastDownload,
-                          // z-lib's signed CDN link and WeLib's partner
-                          // link both expire after a few hours; the
-                          // manager then re-resolves a fresh one from
-                          // the page instead of failing. The refresher
-                          // takes the task's /md5/ link, but WeLib's
-                          // file URL only comes out of the public-server
-                          // page captured above, so that page is used.
-                          linkRefresher: isZlib
-                              ? (pageUrl) async => (await ZlibraryProvider()
-                                      .resolveBookDownload(pageUrl))
-                                  .url
-                              : welibPageUrl != null
-                                  ? (_) async => (await WelibProvider()
-                                          .resolveDownload(welibPageUrl))
-                                      .url
-                                  : null,
-                        );
-
-                        await downloadRepository.addWithMirrorUrl(
-                          task,
-                          effectiveUrl,
-                        );
-
-                        if (context.mounted) {
-                          final message = isFastDownload
-                              ? l10n.fastDownloadStarted
-                              : l10n.downloadStartedBackground;
-                          showSnackBar(
-                            context: context,
-                            message: message,
-                          );
-                          ref.invalidate(myLibraryProvider);
-                        }
-                      }
-                    } else {
-                      if (context.mounted) {
-                        // A mirror's own reason (daily limit, sign-in
-                        // required) beats the generic "no mirrors".
-                        showSnackBar(
-                            context: context,
-                            message: target.refusal ??
-                                AppLocalizations.of(context).noMirrors);
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.download_rounded),
-                  label: Text(AppLocalizations.of(context).downloadThisBook),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    textStyle:
-                        SwissText.label.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-              // Button for "Manual Download" (opens webview for captcha) - only shown if setting is enabled
-              if (showManualButton) ...[
-                const SizedBox(width: 8),
-                IconButton.outlined(
-                  tooltip: AppLocalizations.of(context).manualDownloadAction,
-                  style: IconButton.styleFrom(
-                    fixedSize: const Size(48, 48),
-                    side: BorderSide(
-                        color: Theme.of(context).colorScheme.outlineVariant),
-                    shape: const CircleBorder(),
-                  ),
-                  onPressed: () async {
-                    if (widget.data.mirror != null &&
-                        widget.data.mirror != '') {
-                      // Navigate to webview page
-                      final List<String>? mirrors = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (BuildContext context) =>
-                              Webview(url: widget.data.mirror!),
-                        ),
-                      );
-
-                      if (mirrors != null &&
-                          mirrors.isNotEmpty &&
-                          context.mounted) {
-                        // Start download in background with fetched mirrors
-                        final downloadRepository =
-                            ref.read(downloadManagerProvider);
-                        final task = DownloadTask(
-                          id: '${widget.data.md5}_${DateTime.now().millisecondsSinceEpoch}',
-                          md5: widget.data.md5,
-                          title: widget.data.title,
-                          author: widget.data.author,
-                          thumbnail: widget.data.thumbnail,
-                          publisher: widget.data.publisher,
-                          info: widget.data.info,
-                          format: widget.data.format!,
-                          description: widget.data.description,
-                          link: widget.data.link,
-                          mirrors: mirrors, // Use manually fetched mirrors
-                        );
-
-                        await downloadRepository.add(task);
-
-                        if (context.mounted) {
-                          showSnackBar(
-                            context: context,
-                            message: AppLocalizations.of(context)
-                                .downloadStartedBackground,
-                          );
-                        }
-                        ref.invalidate(myLibraryProvider);
-                      }
-                    } else {
-                      showSnackBar(
-                          context: context,
-                          message: AppLocalizations.of(context).noMirrors);
-                    }
-                  },
-                  icon: const Icon(Icons.open_in_browser_outlined),
-                ),
-              ],
-            ],
+  Future<void> _startDownload(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final plan = await viewModel.startDownload();
+    if (!context.mounted) return;
+    switch (plan) {
+      case DownloadStarted(:final fast):
+        showSnackBar(
+          context: context,
+          message:
+              fast ? l10n.fastDownloadStarted : l10n.downloadStartedBackground,
+        );
+      case DownloadNeedsMirrors(:final url):
+        final mirrors = await _collectMirrors(context, url);
+        if (mirrors == null || mirrors.isEmpty || !context.mounted) return;
+        final started = await viewModel.startWithMirrors(url, mirrors);
+        if (started && context.mounted) {
+          showSnackBar(
+            context: context,
+            message: l10n.downloadStartedBackground,
           );
         }
-      },
-      error: (error, stackTrace) => const SizedBox.shrink(),
-      loading: () => const SizedBox.shrink(),
+      case DownloadRefused(:final refusal):
+        showSnackBar(
+          context: context,
+          message: _refusalMessage(l10n, refusal),
+        );
+    }
+  }
+
+  Future<void> _startManualDownload(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final plan = await viewModel.manualDownload();
+    if (!context.mounted) return;
+    switch (plan) {
+      case DownloadNeedsMirrors(:final url):
+        final mirrors = await _collectMirrors(context, url);
+        if (mirrors == null || mirrors.isEmpty || !context.mounted) return;
+        final started = await viewModel.startWithMirrors(url, mirrors);
+        if (started && context.mounted) {
+          showSnackBar(
+            context: context,
+            message: l10n.downloadStartedBackground,
+          );
+        }
+      case DownloadRefused():
+        showSnackBar(context: context, message: l10n.noMirrors);
+      case DownloadStarted():
+        break;
+    }
+  }
+
+  Future<List<String>?> _collectMirrors(BuildContext context, String url) {
+    return Navigator.push<List<String>>(
+      context,
+      MaterialPageRoute(
+        builder: (BuildContext context) => Webview(url: url),
+      ),
     );
+  }
+
+  /// A mirror's own reason beats the generic "no mirrors"; the two WeLib
+  /// codes stand in for strings the view model cannot localize.
+  String _refusalMessage(AppLocalizations l10n, String? refusal) {
+    if (refusal == null) return l10n.noMirrors;
+    if (refusal == BookDetailViewModel.welibNoDownloadLinkRefusal) {
+      return l10n.welibNoDownloadLink;
+    }
+    if (refusal == BookDetailViewModel.welibPageUnreadableRefusal) {
+      return l10n.welibPageUnreadable;
+    }
+    return refusal;
   }
 }

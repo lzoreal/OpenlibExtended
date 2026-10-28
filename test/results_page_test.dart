@@ -5,23 +5,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/data/models/book_data.dart';
-import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
-import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/features/results/widgets/search_result_card.dart';
 import 'package:openlib/ui/features/results/widgets/source_journey_card.dart';
 import 'package:openlib/ui/features/results/views/results_page.dart';
 
-List<BookData> _sourceBooks(String tag, String displayName, int page, int count) {
+import 'helpers/results_test_support.dart';
+
+List<BookData> _sourceBooks(
+    String tag, String displayName, int page, int count) {
   return List.generate(
     count,
     (i) => BookData(
@@ -82,50 +82,33 @@ SearchManagerResult multiSourcePage(int page) {
 }
 
 void main() {
-  // The results page reads its sort/filter state through AppSettings now;
-  // writes land on the same instance.
-  Override appSettingsOverride() => appSettingsProvider.overrideWith(
-        (ref) => AppSettings(
-          themeMode: ThemeMode.system,
-          fontSizeScale: 1.0,
-          locale: null,
-          showManualDownloadButton: true,
-          backgroundVerification: true,
-          donationKey: '',
-          userAgent: '',
-          cookie: '',
-          filters: const SearchFilters(),
-        ),
-      );
-
-  Future<List<SearchPageKey>> pumpResults(
+  Future<ScriptedSearchRepository> pumpResults(
     WidgetTester tester, {
-    required Future<SearchManagerResult> Function(SearchPageKey key) search,
+    Future<SearchManagerResult> Function(SearchQuery query)? search,
+    Stream<SearchManagerResult> Function(SearchQuery query)? watch,
     String query = 'docker',
     SearchProviderId? source,
   }) async {
-    final keys = <SearchPageKey>[];
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        appSettingsOverride(),
-        initialSearchProvider.overrideWith((ref, key) {
-          keys.add(key);
-          return Stream.fromFuture(search(key));
-        }),
-        searchProvider.overrideWith((ref, key) {
-          keys.add(key);
-          return search(key);
-        }),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: ResultPage(searchQuery: query, source: source),
+    final repository = ScriptedSearchRepository()
+      ..pageHandler = search
+      ..watchHandler = watch;
+    final viewModel = testResultsViewModel(
+      query: query,
+      source: source,
+      search: repository,
+    );
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: ResultPage(
+        searchQuery: query,
+        source: source,
+        viewModel: viewModel,
       ),
     ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    return keys;
+    return repository;
   }
 
   Finder sourceTile(String label) => find.descendant(
@@ -139,8 +122,8 @@ void main() {
 
     expect(find.byType(SearchResultCard), findsWidgets);
     expect(find.byType(SourceJourneyCard), findsOneWidget);
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
     expect(sourceTile(l10n.searchSourceAuto), findsOneWidget);
     expect(
       find.descendant(
@@ -157,8 +140,8 @@ void main() {
       (tester) async {
     await pumpResults(tester, search: (key) async => multiSourcePage(key.page));
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
     await tester.tap(sourceTile(l10n.sourceWelib));
     await tester.pump();
 
@@ -198,12 +181,12 @@ void main() {
       );
     }
 
-    final keys = await pumpResults(
+    final repository = await pumpResults(
       tester,
       search: (key) async => skippedPage(key.page),
     );
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
 
     expect(find.textContaining('Z-Library skipped'), findsOneWidget);
     expect(find.text(l10n.retryAnyway), findsOneWidget);
@@ -212,15 +195,19 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(keys.any((key) => key.forceLocalTimeouts), isTrue);
+    expect(
+      repository.watchCalls.any((call) => call.forceLocalTimeouts),
+      isTrue,
+    );
   });
 
   testWidgets('later source snapshots merge without clearing earlier books',
       (tester) async {
     SearchManagerResult partial({required bool withZlib}) {
       final libgen = _sourceBooks('LibGen', 'Library Genesis', 1, 2);
-      final zlib =
-          withZlib ? _sourceBooks('Z-Library', 'Z-Library', 1, 3) : <BookData>[];
+      final zlib = withZlib
+          ? _sourceBooks('Z-Library', 'Z-Library', 1, 3)
+          : <BookData>[];
       return SearchManagerResult(
         books: [...libgen, ...zlib],
         failedProviders: const [],
@@ -237,9 +224,8 @@ void main() {
             id: SearchProviderId.zlibrary,
             displayName: 'Z-Library',
             resultCount: zlib.length,
-            status: withZlib
-                ? SearchSourceStatus.hit
-                : SearchSourceStatus.pending,
+            status:
+                withZlib ? SearchSourceStatus.hit : SearchSourceStatus.pending,
           ),
         ],
         booksBySource: {
@@ -251,18 +237,7 @@ void main() {
 
     final controller = StreamController<SearchManagerResult>();
     addTearDown(controller.close);
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        appSettingsOverride(),
-        initialSearchProvider.overrideWith((ref, key) => controller.stream),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const ResultPage(searchQuery: 'docker'),
-      ),
-    ));
-    await tester.pump();
+    await pumpResults(tester, watch: (_) => controller.stream);
 
     controller.add(partial(withZlib: false));
     await tester.pump();
@@ -282,7 +257,7 @@ void main() {
 
   testWidgets('the merged view paginates without pinning a source',
       (tester) async {
-    final keys = await pumpResults(
+    final repository = await pumpResults(
       tester,
       search: (key) async => key.page >= 3
           ? const SearchManagerResult(books: [], failedProviders: [])
@@ -294,23 +269,24 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));
 
-    final pageTwo = keys.where((key) => key.page == 2).toList();
+    final pageTwo =
+        repository.searchCalls.where((call) => call.query.page == 2).toList();
     expect(pageTwo, isNotEmpty);
-    expect(pageTwo.first.source, isNull);
+    expect(pageTwo.first.query.source, isNull);
     // The list is lazy now; the first appended row is the one in view.
     expect(find.text('LibGen 2-0'), findsWidgets);
   });
 
   testWidgets('a switched source paginates within that source', (tester) async {
-    final keys = await pumpResults(
+    final repository = await pumpResults(
       tester,
       search: (key) async => key.page >= 3
           ? const SearchManagerResult(books: [], failedProviders: [])
           : multiSourcePage(key.page),
     );
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
     await tester.tap(sourceTile(l10n.sourceZlibShort));
     await tester.pump();
 
@@ -319,9 +295,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));
 
-    final pageTwo = keys.where((key) => key.page == 2).toList();
+    final pageTwo =
+        repository.searchCalls.where((call) => call.query.page == 2).toList();
     expect(pageTwo, isNotEmpty);
-    expect(pageTwo.first.source, SearchProviderId.zlibrary);
+    expect(pageTwo.first.query.source, SearchProviderId.zlibrary);
   });
 
   testWidgets('an empty result shows the switcher and clear-filter retry',
@@ -364,8 +341,8 @@ void main() {
       },
     );
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
     expect(find.byType(SourceJourneyCard), findsOneWidget);
     expect(find.text(l10n.noResultsFor('docker')), findsOneWidget);
     expect(find.text(l10n.clearFiltersRetry), findsOneWidget);
@@ -379,13 +356,13 @@ void main() {
 
   testWidgets('a source route opens on that source but still fetches all',
       (tester) async {
-    final keys = await pumpResults(
+    final repository = await pumpResults(
       tester,
       source: SearchProviderId.welib,
       search: (key) async => multiSourcePage(key.page),
     );
 
-    expect(keys.first.source, isNull,
+    expect(repository.watchCalls.first.query.source, isNull,
         reason: 'the first page always queries every source');
     expect(find.text('WeLib 1-0'), findsWidgets);
     expect(find.text('LibGen 1-0'), findsNothing);
@@ -429,8 +406,8 @@ void main() {
 
     await pumpResults(tester, search: (key) async => infoPage(key.page));
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
     expect(find.byKey(const ValueKey('format-filter-capsule')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('language-filter-capsule')),
@@ -495,16 +472,16 @@ void main() {
 
     await pumpResults(tester, search: (key) async => infoPage(key.page));
 
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
     final capsule = find.byKey(const ValueKey('language-filter-capsule'));
     expect(capsule, findsOneWidget);
 
     await tester.tap(capsule);
     await tester.pumpAndSettle();
     await tester.tap(
-        find.widgetWithText(CheckboxListTile, l10n.languageNameZh),
-      );
+      find.widgetWithText(CheckboxListTile, l10n.languageNameZh),
+    );
     await tester.pump();
     await tester.tap(find.text(l10n.done));
     await tester.pumpAndSettle();
@@ -527,8 +504,8 @@ void main() {
       tester,
       search: (key) async => multiSourcePage(key.page),
     );
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
 
     expect(find.text(l10n.challengeNeedsVerificationRetry), findsOneWidget);
     expect(find.text(l10n.challengeVerifyNow), findsOneWidget);
@@ -580,8 +557,8 @@ void main() {
     });
 
     await pumpResults(tester, search: (key) async => pendingPage(key.page));
-    final l10n = AppLocalizations.of(
-        tester.element(find.byType(ResultPage).first));
+    final l10n =
+        AppLocalizations.of(tester.element(find.byType(ResultPage).first));
 
     // Nothing blocked yet: just the plain "still searching" hint.
     expect(find.text(l10n.challengeVerifyNow), findsNothing);

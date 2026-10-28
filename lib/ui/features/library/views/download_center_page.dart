@@ -9,142 +9,51 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
 import 'package:openlib/data/models/my_book.dart';
-import 'package:openlib/data/services/database.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/data/services/files.dart' show deleteFile, getFilePath;
+import 'package:openlib/data/services/files.dart' show getFilePath;
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/share_book.dart';
-import 'package:openlib/data/repositories/preferences_repository.dart';
-import 'package:openlib/state/state.dart'
-    show
-        activeDownloadsProvider,
-        downloadManagerProvider,
-        myLibraryProvider,
-        selectedIndexProvider;
+import 'package:openlib/state/state.dart' show FileName;
 import 'package:openlib/ui/core/components/book_info_widget.dart'
     show sourceLabelForUrl;
-import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/core/components/inline_hint.dart';
-import 'package:openlib/ui/core/open_book.dart';
 import 'package:openlib/ui/core/components/page_header.dart';
 import 'package:openlib/ui/core/components/pill_tabs.dart';
 import 'package:openlib/ui/core/components/section_header.dart';
 import 'package:openlib/ui/core/components/tab_keep_alive.dart';
-import 'package:openlib/ui/features/library/views/mybook_page.dart';
+import 'package:openlib/ui/core/open_book.dart';
 import 'package:openlib/ui/core/swiss_grid.dart';
+import 'package:openlib/ui/features/library/view_models/library_view_model.dart';
+import 'package:openlib/ui/features/library/views/mybook_page.dart';
+import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/features/webview/views/webview_page.dart';
 
-/// A completed download as shown in the download center. The file facts
-/// come from the local file, so the database schema stays unchanged.
-class CompletedDownload {
-  final MyBook book;
-  final int? sizeBytes;
-  final DateTime? modifiedAt;
+enum _DownloadFilter { all, active, completed }
 
-  const CompletedDownload({
-    required this.book,
-    this.sizeBytes,
-    this.modifiedAt,
-  });
-
-  String get fileName => book.getFileName();
-}
-
-/// Completed records live in the `mybooks` table. The preview calls for
-/// "completed downloads" rather than a browsable library, so this provider
-/// only enriches them with file size and modification time.
-final completedDownloadsProvider =
-    FutureProvider<List<CompletedDownload>>((ref) async {
-  final books = await ref.watch(myLibraryProvider.future);
-  // Resolve the folder once: reading the preference per book turned
-  // opening the tab into N database queries on top of N stat calls.
-  final storageDirectory = await PreferencesRepository().bookStorageDirectory();
-  final entries = await Future.wait(books.map((book) async {
-    int? size;
-    DateTime? modified;
-    if (storageDirectory != null) {
-      try {
-        final stat =
-            await File('$storageDirectory/${book.getFileName()}').stat();
-        size = stat.size;
-        modified = stat.modified;
-      } catch (_) {
-        // The record survives even if the file was moved away.
-      }
-    }
-    return CompletedDownload(
-      book: book,
-      sizeBytes: size,
-      modifiedAt: modified,
-    );
-  }));
-
-  entries.sort((a, b) {
-    final aTime = a.modifiedAt?.millisecondsSinceEpoch ?? 0;
-    final bTime = b.modifiedAt?.millisecondsSinceEpoch ?? 0;
-    return bTime.compareTo(aTime);
-  });
-  return entries;
-});
+enum _CompletedAction { details, share, folder, remove }
 
 bool _isActiveTask(DownloadTask task) =>
     task.status != DownloadStatus.completed &&
     task.status != DownloadStatus.cancelled &&
     task.status != DownloadStatus.failed;
 
-@immutable
-class _ActiveSummary {
-  const _ActiveSummary({required this.activeCount, required this.failedCount});
+class DownloadCenterPage extends StatefulWidget {
+  const DownloadCenterPage({super.key, this.viewModel, this.onBrowseSearch});
 
-  final int activeCount;
-  final int failedCount;
+  /// Test seam; production builds the view model from the DI container.
+  final LibraryViewModel? viewModel;
 
-  static const empty = _ActiveSummary(activeCount: 0, failedCount: 0);
-
-  @override
-  bool operator ==(Object other) =>
-      other is _ActiveSummary &&
-      other.activeCount == activeCount &&
-      other.failedCount == failedCount;
+  /// The empty state's primary action used to flip the shell's tab index.
+  final VoidCallback? onBrowseSearch;
 
   @override
-  int get hashCode => Object.hash(activeCount, failedCount);
+  State<DownloadCenterPage> createState() => _DownloadCenterPageState();
 }
 
-/// Only counts/statuses: progress ticks produce an equal summary, so the
-/// page shell and the completed list do not rebuild ten times per second.
-final _activeSummaryProvider = Provider<_ActiveSummary>((ref) {
-  final tasks =
-      ref.watch(activeDownloadsProvider).valueOrNull?.values ?? const [];
-  var active = 0;
-  var failed = 0;
-  for (final task in tasks) {
-    if (task.status == DownloadStatus.failed) {
-      failed++;
-    } else if (_isActiveTask(task)) {
-      active++;
-    }
-  }
-  return _ActiveSummary(activeCount: active, failedCount: failed);
-});
-
-enum _DownloadFilter { all, active, completed }
-
-enum _CompletedAction { details, share, folder, remove }
-
-class DownloadCenterPage extends ConsumerStatefulWidget {
-  const DownloadCenterPage({super.key});
-
-  @override
-  ConsumerState<DownloadCenterPage> createState() => _DownloadCenterPageState();
-}
-
-class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
+class _DownloadCenterPageState extends State<DownloadCenterPage>
     with SingleTickerProviderStateMixin {
   Timer? _speedTimer;
   final Map<String, int> _lastBytes = {};
@@ -156,9 +65,15 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
   _DownloadFilter _filter = _DownloadFilter.all;
   late final TabController _filterController;
 
+  late final LibraryViewModel _viewModel;
+  late final bool _ownsViewModel;
+
   @override
   void initState() {
     super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ?? LibraryViewModel.fromDi();
+    unawaited(_viewModel.load());
     _filterController = TabController(
       length: _DownloadFilter.values.length,
       vsync: this,
@@ -197,11 +112,12 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
   void dispose() {
     _speedTimer?.cancel();
     _filterController.dispose();
+    if (_ownsViewModel) _viewModel.dispose();
     super.dispose();
   }
 
   void _sampleSpeeds() {
-    final downloads = ref.read(downloadManagerProvider).active;
+    final downloads = _viewModel.active;
     if (downloads.isEmpty && _lastBytes.isEmpty && _speeds.isEmpty) return;
 
     final now = DateTime.now();
@@ -213,15 +129,15 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
       _lastSample = now;
       _lastBytes
         ..clear()
-        ..addEntries(downloads.values
-            .map((task) => MapEntry(task.id, task.downloadedBytes)));
+        ..addEntries(
+            downloads.map((task) => MapEntry(task.id, task.downloadedBytes)));
       _speeds.clear();
       return;
     }
 
     final nextSpeeds = <String, double>{};
     final nextLast = <String, int>{};
-    for (final task in downloads.values) {
+    for (final task in downloads) {
       if (task.status == DownloadStatus.downloading) {
         final previousBytes = _lastBytes[task.id];
         final instant = previousBytes == null
@@ -245,7 +161,6 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
   }
 
   Future<void> _toggleAll(List<DownloadTask> active) async {
-    final manager = ref.read(downloadManagerProvider);
     final paused = active.where((t) => t.status == DownloadStatus.paused);
     final pausable = active.where((t) =>
         t.status == DownloadStatus.downloading ||
@@ -253,16 +168,15 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
         t.status == DownloadStatus.fetchingMirrors ||
         t.status == DownloadStatus.queued);
     if (paused.isNotEmpty && pausable.isEmpty) {
-      await manager.resumeAll();
+      await _viewModel.resumeAll();
     } else {
-      await manager.pauseAll();
+      await _viewModel.pauseAll();
     }
   }
 
   Future<void> _verifyTask(DownloadTask task) async {
     if (task.mirrorUrl == null || _verifyingTaskId != null) return;
     setState(() => _verifyingTaskId = task.id);
-    final manager = ref.read(downloadManagerProvider);
     final mirrors = await Navigator.push<List<String>>(
       context,
       MaterialPageRoute(
@@ -273,7 +187,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
       ),
     );
     if (mirrors != null && mirrors.isNotEmpty && mounted) {
-      await manager.restartWithMirrors(task.id, mirrors);
+      await _viewModel.restartWithMirrors(task.id, mirrors);
     }
     if (mounted) setState(() => _verifyingTaskId = null);
   }
@@ -386,22 +300,16 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
       ),
     );
     if (deleteLocalFile == null) return;
-    if (deleteLocalFile) {
-      try {
-        final directory =
-            await PreferencesRepository().bookStorageDirectory();
-        if (directory != null) {
-          await deleteFile('$directory/${item.fileName}');
-        }
-      } catch (_) {
-        // The record must still go away if the file or preference is missing.
+    await _viewModel.deleteBook(item.book, removeFile: deleteLocalFile);
+  }
+
+  Future<void> _deleteFileForBook(FileName fileName) async {
+    for (final book in _viewModel.books) {
+      if (book.id == fileName.md5) {
+        await _viewModel.deleteBook(book);
+        return;
       }
     }
-    final db = MyLibraryDb.instance;
-    await db.delete(item.book.id);
-    await db.deleteBookState(item.fileName);
-    ref.invalidate(myLibraryProvider);
-    ref.invalidate(completedDownloadsProvider);
   }
 
   Future<void> _openStorageFolder() async {
@@ -450,41 +358,50 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
 
   @override
   Widget build(BuildContext context) {
+    // A hidden tab stays mounted, so it must not keep rebuilding: every
+    // download event would repaint this whole page behind the user's back.
+    if (!TabVisibility.of(context)) {
+      return _buildContent(
+        context,
+        const [],
+        const [],
+        0,
+        0,
+        const [],
+      );
+    }
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) => _buildContent(
+        context,
+        _viewModel.active,
+        _viewModel.failed,
+        _viewModel.activeCount,
+        _viewModel.failedCount,
+        _viewModel.completed,
+      ),
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    List<DownloadTask> activeTasks,
+    List<DownloadTask> failedTasks,
+    int activeCount,
+    int failedCount,
+    List<CompletedDownload> completed,
+  ) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    ref.listen(activeDownloadsProvider, (previous, next) {
-      final before = previous?.valueOrNull ?? const <String, DownloadTask>{};
-      final after = next.valueOrNull ?? const <String, DownloadTask>{};
-      final newlyCompleted = after.values.any((task) =>
-          task.status == DownloadStatus.completed &&
-          before[task.id]?.status != DownloadStatus.completed);
-      if (newlyCompleted) {
-        ref.invalidate(myLibraryProvider);
-        ref.invalidate(completedDownloadsProvider);
-      }
-    });
-
-    // A hidden tab stays mounted, so it must not keep subscribing: every
-    // download event would rebuild this whole page behind the user's back.
-    final tabActive = TabVisibility.of(context);
-    final summary = tabActive
-        ? ref.watch(_activeSummaryProvider)
-        : _ActiveSummary.empty;
-    final completedAsync = tabActive
-        ? ref.watch(completedDownloadsProvider)
-        : const AsyncData<List<CompletedDownload>>([]);
-    final completed = completedAsync.valueOrNull ?? const <CompletedDownload>[];
-
-    final allCount =
-        summary.activeCount + summary.failedCount + completed.length;
+    final allCount = activeCount + failedCount + completed.length;
 
     Widget buildList(_DownloadFilter filter) {
       final includeActive = filter != _DownloadFilter.completed;
       final includeCompleted = filter != _DownloadFilter.active;
-      final hasActive = includeActive && summary.activeCount > 0;
-      final hasFailed = includeCompleted && summary.failedCount > 0;
+      final hasActive = includeActive && activeCount > 0;
+      final hasFailed = includeCompleted && failedCount > 0;
       final hasCompleted = includeCompleted && completed.isNotEmpty;
       final hasContent = hasActive || hasFailed || hasCompleted;
 
@@ -501,10 +418,15 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
                 children: [
                   if (hasActive)
                     _ActiveSection(
+                      tasks: activeTasks,
                       speeds: _speeds,
                       verifyingTaskId: _verifyingTaskId,
                       onToggleAll: _toggleAll,
                       onVerify: _verifyTask,
+                      onPause: _viewModel.pause,
+                      onResume: _viewModel.resume,
+                      onCancel: _viewModel.cancel,
+                      onRetry: _viewModel.retry,
                     ),
                   if (!hasActive) const SizedBox(height: 16),
                   if (!hasContent)
@@ -522,8 +444,11 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
                   else ...[
                     if (hasFailed)
                       _FailedSection(
+                        tasks: failedTasks,
                         verifyingTaskId: _verifyingTaskId,
                         onVerify: _verifyTask,
+                        onCancel: _viewModel.cancel,
+                        onRetry: _viewModel.retry,
                       ),
                     if (showCompleted && (hasActive || hasFailed))
                       const SizedBox(height: 16),
@@ -542,7 +467,11 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => BookPage(id: item.book.id),
+                      builder: (context) => BookPage(
+                        id: item.book.id,
+                        annaArchiveBaseUrl: _viewModel.annaArchiveBaseUrl,
+                        onDeleteFile: _deleteFileForBook,
+                      ),
                     ),
                   );
                 },
@@ -619,8 +548,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                ref.invalidate(myLibraryProvider);
-                ref.invalidate(completedDownloadsProvider);
+                _viewModel.refresh();
               },
               child: allCount == 0
                   ? ListView(
@@ -628,9 +556,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                       children: [
                         _EmptyState(
-                          onSearch: () {
-                            ref.read(selectedIndexProvider.notifier).state = 1;
-                          },
+                          onSearch: () => widget.onBrowseSearch?.call(),
                         ),
                       ],
                     )
@@ -1085,34 +1011,41 @@ class _TaskCard extends StatelessWidget {
   }
 }
 
-class _ActiveSection extends ConsumerWidget {
+class _ActiveSection extends StatelessWidget {
   const _ActiveSection({
+    required this.tasks,
     required this.speeds,
     required this.verifyingTaskId,
     required this.onToggleAll,
     required this.onVerify,
+    required this.onPause,
+    required this.onResume,
+    required this.onCancel,
+    required this.onRetry,
   });
 
+  final List<DownloadTask> tasks;
   final Map<String, double> speeds;
   final String? verifyingTaskId;
   final Future<void> Function(List<DownloadTask> tasks) onToggleAll;
   final Future<void> Function(DownloadTask task) onVerify;
+  final Future<void> Function(String id) onPause;
+  final Future<void> Function(String id) onResume;
+  final void Function(String id) onCancel;
+  final Future<void> Function(String id) onRetry;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tasks = (ref.watch(activeDownloadsProvider).valueOrNull?.values ??
-            const <DownloadTask>[])
-        .where(_isActiveTask)
-        .toList(growable: false);
-    if (tasks.isEmpty) return const SizedBox.shrink();
+  Widget build(BuildContext context) {
+    final active = tasks.where(_isActiveTask).toList(growable: false);
+    if (active.isEmpty) return const SizedBox.shrink();
 
-    final selected = tasks.firstWhere(
+    final selected = active.firstWhere(
       (task) => task.status == DownloadStatus.downloading,
-      orElse: () => tasks.first,
+      orElse: () => active.first,
     );
     final pausedCount =
-        tasks.where((task) => task.status == DownloadStatus.paused).length;
-    final canPause = tasks.any((task) =>
+        active.where((task) => task.status == DownloadStatus.paused).length;
+    final canPause = active.any((task) =>
         task.status == DownloadStatus.downloading ||
         task.status == DownloadStatus.downloadingMirrors ||
         task.status == DownloadStatus.fetchingMirrors ||
@@ -1130,7 +1063,7 @@ class _ActiveSection extends ConsumerWidget {
           hint: l10n.downloadCenterQueueMemory,
           action: canPause || canResume
               ? TextButton.icon(
-                  onPressed: () => onToggleAll(tasks),
+                  onPressed: () => onToggleAll(active),
                   icon: Icon(
                     canResume && !canPause
                         ? Icons.play_arrow_rounded
@@ -1154,16 +1087,15 @@ class _ActiveSection extends ConsumerWidget {
                 )
               : null,
         ),
-        for (final task in tasks)
+        for (final task in active)
           _TaskCard(
             task: task,
             speed: speeds[task.id],
             verifying: verifyingTaskId == task.id,
-            onPause: () => ref.read(downloadManagerProvider).pause(task.id),
-            onResume: () => ref.read(downloadManagerProvider).resume(task.id),
-            onCancel: () => ref.read(downloadManagerProvider).cancel(task.id),
-            onRetry: () =>
-                ref.read(downloadManagerProvider).retryKeepingPartial(task.id),
+            onPause: () => onPause(task.id),
+            onResume: () => onResume(task.id),
+            onCancel: () => onCancel(task.id),
+            onRetry: () => onRetry(task.id),
             onVerify: () => onVerify(task),
           ),
       ],
@@ -1171,19 +1103,24 @@ class _ActiveSection extends ConsumerWidget {
   }
 }
 
-class _FailedSection extends ConsumerWidget {
+class _FailedSection extends StatelessWidget {
   const _FailedSection({
+    required this.tasks,
     required this.verifyingTaskId,
     required this.onVerify,
+    required this.onCancel,
+    required this.onRetry,
   });
 
+  final List<DownloadTask> tasks;
   final String? verifyingTaskId;
   final Future<void> Function(DownloadTask task) onVerify;
+  final void Function(String id) onCancel;
+  final Future<void> Function(String id) onRetry;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final failed = (ref.watch(activeDownloadsProvider).valueOrNull?.values ??
-            const <DownloadTask>[])
+  Widget build(BuildContext context) {
+    final failed = tasks
         .where((task) => task.status == DownloadStatus.failed)
         .toList(growable: false);
     if (failed.isEmpty) return const SizedBox.shrink();
@@ -1203,9 +1140,8 @@ class _FailedSection extends ConsumerWidget {
             verifying: verifyingTaskId == task.id,
             onPause: null,
             onResume: null,
-            onCancel: () => ref.read(downloadManagerProvider).cancel(task.id),
-            onRetry: () =>
-                ref.read(downloadManagerProvider).retryKeepingPartial(task.id),
+            onCancel: () => onCancel(task.id),
+            onRetry: () => onRetry(task.id),
             onVerify: () => onVerify(task),
           ),
       ],
@@ -1455,9 +1391,8 @@ class _CompletedSliver extends StatelessWidget {
                 onOpen: () => onOpen(item.book),
                 onDetails: () => onDetails(item),
                 onShare: () => onShare(item),
-                onShowInFolder: onShowInFolder == null
-                    ? null
-                    : () => onShowInFolder!(item),
+                onShowInFolder:
+                    onShowInFolder == null ? null : () => onShowInFolder!(item),
                 onRemove: () => onRemove(item),
               ),
               if (index < items.length - 1)

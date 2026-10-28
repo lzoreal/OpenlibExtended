@@ -122,7 +122,7 @@ lib/
 │  ├─ core/                   # themes、motion、swiss_grid、open_book 与共享组件
 │  ├─ features/<feature>/views/    # 页面：shell、search、results、book_detail、library…
 │  ├─ features/<feature>/widgets/  # 只被该 feature 使用的组件
-│  └─ features/search/view_models/ # SearchViewModel（ChangeNotifier）
+│  └─ features/<feature>/view_models/ # Search/Results/Library/BookDetailViewModel（ChangeNotifier）
 test/                         # 37 个测试文件 + HTML fixtures
 tool/update_scoop_manifest.py # 发布后重写 scoop 清单
 .github/workflows/build.yml   # 唯一 CI：测试 + 全平台构建 + 发布 + scoop
@@ -139,7 +139,7 @@ bucket/openlibextended.json   # Scoop 清单
 Widget / Page
         │ ListenableBuilder（新页面、search）
         ▼
-ViewModel（ChangeNotifier，app/di.dart 装配；search 已迁移）
+ViewModel（ChangeNotifier，app/di.dart 装配；search/results/library/book_detail 已迁移）
         │ 其余页面仍走 ref.watch / ref.read
         ▼
 Riverpod providers（lib/state/state.dart；筛选值由 AppSettings 派生）
@@ -192,7 +192,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 ### 5.1 搜索
 
-入口：首屏 `initialSearchProvider`（`lib/state/state.dart`）→ `SearchManager.watch()` 流式返回；分页走 `searchProvider` → `SearchManager.search()`（`lib/data/services/search_manager.dart`）。
+入口：`ResultsViewModel` 订阅 `SearchRepository.watch()` 流式返回首屏，分页走 `SearchRepository.search()`（`SearchManager` 在 `lib/data/services/search_manager.dart`）。
 
 搜索页自身的状态在 `SearchViewModel`（`lib/ui/features/search/view_models/search_view_model.dart`，ChangeNotifier）：查询、来源选择、建议与 420ms 防抖、最近搜索、书源启用/顺序、趋势建议、镜像测速；通过 `SearchPage(viewModel:)` 注入，由 `ListenableBuilder` 刷新。筛选值（type/sort/fileType/language/year 与作者/出版社、`filtersEnabled`）存在 `AppSettings`，结果页与趋势页通过 `appSettingsProvider` 读到同一份；搜索页改筛选时由 ViewModel 写 `PreferencesRepository`。镜像测速控制器是 get_it 单例，搜索页与镜像页共享同一状态。
 
@@ -203,7 +203,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 3. 单个源失败不会影响其他源；只有“所有启用的源都抛错”时 UI 才显示错误。空结果 `[]` 是合法的“没搜到”。
 4. 每个来源的结果先在源内按 `md5` 去重，再按书源顺序合并成“全部”视图并跨源去重；`booksBySource` 保留每个来源自己的列表。
 5. 结果页第一页在第一个来源命中后立即显示，后续来源完成时自动回填；“搜索来源”卡片点击即可在“全部 / 单个来源”之间切换，不需重新搜索。
-6. 分页跟随当前视图：全部视图的下一页仍查询所有来源；单源视图的下一页只请求该来源。分页使用 `searchProvider`，等待该页所有来源完成后合并。
+6. 分页跟随当前视图：全部视图的下一页仍查询所有来源；单源视图的下一页只请求该来源。分页在 `ResultsViewModel` 内经 `SearchRepository.search()` 完成，等待该页所有来源完成后合并。
 
 筛选能力矩阵：
 
@@ -220,7 +220,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 实现位置：AA `AnnasArchieve.searchBooks`（`lib/data/services/annas_archieve.dart`）；LibGen `LibgenProvider.search`；Z-Library `ZlibraryProvider.search`；WeLib `WelibProvider.search`（三者都在 `lib/data/services/search_manager.dart`）。
 
-每页搜索结果用 `SearchPageKey(query, page)` 作为 provider family key 缓存（`SearchPageKey` / `searchProvider`，`lib/state/state.dart`）；结果页滚动到距底部 200px 加载下一页（`lib/ui/features/results/views/results_page.dart:82-110`）。
+结果页由 `ResultsViewModel`（`lib/ui/features/results/view_models/results_view_model.dart`）持有 `ResultsPager`：首屏流式合并、来源切换、按视图分页；滚动到距底部 200px 加载下一页（`lib/ui/features/results/views/results_page.dart`）。
 
 ### 5.2 详情路由
 
@@ -231,7 +231,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 3. 路径以 `/book/` 开头 → Z-Library（URL 形状兜底）。
 4. 其余 → Anna's Archive（catch-all；WeLib 的 `/md5/` 在目录可用时会先被 host 命中 `welib`，只有冷目录/未知 host 才落到这里）。
 
-`bookInfoProvider` 根据路由调用对应服务（路由在 `_fetchBookInfo`，均属 `lib/state/state.dart`）。**不要新增硬编码 host 白名单**：镜像会变，目录是唯一事实来源。
+`BookInfoRepository` 根据路由调用对应服务（`lib/data/repositories/book_info_repository.dart`，含 `BookInfoCache`）。**不要新增硬编码 host 白名单**：镜像会变，目录是唯一事实来源。
 
 ### 5.3 下载
 
@@ -489,7 +489,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 | 文件/目录/同步 | `lib/data/services/files.dart` |
 | 详情页与下载按钮 | `lib/ui/features/book_detail/views/book_info_page.dart` |
 | 下载中心 | `lib/ui/features/library/views/download_center_page.dart`、`lib/data/services/download_manager.dart` |
-| 搜索结果与来源切换 | `lib/ui/features/results/views/results_page.dart`、`lib/ui/features/results/widgets/source_journey_card.dart`、`lib/state/state.dart`（`initialSearchProvider`） |
+| 搜索结果与来源切换 | `lib/ui/features/results/views/results_page.dart`、`lib/ui/features/results/widgets/source_journey_card.dart`、`lib/ui/features/results/view_models/results_view_model.dart` |
 | 外部阅读入口 | `lib/ui/core/components/file_buttons_widget.dart` |
 | 设置 | `lib/ui/features/settings/views/settings_page.dart` |
 | 更新 | `lib/data/services/update_checker.dart` |

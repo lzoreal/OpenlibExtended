@@ -6,17 +6,25 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/share_book.dart';
+import 'package:openlib/state/state.dart' show FileName;
 import 'package:openlib/ui/core/components/book_info_widget.dart';
-import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/core/components/error_widget.dart';
 import 'package:openlib/ui/core/components/file_buttons_widget.dart';
 import 'package:openlib/ui/core/components/share_icon.dart';
 import 'package:openlib/ui/core/components/snack_bar_widget.dart';
+import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 
 class BookPage extends StatelessWidget {
-  const BookPage({super.key, required this.id});
+  const BookPage({
+    super.key,
+    required this.id,
+    this.annaArchiveBaseUrl,
+    required this.onDeleteFile,
+  });
 
   final String id;
+  final String? annaArchiveBaseUrl;
+  final Future<void> Function(FileName) onDeleteFile;
 
   @override
   Widget build(BuildContext context) {
@@ -55,12 +63,14 @@ class BookPage extends StatelessWidget {
               child: BookInfoWidget(
                 data: book,
                 source: sourceLabelForUrl(book.link, l10n),
+                annaArchiveBaseUrl: annaArchiveBaseUrl,
               ),
             ),
             bottomNavigationBar: FileOpenAndDeleteButtons(
               id: book.id,
               format: book.format!,
               fileName: book.fileName,
+              onDeleteFile: onDeleteFile,
               onDelete: () => Navigator.of(context).pop(),
             ),
           );

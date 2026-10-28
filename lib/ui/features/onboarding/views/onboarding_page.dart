@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/app/di.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlib/main.dart' show MainScreen;
 import 'package:openlib/data/services/book_import.dart';
@@ -398,6 +400,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             ),
             onChanged: (value) {
               ref.read(donationKeyProvider.notifier).state = value;
+              getIt<AppSettings>().setDonationKey(value);
             },
           ),
         ],

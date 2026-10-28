@@ -14,17 +14,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // NOTE: These imports are crucial and must exist in your project structure.
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
-import 'package:openlib/data/models/book_data.dart';
-import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/models/trending_book_data.dart';
-import 'package:openlib/data/services/annas_archieve.dart';
-import 'package:openlib/data/services/book_detail_routing.dart';
-import 'package:openlib/data/services/book_info_cache.dart';
 import 'package:openlib/data/services/database.dart';
-import 'package:openlib/data/services/libgen_service.dart';
-import 'package:openlib/data/services/search_manager.dart';
-import 'package:openlib/data/services/files.dart';
 import 'package:openlib/data/services/goodreads.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency_controller.dart';
@@ -352,29 +344,6 @@ final annaArchiveBaseUrlProvider = FutureProvider<String?>((ref) async {
 // DERIVED (COMPUTED) STATE PROVIDERS
 // ====================================================================
 
-final getTypeValue = Provider.autoDispose<String>((ref) {
-  return typeValues[ref.watch(selectedTypeState)] ?? '';
-});
-
-final getSortValue = Provider.autoDispose<String>((ref) {
-  return sortValues[ref.watch(selectedSortState)] ?? '';
-});
-
-final getFileTypeValue = Provider.autoDispose<String>((ref) {
-  final selectedFile = ref.watch(selectedFileTypeState);
-  return selectedFile == "All" ? '' : selectedFile.toLowerCase();
-});
-
-final getLanguageValue = Provider.autoDispose<String>((ref) {
-  return languageValues[ref.watch(selectedLanguageState)] ?? '';
-});
-
-final getYearValue = Provider.autoDispose<String>((ref) {
-  return ref.watch(selectedYearState) == "All"
-      ? ''
-      : ref.watch(selectedYearState);
-});
-
 // ====================================================================
 // ASYNCHRONOUS DATA (FUTURE) PROVIDERS
 // ====================================================================
@@ -440,69 +409,6 @@ class SearchPageKey {
       Object.hash(query, page, source, forceLocalTimeouts);
 }
 
-// Provider for one page of search results across all enabled providers
-final searchProvider = FutureProvider.family
-    .autoDispose<SearchManagerResult, SearchPageKey>((ref, key) async {
-  if (key.query.isEmpty) {
-    return const SearchManagerResult(books: [], failedProviders: []);
-  }
-
-  // A provider failure must not swallow results from the others: the
-  // manager returns what it got and lists the stragglers by name.
-  final repository = ref.watch(searchRepositoryProvider);
-  final enabled = await repository.enabledProviders();
-  final source =
-      key.source != null && enabled.contains(key.source) ? key.source : null;
-  final result = await repository.search(SearchQuery(
-    text: key.query,
-    content: ref.watch(getTypeValue),
-    sort: ref.watch(getSortValue),
-    fileType: ref.watch(getFileTypeValue),
-    language: ref.watch(getLanguageValue),
-    year: ref.watch(getYearValue),
-    author: ref.watch(searchAuthorProvider),
-    publisher: ref.watch(searchPublisherProvider),
-    filtersEnabled: ref.watch(enableFiltersState),
-    page: key.page,
-    source: source,
-  ), forceLocalTimeouts: key.forceLocalTimeouts);
-  final expectedCount = source == null ? enabled.length : 1;
-  if (result.books.isEmpty &&
-      result.failedProviders.length == expectedCount &&
-      expectedCount > 0) {
-    // Every enabled provider failed: surface a real error. One failing
-    // provider with others merely finding nothing is NOT an error - an
-    // empty result from a working source is a valid "no matches".
-    throw Exception('All search sources are unreachable: '
-        '${result.failedProviders.join(', ')}');
-  }
-  return result;
-});
-
-/// First page of a results route, streamed per source. The page paints as
-/// soon as the first catalog answers; slower catalogs are filled in later.
-final initialSearchProvider = StreamProvider.family
-    .autoDispose<SearchManagerResult, SearchPageKey>((ref, key) {
-  if (key.query.isEmpty) {
-    return Stream.value(
-        const SearchManagerResult(books: [], failedProviders: []));
-  }
-  final enabledSource = key.source;
-  return ref.watch(searchRepositoryProvider).watch(SearchQuery(
-    text: key.query,
-    content: ref.watch(getTypeValue),
-    sort: ref.watch(getSortValue),
-    fileType: ref.watch(getFileTypeValue),
-    language: ref.watch(getLanguageValue),
-    year: ref.watch(getYearValue),
-    author: ref.watch(searchAuthorProvider),
-    publisher: ref.watch(searchPublisherProvider),
-    filtersEnabled: ref.watch(enableFiltersState),
-    page: key.page,
-    source: enabledSource,
-  ), forceLocalTimeouts: key.forceLocalTimeouts);
-});
-
 // Which sources the user turned on in settings.
 final searchProviderToggles = FutureProvider<Set<SearchProviderId>>(
     (ref) => ref.watch(searchRepositoryProvider).enabledProviders());
@@ -513,93 +419,7 @@ final searchProviderToggles = FutureProvider<Set<SearchProviderId>>(
 final searchSourceOrderProvider = FutureProvider<List<SearchProviderId>>(
     (ref) => ref.watch(searchRepositoryProvider).sourceOrder());
 
-// Provider for Book Info Details
-//
-// Routes by URL through routeBookDetail: libgen detail pages
-// (ads.php?md5=), Z-Library /book/ pages, WeLib /md5/ pages, everything
-// else to Anna's Archive. The route comes from the open-slum.org
-// catalogue (which mirror belongs to which service), so it keeps working
-// when SLUM lists a mirror this build never shipped - a hardcoded host
-// list made every Z-Library result on a new mirror fail. Routing also
-// matters because handing a provider's URL to Anna's used to swap its
-// host for an AA mirror that does not carry the book (404 city).
-final bookInfoProvider =
-    FutureProvider.family<BookInfoData, String>((ref, url) async {
-  final cached = await BookInfoCache.read(url);
-  if (cached != null) return cached;
-  final data = await _fetchBookInfo(ref, url);
-  await BookInfoCache.write(url, data);
-  return data;
-});
-
-Future<BookInfoData> _fetchBookInfo(Ref ref, String url) async {
-  final route = await routeBookDetail(url);
-  switch (route) {
-    case BookDetailRoute.libgen:
-      final data = await LibgenService().bookInfo(url);
-      if (data == null) {
-        throw Exception('Could not read this libgen book page');
-      }
-      return data;
-    case BookDetailRoute.zlibrary:
-      final data = await ZlibraryProvider().bookInfo(url);
-      if (data == null) {
-        throw Exception('Could not read this Z-Library book page');
-      }
-      return data;
-    case BookDetailRoute.welib:
-      final data = await WelibProvider().bookInfo(url);
-      if (data == null) {
-        throw Exception('Could not read this WeLib book page');
-      }
-      return data;
-    case BookDetailRoute.annasArchive:
-      final AnnasArchieve annasArchieve = AnnasArchieve();
-      final donationKey = ref.watch(donationKeyProvider);
-      return annasArchieve.bookInfo(url: url, donationKey: donationKey);
-  }
-}
-
 // Completed download records
 final myLibraryProvider = FutureProvider((ref) async {
   return ref.watch(libraryRepositoryProvider).allBooks();
-});
-
-/// Ids already in the library, resolved in one query so result cards can
-/// check membership in memory instead of running a database query per row.
-final downloadedBookIdsProvider = FutureProvider<Set<String>>((ref) async {
-  final books = await ref.watch(myLibraryProvider.future);
-  return books.map((book) => book.id).toSet();
-});
-
-final checkIdExists =
-    FutureProvider.family.autoDispose<bool, String>((ref, id) async {
-  return ref.watch(libraryRepositoryProvider).contains(id);
-});
-
-/// Lazily resolves a cover URL for a result that has none (LibGen
-/// search rows ship without covers). Keyed by the book page URL so the
-/// same book across pages shares one lookup; autoDispose keeps the
-/// cache tied to what is on screen.
-final resultCoverProvider =
-    FutureProvider.family.autoDispose<String?, String>((ref, url) async {
-  // Keep the resolved cover address briefly so scrolling a row away and
-  // back reuses it instead of hitting ads.php again. The image bytes stay
-  // in CachedNetworkImage's own cache.
-  final keepAlive = ref.keepAlive();
-  final timer = Timer(const Duration(minutes: 10), keepAlive.close);
-  ref.onDispose(timer.cancel);
-  if (!url.contains('ads.php?md5=')) return null;
-  return LibgenService().fetchCover(url);
-});
-
-final getBookByIdProvider =
-    FutureProvider.family.autoDispose<MyBook?, String>((ref, id) async {
-  return ref.watch(libraryRepositoryProvider).bookById(id);
-});
-
-final deleteFileFromMyLib =
-    FutureProvider.family<void, FileName>((ref, fileName) async {
-  return await deleteFileWithDbData(ref, fileName.md5, fileName.format,
-      fileName: fileName.fileName);
 });

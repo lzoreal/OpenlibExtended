@@ -263,7 +263,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   late final List<Widget> _pages = <Widget>[
     const HomePage(),
     SearchPage(onManageSources: () => _selectTab(3)),
-    const DownloadCenterPage(),
+    DownloadCenterPage(onBrowseSearch: () => _selectTab(1)),
     const SettingsPage(),
   ];
 

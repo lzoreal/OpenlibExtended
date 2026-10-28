@@ -7,13 +7,11 @@
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/book_detail_source.dart';
-import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/core/components/book_info_widget.dart';
 
 class _FakeBookData implements BookDetailSource {
@@ -43,19 +41,13 @@ void main() {
   testWidgets('book info text is selectable for copying', (tester) async {
     final data = _FakeBookData();
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        // The "open in site" button resolves its mirror through the
-        // catalogue provider; this test is about text selection, so the
-        // mirror is stubbed instead of letting build() start I/O.
-        annaArchiveBaseUrlProvider.overrideWith((ref) async => null),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: BookInfoWidget(data: data),
-        ),
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        // The "open in site" button resolves its mirror through the view
+        // model; this test is about text selection, so no mirror is set.
+        body: BookInfoWidget(data: data, annaArchiveBaseUrl: null),
       ),
     ));
 

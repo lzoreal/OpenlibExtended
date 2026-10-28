@@ -5,25 +5,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/book_data.dart' show BookData;
-import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/search_result.dart';
-import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
-import 'package:openlib/state/state.dart' as app_state;
-import 'package:openlib/state/results_pager.dart';
 import 'package:openlib/ui/features/book_detail/views/book_info_page.dart';
-import 'package:openlib/ui/core/components/book_card_widget.dart'
-    show getFileType, getLanguage;
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/core/components/error_widget.dart';
 import 'package:openlib/ui/core/components/inline_hint.dart';
 import 'package:openlib/ui/core/components/language_names.dart';
+import 'package:openlib/ui/features/results/view_models/results_view_model.dart';
 import 'package:openlib/ui/features/results/widgets/search_result_card.dart';
 import 'package:openlib/ui/core/components/search_source_meta.dart';
 import 'package:openlib/ui/features/results/widgets/source_journey_card.dart';
@@ -34,8 +26,13 @@ import 'package:openlib/ui/core/swiss_grid.dart';
 /// Page 1 queries every enabled source in parallel. The source card
 /// switches between the merged list and one catalog's list; deeper pages
 /// follow the currently selected view.
-class ResultPage extends ConsumerStatefulWidget {
-  const ResultPage({super.key, required this.searchQuery, this.source});
+class ResultPage extends StatefulWidget {
+  const ResultPage({
+    super.key,
+    required this.searchQuery,
+    this.source,
+    this.viewModel,
+  });
 
   final String searchQuery;
 
@@ -43,116 +40,50 @@ class ResultPage extends ConsumerStatefulWidget {
   /// null opens the merged list. The source card switches views in place.
   final SearchProviderId? source;
 
+  /// Injected by tests; the route builds its own view model otherwise.
+  final ResultsViewModel? viewModel;
+
   @override
-  ConsumerState<ResultPage> createState() => _ResultPageState();
+  State<ResultPage> createState() => _ResultPageState();
 }
 
-class _ResultPageState extends ConsumerState<ResultPage> {
+class _ResultPageState extends State<ResultPage> {
   final _scrollController = ScrollController();
-  late final ResultsPager _pager = ResultsPager(routeSource: widget.source);
-  bool _retrying = false;
-  bool _forceLocalTimeouts = false;
-  ProviderSubscription<AsyncValue<SearchManagerResult>>? _firstPageSubscription;
-  final Set<String> _formatFilters = {};
-  final Set<String> _languageFilters = {};
-
-  SearchManagerResult? get _firstResult => _pager.firstResult;
-  SearchProviderId? get _selectedSource => _pager.selectedSource;
-  bool get _fetchingNextPage => _pager.fetchingNextPage;
-
-  List<BookData> get _books => _pager.booksFor(_pager.selectedSource);
-
-  app_state.SearchPageKey get _firstPageKey => app_state.SearchPageKey(
-        widget.searchQuery,
-        1,
-        forceLocalTimeouts: _forceLocalTimeouts,
-      );
+  late final ResultsViewModel _viewModel;
+  late final bool _ownsViewModel;
 
   @override
   void initState() {
     super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ??
+        ResultsViewModel.fromDi(
+          query: widget.searchQuery,
+          source: widget.source,
+        );
     _scrollController.addListener(_onScroll);
-    _listenFirstPage();
-  }
-
-  void _listenFirstPage() {
-    _firstPageSubscription?.close();
-    _firstPageSubscription = ref.listenManual(
-      app_state.initialSearchProvider(_firstPageKey),
-      (previous, next) {
-        final result = next.valueOrNull;
-        if (result == null) return;
-        _applyFirstResult(result);
-      },
-      fireImmediately: true,
-    );
-  }
-
-  void _applyFirstResult(SearchManagerResult result) {
-    if (_firstResult != null) {
-      setState(() => _pager.merge(result));
-      return;
-    }
-    setState(() => _pager.applyInitial(result));
+    unawaited(_viewModel.start());
   }
 
   @override
   void dispose() {
-    _firstPageSubscription?.close();
     _scrollController.dispose();
+    if (_ownsViewModel) _viewModel.dispose();
     super.dispose();
   }
 
   void _onScroll() {
     if (_scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 240 &&
-        !_pager.fetchingNextPage &&
-        !_pager.currentViewEnded) {
-      _loadNextPage();
+        !_viewModel.fetchingNextPage &&
+        !_viewModel.currentViewEnded) {
+      unawaited(_viewModel.loadNextPage());
     }
-  }
-
-  Future<void> _loadNextPage() async {
-    if (!mounted || _pager.fetchingNextPage) return;
-    final view = _pager.selectedSource;
-    if (_pager.currentViewEnded) return;
-    final nextPage = _pager.pageOf(view) + 1;
-    setState(() => _pager.fetchingNextPage = true);
-    try {
-      final result = await ref.read(app_state
-          .searchProvider(app_state.SearchPageKey(
-            widget.searchQuery,
-            nextPage,
-            source: view,
-            forceLocalTimeouts: _forceLocalTimeouts,
-          ))
-          .future);
-      if (!mounted) return;
-      setState(() =>
-          _pager.appendPage(page: nextPage, view: view, result: result));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _pager.fetchingNextPage = false);
-    }
-  }
-
-  void _retryPageOne() {
-    setState(() => _forceLocalTimeouts = false);
-    _resetLocalPager();
-    ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
-    _listenFirstPage();
-  }
-
-  void _retryIgnoringLocalTimeouts() {
-    setState(() => _forceLocalTimeouts = true);
-    _resetLocalPager();
-    ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
-    _listenFirstPage();
   }
 
   Future<void> _pickSort() async {
     final l10n = AppLocalizations.of(context);
-    final current = ref.read(app_state.selectedSortState);
+    final current = _viewModel.sortValue;
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -162,26 +93,17 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       ),
     );
     if (selected == null || selected == current) return;
-    ref
-        .read(app_state.appSettingsProvider)
-        .setFilter(SearchFilterKind.sort, selected);
-    await PreferencesRepository()
-        .saveSearchFilter(SearchFilterKind.sort, selected);
-    _retryPageOne();
+    await _viewModel.setSort(selected);
   }
 
   Future<void> _pickFormats(List<String> options) async {
     final picked = await _pickMultiSelect(
       title: AppLocalizations.of(context).filterFileTypeLabel,
       options: options,
-      selected: _formatFilters,
+      selected: _viewModel.formatFilters,
     );
     if (picked == null || !mounted) return;
-    setState(() {
-      _formatFilters
-        ..clear()
-        ..addAll(picked);
-    });
+    _viewModel.setFormatFilters(picked);
   }
 
   Future<void> _pickLanguages(List<String> options) async {
@@ -192,14 +114,10 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       labels: {
         for (final code in options) code: localizedLanguageName(l10n, code),
       },
-      selected: _languageFilters,
+      selected: _viewModel.languageFilters,
     );
     if (picked == null || !mounted) return;
-    setState(() {
-      _languageFilters
-        ..clear()
-        ..addAll(picked);
-    });
+    _viewModel.setLanguageFilters(picked);
   }
 
   Future<Set<String>?> _pickMultiSelect({
@@ -221,38 +139,9 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     );
   }
 
-  void _resetLocalPager() {
-    setState(_pager.reset);
-  }
-
-  void _clearFiltersAndRetry() {
-    if (_retrying) return;
-    setState(() {
-      _retrying = true;
-      _forceLocalTimeouts = false;
-    });
-    _resetLocalPager();
-    ref.read(app_state.appSettingsProvider).resetSearchFilters();
-    ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
-    _listenFirstPage();
-    unawaited(_persistFilterDefaults());
-    if (mounted) setState(() => _retrying = false);
-  }
-
-  Future<void> _persistFilterDefaults() async {
-    try {
-      await PreferencesRepository().resetSearchFilters();
-    } catch (_) {
-      // In-memory filters already reset; persistence is a convenience.
-    }
-  }
-
-  Future<void> _openSourceSheet(SearchManagerResult? result) async {
-    final enabled = ref.read(app_state.searchProviderToggles).valueOrNull ??
-        fallbackSearchSourceOrder.toSet();
-    final order = ref.read(app_state.searchSourceOrderProvider).valueOrNull ??
-        fallbackSearchSourceOrder;
-    final available = order
+  Future<void> _openSourceSheet() async {
+    final enabled = _viewModel.enabledSources.toSet();
+    final available = _viewModel.sourceOrder
         .where((source) => enabled.contains(source))
         .toList(growable: false);
     final selection = await showModalBottomSheet<_SourceSelection>(
@@ -263,22 +152,17 @@ class _ResultPageState extends ConsumerState<ResultPage> {
         return _SourcePickerSheet(
           query: widget.searchQuery,
           sources: available,
-          runs: result?.sources ?? const [],
-          currentSource: _selectedSource,
+          runs: _viewModel.sources,
+          currentSource: _viewModel.selectedSource,
         );
       },
     );
     if (!mounted || selection == null) return;
-    _selectSource(selection.auto ? null : selection.source);
+    _viewModel.selectSource(selection.auto ? null : selection.source);
   }
 
-  void _selectSource(SearchProviderId? source) {
-    if (_selectedSource == source) return;
-    setState(() => _pager.selectSource(source));
-  }
-
-  void _openBook(BookData book) {
-    Navigator.of(context).push(
+  Future<void> _openBook(BookData book) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BookInfoPage(
           url: book.link,
@@ -287,13 +171,12 @@ class _ResultPageState extends ConsumerState<ResultPage> {
         ),
       ),
     );
+    if (mounted) unawaited(_viewModel.refreshDownloadedIds());
   }
 
   @override
   Widget build(BuildContext context) {
-    final firstPage = ref.watch(app_state.initialSearchProvider(_firstPageKey));
     final l10n = AppLocalizations.of(context);
-    final sortLabel = _sortLabel(l10n, ref.watch(app_state.selectedSortState));
 
     return Scaffold(
       appBar: AppBar(
@@ -328,60 +211,63 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       ),
       body: ContentWidth(
         maxWidth: 840,
-        child: firstPage.when(
-          data: (pageOne) {
-            final result = _firstResult ?? pageOne;
-            final fallbackBooks = _selectedSource == null
-                ? pageOne.books
-                : (pageOne.booksBySource[_selectedSource] ??
-                    const <BookData>[]);
-            final books = _books.isNotEmpty ? _books : fallbackBooks;
-            if (books.isEmpty) {
-              return _EmptyResults(
-                query: widget.searchQuery,
-                result: result,
-                selectedSource: _selectedSource,
-                onSelectSource: _selectSource,
-                onModify: () => Navigator.of(context).maybePop(),
-                onClearFilters: _clearFiltersAndRetry,
-                onRetrySkipped: _retryIgnoringLocalTimeouts,
-                retrying: _retrying,
-              );
-            }
-            return _successView(
-              result: result,
-              books: books,
-              sortLabel: sortLabel,
-            );
-          },
-          error: (error, stackTrace) {
-            final source = _selectedSource;
-            return CustomErrorWidget(
-              error: error,
-              stackTrace: stackTrace,
-              onRefresh: _retryPageOne,
-              contextLabel: l10n.results,
-              contextDetails: 'query=${widget.searchQuery}'
-                  '${source == null ? '' : ' · source=${source.name}'}',
-            );
-          },
-          loading: () => _LoadingResults(source: widget.source),
+        child: ListenableBuilder(
+          listenable: _viewModel,
+          builder: (context, _) => _body(l10n),
         ),
       ),
     );
   }
 
-  Widget _successView({
-    required SearchManagerResult result,
-    required List<BookData> books,
-    required String sortLabel,
-  }) {
+  Widget _body(AppLocalizations l10n) {
+    final vm = _viewModel;
+
+    if (vm.error != null) {
+      final source = vm.selectedSource;
+      return CustomErrorWidget(
+        error: vm.error!,
+        stackTrace: vm.errorStackTrace ?? StackTrace.empty,
+        onRefresh: vm.retryPageOne,
+        contextLabel: l10n.results,
+        contextDetails: 'query=${widget.searchQuery}'
+            '${source == null ? '' : ' · source=${source.name}'}',
+      );
+    }
+
+    final result = vm.firstResult;
+    if (result == null) {
+      return _LoadingResults(
+        source: widget.source,
+        enabledSources: vm.enabledSources,
+        sourceOrder: vm.sourceOrder,
+      );
+    }
+
+    if (vm.books.isEmpty) {
+      return _EmptyResults(
+        query: widget.searchQuery,
+        result: result,
+        selectedSource: vm.selectedSource,
+        onSelectSource: vm.selectSource,
+        onModify: () => Navigator.of(context).maybePop(),
+        onClearFilters: vm.clearFiltersAndRetry,
+        onRetrySkipped: vm.retryIgnoringLocalTimeouts,
+        retrying: vm.retrying,
+      );
+    }
+
+    return _successView(result: result);
+  }
+
+  Widget _successView({required SearchManagerResult result}) {
     final l10n = AppLocalizations.of(context);
-    final allCount = _pager.booksFor(null).length;
+    final vm = _viewModel;
+    final selectedSource = vm.selectedSource;
+    final allCount = vm.allBooks.length;
 
     SearchSourceRun? selectedRun;
     for (final run in result.sources) {
-      if (run.id == _selectedSource) {
+      if (run.id == selectedSource) {
         selectedRun = run;
         break;
       }
@@ -396,10 +282,10 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     ];
 
     String? otherSources;
-    if (_selectedSource != null) {
+    if (selectedSource != null) {
       final parts = <String>[];
       for (final run in result.sources) {
-        if (run.id == _selectedSource) continue;
+        if (run.id == selectedSource) continue;
         final status = switch (run.status) {
           SearchSourceStatus.pending => '…',
           SearchSourceStatus.failed => l10n.sourceStatusFailed,
@@ -412,77 +298,37 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       }
     }
 
-    final sortValue = ref.watch(app_state.selectedSortState);
+    final sortValue = vm.sortValue;
 
     return _ResultsView(
       result: result,
-      visibleBooks: _visibleBooks(books),
-      sortChipLabel:
-          sortValue == 'Most Relevant' ? l10n.filterRelevance : sortLabel,
+      visibleBooks: vm.visibleBooks,
+      sortChipLabel: sortValue == 'Most Relevant'
+          ? l10n.filterRelevance
+          : _sortLabel(l10n, sortValue),
       allCount: allCount,
       rightLabel: rightLabel,
       pendingLabels: pending,
-      formats: _availableFormats(books),
-      languages: _availableLanguages(books),
+      formats: vm.availableFormats,
+      languages: vm.availableLanguages,
       otherSources: otherSources,
-      selectedSource: _selectedSource,
-      formatFilters: _formatFilters,
-      languageFilters: _languageFilters,
-      fetchingNextPage: _fetchingNextPage,
-      reachedEnd: _pager.currentViewEnded,
+      selectedSource: selectedSource,
+      formatFilters: vm.formatFilters,
+      languageFilters: vm.languageFilters,
+      fetchingNextPage: vm.fetchingNextPage,
+      reachedEnd: vm.currentViewEnded,
       scrollController: _scrollController,
-      onSelectSource: _selectSource,
-      onOpenSourceSheet: () => _openSourceSheet(result),
+      isDownloaded: vm.isDownloaded,
+      resolveCover: vm.coverFor,
+      onSelectSource: vm.selectSource,
+      onOpenSourceSheet: _openSourceSheet,
       onPickSort: _pickSort,
       onPickFormats: _pickFormats,
       onPickLanguages: _pickLanguages,
-      onClearFilters: _clearFilters,
-      onRetrySkipped: _retryIgnoringLocalTimeouts,
+      onClearFilters: vm.clearLocalFilters,
+      onRetrySkipped: vm.retryIgnoringLocalTimeouts,
       onOpenBook: _openBook,
     );
-  }
-
-  void _clearFilters() {
-    setState(() {
-      _formatFilters.clear();
-      _languageFilters.clear();
-    });
-  }
-
-  List<String> _availableFormats(List<BookData> books) {
-    return <String>{
-      for (final book in books)
-        if (getFileType(book.info) != null)
-          getFileType(book.info)!.toUpperCase(),
-    }.toList()
-      ..sort((a, b) {
-        const order = ['EPUB', 'PDF'];
-        final aIndex = order.indexOf(a);
-        final bIndex = order.indexOf(b);
-        if (aIndex == -1 && bIndex == -1) return a.compareTo(b);
-        if (aIndex == -1) return 1;
-        if (bIndex == -1) return -1;
-        return aIndex.compareTo(bIndex);
-      });
-  }
-
-  List<String> _availableLanguages(List<BookData> books) {
-    return <String>{
-      for (final book in books)
-        if (getLanguage(book.info) != null) getLanguage(book.info)!,
-    }.toList()
-      ..sort();
-  }
-
-  List<BookData> _visibleBooks(List<BookData> books) {
-    return <BookData>[
-      for (final book in books)
-        if (_formatFilters.isEmpty ||
-            _formatFilters.contains(getFileType(book.info)?.toUpperCase()))
-          if (_languageFilters.isEmpty ||
-              _languageFilters.contains(getLanguage(book.info)))
-            book,
-    ];
   }
 
   String _sortLabel(AppLocalizations l10n, String value) {
@@ -514,7 +360,7 @@ SearchProviderId? _sourceIdForBook(
 }
 
 /// The scrollable results surface: header, filter capsules, the list and
-/// the pagination footer. State ownership stays on [ResultPage] so filters
+/// the pagination footer. Filters live in [ResultsViewModel] so they
 /// survive a retry's loading flash; this widget only renders and forwards
 /// intents.
 class _ResultsView extends StatelessWidget {
@@ -534,6 +380,8 @@ class _ResultsView extends StatelessWidget {
     required this.fetchingNextPage,
     required this.reachedEnd,
     required this.scrollController,
+    required this.isDownloaded,
+    required this.resolveCover,
     required this.onSelectSource,
     required this.onOpenSourceSheet,
     required this.onPickSort,
@@ -559,6 +407,8 @@ class _ResultsView extends StatelessWidget {
   final bool fetchingNextPage;
   final bool reachedEnd;
   final ScrollController scrollController;
+  final bool Function(String? md5) isDownloaded;
+  final Future<String?> Function(String link) resolveCover;
   final ValueChanged<SearchProviderId?> onSelectSource;
   final VoidCallback onOpenSourceSheet;
   final VoidCallback onPickSort;
@@ -684,6 +534,8 @@ class _ResultsView extends StatelessWidget {
                           book,
                           selectedSource,
                         ),
+                        downloaded: isDownloaded(book.md5),
+                        resolveCover: resolveCover,
                         onTap: () => onOpenBook(book),
                       ),
                       if (index < visibleBooks.length - 1)
@@ -843,11 +695,15 @@ class _ResultRow extends StatelessWidget {
   const _ResultRow({
     required this.book,
     required this.sourceId,
+    required this.downloaded,
+    required this.resolveCover,
     required this.onTap,
   });
 
   final BookData book;
   final SearchProviderId? sourceId;
+  final bool downloaded;
+  final Future<String?> Function(String link) resolveCover;
   final VoidCallback onTap;
 
   @override
@@ -862,6 +718,8 @@ class _ResultRow extends StatelessWidget {
       link: book.link,
       md5: book.md5,
       sourceLabel: id == null ? book.source : sourceShortLabel(l10n, id),
+      downloaded: downloaded,
+      resolveCover: resolveCover,
       onClick: onTap,
     );
   }
@@ -915,7 +773,7 @@ class _SortSheet extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
           ),
-          for (final value in app_state.sortValues.keys)
+          for (final value in resultSortValues)
             ListTile(
               title: Text(labelFor(value)),
               trailing: value == current
@@ -1067,22 +925,26 @@ class _PaginationFooter extends StatelessWidget {
   }
 }
 
-class _LoadingResults extends ConsumerWidget {
-  const _LoadingResults({required this.source});
+class _LoadingResults extends StatelessWidget {
+  const _LoadingResults({
+    required this.source,
+    required this.enabledSources,
+    required this.sourceOrder,
+  });
 
   final SearchProviderId? source;
+  final List<SearchProviderId> enabledSources;
+  final List<SearchProviderId> sourceOrder;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final enabled = ref.watch(app_state.searchProviderToggles).valueOrNull ??
-        fallbackSearchSourceOrder.toSet();
-    final order = ref.watch(app_state.searchSourceOrderProvider).valueOrNull ??
-        fallbackSearchSourceOrder;
-    final chain =
-        source != null ? [source!] : order.where(enabled.contains).toList();
+    final enabled = enabledSources.toSet();
+    final chain = source != null
+        ? [source!]
+        : sourceOrder.where(enabled.contains).toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),

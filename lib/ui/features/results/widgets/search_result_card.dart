@@ -3,12 +3,9 @@ import 'package:flutter/material.dart';
 
 // Package imports:
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/state/state.dart'
-    show downloadedBookIdsProvider, resultCoverProvider;
 import 'package:openlib/ui/core/components/book_card_widget.dart'
     show getFileType, getLanguage;
 import 'package:openlib/ui/core/components/language_names.dart';
@@ -32,7 +29,7 @@ Map<String, String>? _coverHeaders(String? coverUrl) {
 }
 
 /// Compact search result row used inside the results surface card.
-class SearchResultCard extends ConsumerWidget {
+class SearchResultCard extends StatelessWidget {
   const SearchResultCard({
     super.key,
     required this.title,
@@ -43,6 +40,8 @@ class SearchResultCard extends ConsumerWidget {
     required this.onClick,
     this.md5,
     this.sourceLabel,
+    this.downloaded = false,
+    this.resolveCover,
   });
 
   final String title;
@@ -54,18 +53,22 @@ class SearchResultCard extends ConsumerWidget {
   final String? md5;
   final String? sourceLabel;
 
+  /// The book is already in the library.
+  final bool downloaded;
+
+  /// Lazily returns a cover address for rows without a thumbnail; null
+  /// keeps the placeholder.
+  final Future<String?> Function(String link)? resolveCover;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     final fileType = getFileType(info);
     final language = getLanguage(info);
     final fileSize = getFileSize(info);
-    final downloadedIds = md5 == null
-        ? const <String>{}
-        : ref.watch(downloadedBookIdsProvider).valueOrNull ?? const <String>{};
-    final isDownloaded = md5 != null && downloadedIds.contains(md5);
+    final isDownloaded = downloaded && md5 != null;
 
     final hasThumbnail = thumbnail != null && thumbnail!.isNotEmpty;
 
@@ -87,6 +90,7 @@ class SearchResultCard extends ConsumerWidget {
                     if (!visible) {
                       return _CoverFallback(scheme: scheme, title: title);
                     }
+                    final resolver = resolveCover;
                     return Stack(
                       fit: StackFit.expand,
                       children: [
@@ -96,12 +100,15 @@ class SearchResultCard extends ConsumerWidget {
                             title: title,
                             scheme: scheme,
                           )
-                        else
+                        else if (resolver != null)
                           _LazyResultCover(
                             link: link,
                             title: title,
                             scheme: scheme,
-                          ),
+                            resolveCover: resolver,
+                          )
+                        else
+                          _CoverFallback(scheme: scheme, title: title),
                         if (isDownloaded)
                           Positioned(
                             top: 4,
@@ -280,24 +287,59 @@ class _CoverImage extends StatelessWidget {
   }
 }
 
-class _LazyResultCover extends ConsumerWidget {
+class _LazyResultCover extends StatefulWidget {
   const _LazyResultCover({
     required this.link,
     required this.title,
     required this.scheme,
+    required this.resolveCover,
   });
 
   final String link;
   final String title;
   final ColorScheme scheme;
+  final Future<String?> Function(String link) resolveCover;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final url = ref.watch(resultCoverProvider(link)).valueOrNull;
-    if (url == null || url.isEmpty) {
-      return _CoverFallback(scheme: scheme, title: title);
+  State<_LazyResultCover> createState() => _LazyResultCoverState();
+}
+
+class _LazyResultCoverState extends State<_LazyResultCover> {
+  String? _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LazyResultCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.link != widget.link) {
+      _url = null;
+      _resolve();
     }
-    return _CoverImage(url: url, title: title, scheme: scheme);
+  }
+
+  Future<void> _resolve() async {
+    String? url;
+    try {
+      url = await widget.resolveCover(widget.link);
+    } catch (_) {
+      url = null;
+    }
+    if (!mounted || url == _url) return;
+    setState(() => _url = url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = _url;
+    if (url == null || url.isEmpty) {
+      return _CoverFallback(scheme: widget.scheme, title: widget.title);
+    }
+    return _CoverImage(url: url, title: widget.title, scheme: widget.scheme);
   }
 }
 

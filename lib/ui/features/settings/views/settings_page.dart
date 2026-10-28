@@ -15,6 +15,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/app/di.dart';
 import 'package:openlib/data/services/files.dart';
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/update_checker.dart';
@@ -365,6 +367,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               value: showManualDownload,
               onChanged: (val) {
                 ref.read(showManualDownloadButtonProvider.notifier).state = val;
+                getIt<AppSettings>().setShowManualDownloadButton(val);
                 dataBase.savePreference('showManualDownloadButton', val);
               },
             ),
@@ -624,6 +627,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
             onPressed: () {
               final newKey = controller.text.trim();
               ref.read(donationKeyProvider.notifier).state = newKey;
+              getIt<AppSettings>().setDonationKey(newKey);
               dataBase.savePreference('donationKey', newKey);
               Navigator.pop(dialogContext);
             },

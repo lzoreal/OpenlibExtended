@@ -6,23 +6,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
+import 'package:openlib/app/di.dart' show resetDi;
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/download_manager.dart' show DownloadTask;
-import 'package:openlib/state/state.dart'
-    show activeDownloadsProvider, searchProvider;
+import 'package:openlib/state/state.dart' show activeDownloadsProvider;
 import 'package:openlib/ui/features/results/views/results_page.dart';
 import 'package:openlib/ui/features/search/view_models/search_view_model.dart';
 import 'package:openlib/ui/features/search/views/search_page.dart';
 
 import 'helpers/search_test_support.dart';
+import 'helpers/test_di.dart';
 
 void main() {
   late TestRecentStore recentStore;
   late SearchViewModel viewModel;
 
-  setUp(() {
+  setUp(() async {
     recentStore = TestRecentStore(['Dune', 'Emma']);
+    await setupTestDi();
+  });
+
+  tearDown(() async {
+    await resetDi();
   });
 
   Future<void> pumpSearch(WidgetTester tester) async {
@@ -43,12 +48,6 @@ void main() {
           ...testSearchOverrides(viewModel: viewModel),
           activeDownloadsProvider.overrideWith(
             (ref) => Stream.value(const <String, DownloadTask>{}),
-          ),
-          searchProvider.overrideWith(
-            (ref, key) async => const SearchManagerResult(
-              books: [],
-              failedProviders: [],
-            ),
           ),
         ],
         child: MaterialApp(

@@ -4,12 +4,10 @@ import 'package:openlib/l10n/app_localizations.dart';
 
 // Package imports:
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Project imports:
 import 'package:openlib/data/models/book_detail_source.dart';
-import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 import 'package:openlib/ui/core/components/book_card_widget.dart'
     show getFileType, getLanguage;
 import 'package:openlib/ui/core/components/language_names.dart';
@@ -76,7 +74,7 @@ String? sourceLabelForUrl(String? url, AppLocalizations l10n) {
   return host.isEmpty ? null : host;
 }
 
-class BookInfoWidget extends ConsumerWidget {
+class BookInfoWidget extends StatelessWidget {
   final BookDetailSource data;
   final String? source;
 
@@ -84,20 +82,25 @@ class BookInfoWidget extends ConsumerWidget {
   /// search result already knew are shown, the rest waits as skeletons.
   final bool loading;
 
+  /// The Anna's Archive mirror the "open in site" button uses, or null
+  /// when no attemptable mirror is known.
+  final String? annaArchiveBaseUrl;
+
   const BookInfoWidget({
     super.key,
     required this.data,
     this.source,
     this.loading = false,
+    this.annaArchiveBaseUrl,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final l10n = AppLocalizations.of(context);
-    final aaBaseUrl = ref.watch(annaArchiveBaseUrlProvider).valueOrNull;
+    final aaBaseUrl = annaArchiveBaseUrl;
     final link = data.link;
     final sourceName = (source?.trim().isNotEmpty ?? false)
         ? source!

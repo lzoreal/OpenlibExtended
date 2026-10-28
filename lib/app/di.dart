@@ -3,6 +3,8 @@ import 'package:get_it/get_it.dart';
 
 // Project imports:
 import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/data/repositories/book_info_repository.dart';
+import 'package:openlib/data/repositories/cover_repository.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/mirror_repository.dart';
@@ -29,14 +31,18 @@ Future<void> initDi({
   getIt.registerSingleton<MyLibraryDb>(database);
   getIt.registerSingleton<AppSettings>(settings);
   getIt.registerLazySingleton<PreferencesRepository>(() => preferences);
-  getIt.registerLazySingleton<LibraryRepository>(
-      () => LibraryRepository(database: getIt<MyLibraryDb>()));
+  getIt.registerLazySingleton<LibraryRepository>(() => LibraryRepository(
+        database: getIt<MyLibraryDb>(),
+        preferences: getIt<PreferencesRepository>(),
+      ));
   getIt.registerLazySingleton<SearchRepository>(() => SearchRepository());
   getIt.registerLazySingleton<DownloadManager>(() => DownloadManager());
   getIt.registerLazySingleton<DownloadRepository>(
       () => DownloadRepository(manager: getIt<DownloadManager>()));
   getIt.registerLazySingleton<MirrorRepository>(() => MirrorRepository());
   getIt.registerLazySingleton<TrendingRepository>(() => TrendingRepository());
+  getIt.registerLazySingleton<CoverRepository>(() => CoverRepository());
+  getIt.registerLazySingleton<BookInfoRepository>(() => BookInfoRepository());
   getIt.registerLazySingleton<MirrorLatencyNotifier>(
       () => MirrorLatencyNotifier(getIt<MirrorRepository>()));
   getIt.registerFactory<SearchViewModel>(() => SearchViewModel(

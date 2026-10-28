@@ -5,32 +5,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/my_book.dart';
-import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/state/state.dart'
-    show activeDownloadsProvider, downloadManagerProvider;
+import 'package:openlib/ui/features/library/view_models/library_view_model.dart';
 import 'package:openlib/ui/features/library/views/download_center_page.dart';
 
+import 'helpers/library_test_support.dart';
+
 void main() {
-  Widget app({
+  Future<LibraryViewModel> pumpCenter(
+    WidgetTester tester, {
     Map<String, DownloadTask> downloads = const {},
     List<CompletedDownload> completed = const [],
     TextScaler textScaler = TextScaler.noScaling,
-  }) {
-    return ProviderScope(
-      overrides: [
-        activeDownloadsProvider.overrideWith((ref) => Stream.value(downloads)),
-        // The page resolves the queue through DI; tests do not run initDi.
-        downloadManagerProvider.overrideWithValue(DownloadRepository()),
-        completedDownloadsProvider.overrideWith((ref) async => completed),
-      ],
-      child: MaterialApp(
+    VoidCallback? onBrowseSearch,
+  }) async {
+    final viewModel = testLibraryViewModel(
+      library: TestLibraryRepository(
+        books: [for (final item in completed) item.book],
+      ),
+      downloads: TestDownloadRepository(initial: downloads),
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.load();
+    await tester.pumpWidget(
+      MaterialApp(
         locale: const Locale('zh'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -38,9 +39,16 @@ void main() {
           data: MediaQuery.of(context).copyWith(textScaler: textScaler),
           child: child!,
         ),
-        home: const Scaffold(body: DownloadCenterPage()),
+        home: Scaffold(
+          body: DownloadCenterPage(
+            viewModel: viewModel,
+            onBrowseSearch: onBrowseSearch,
+          ),
+        ),
       ),
     );
+    await tester.pump();
+    return viewModel;
   }
 
   Future<void> disposePage(WidgetTester tester) async {
@@ -49,8 +57,7 @@ void main() {
   }
 
   testWidgets('shows the empty state with a search action', (tester) async {
-    await tester.pumpWidget(app());
-    await tester.pump();
+    await pumpCenter(tester);
 
     expect(find.text('下载中心'), findsOneWidget);
     expect(find.text('还没有下载任务'), findsOneWidget);
@@ -65,7 +72,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(app(downloads: {
+    await pumpCenter(tester, downloads: {
       'task-1': DownloadTask(
         id: 'task-1',
         md5: 'md5',
@@ -79,8 +86,7 @@ void main() {
         downloadedBytes: 50,
         totalBytes: 100,
       ),
-    }));
-    await tester.pump();
+    });
 
     expect(find.text('测试书'), findsWidgets);
     expect(find.text('50%'), findsWidgets);
@@ -106,7 +112,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(app(
+    await pumpCenter(
+      tester,
       downloads: {
         'task-1': DownloadTask(
           id: 'task-1',
@@ -140,8 +147,7 @@ void main() {
           modifiedAt: DateTime.now(),
         ),
       ],
-    ));
-    await tester.pump();
+    );
 
     await tester.fling(
       find.byType(TabBarView),
@@ -170,7 +176,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(app(
+    await pumpCenter(
+      tester,
       textScaler: const TextScaler.linear(2),
       downloads: {
         'task-1': DownloadTask(
@@ -187,8 +194,7 @@ void main() {
           totalBytes: 100,
         ),
       },
-    ));
-    await tester.pump();
+    );
 
     expect(find.text('50%'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -202,7 +208,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(app(completed: [
+    await pumpCenter(tester, completed: [
       CompletedDownload(
         book: MyBook(
           id: 'book-1',
@@ -219,8 +225,7 @@ void main() {
         sizeBytes: 2 * 1024 * 1024,
         modifiedAt: DateTime.now(),
       ),
-    ]));
-    await tester.pump();
+    ]);
 
     expect(find.text('已完成的书'), findsOneWidget);
     expect(find.text('打开'), findsOneWidget);
@@ -228,8 +233,8 @@ void main() {
 
     // The status chip and the open button read as one control group:
     // same height, not one tall pill next to a shorter button.
-    final status = tester
-        .getSize(find.byKey(const ValueKey('completed-status-pill')));
+    final status =
+        tester.getSize(find.byKey(const ValueKey('completed-status-pill')));
     final open =
         tester.getSize(find.byKey(const ValueKey('completed-open-button')));
     expect(status.height, 36);
@@ -240,7 +245,7 @@ void main() {
 
   testWidgets('remove-record dialog offers deleting the local file',
       (tester) async {
-    await tester.pumpWidget(app(completed: [
+    await pumpCenter(tester, completed: [
       CompletedDownload(
         book: MyBook(
           id: 'book-1',
@@ -257,8 +262,7 @@ void main() {
         sizeBytes: 2 * 1024 * 1024,
         modifiedAt: DateTime.now(),
       ),
-    ]));
-    await tester.pump();
+    ]);
 
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
@@ -283,7 +287,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(app(completed: [
+    await pumpCenter(tester, completed: [
       CompletedDownload(
         book: MyBook(
           id: 'book-1',
@@ -300,8 +304,7 @@ void main() {
         sizeBytes: 2 * 1024 * 1024,
         modifiedAt: DateTime.now(),
       ),
-    ]));
-    await tester.pump();
+    ]);
 
     // The 0 / 1 / 0 counters and the "tap a title" hint are both gone.
     expect(find.text('0'), findsNothing);

@@ -1,19 +1,17 @@
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
 
 // Package imports:
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/book_format.dart';
 import 'package:openlib/state/state.dart'
-    show
-        checkIdExists,
-        languageCodeToDisplay,
-        languageValues,
-        resultCoverProvider;
+    show languageCodeToDisplay, languageValues;
 import 'package:openlib/ui/core/components/language_names.dart';
 
 /// Badge label for the format embedded in a result's info string.
@@ -65,7 +63,7 @@ Map<String, String>? _coverHeaders(String? coverUrl) {
   return {'Referer': '$origin/ads.php?md5=cover-lookup'};
 }
 
-class BookInfoCard extends ConsumerWidget {
+class BookInfoCard extends StatefulWidget {
   const BookInfoCard({
     super.key,
     required this.title,
@@ -78,6 +76,8 @@ class BookInfoCard extends ConsumerWidget {
     this.onLongPress,
     this.md5,
     this.source,
+    this.downloaded = false,
+    this.resolveCover,
   });
 
   final String title;
@@ -93,33 +93,76 @@ class BookInfoCard extends ConsumerWidget {
   /// Catalog name this result came from; shown as a small chip.
   final String? source;
 
+  /// The book is already in the library.
+  final bool downloaded;
+
+  /// Lazily returns a cover address for rows without a thumbnail; null
+  /// keeps the placeholder.
+  final Future<String?> Function(String link)? resolveCover;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<BookInfoCard> createState() => _BookInfoCardState();
+}
+
+class _BookInfoCardState extends State<BookInfoCard> {
+  String? _lazyCover;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_resolveLazyCover());
+  }
+
+  @override
+  void didUpdateWidget(covariant BookInfoCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.link != widget.link ||
+        oldWidget.thumbnail != widget.thumbnail ||
+        oldWidget.resolveCover != widget.resolveCover) {
+      _lazyCover = null;
+      unawaited(_resolveLazyCover());
+    }
+  }
+
+  Future<void> _resolveLazyCover() async {
+    // LibGen search rows ship without covers; resolve one lazily from
+    // the book's ads.php page (it carries the cover URL).
+    final hasThumbnail =
+        widget.thumbnail != null && widget.thumbnail!.isNotEmpty;
+    final resolver = widget.resolveCover;
+    if (hasThumbnail || resolver == null) return;
+    String? url;
+    try {
+      url = await resolver(widget.link);
+    } catch (_) {
+      url = null;
+    }
+    if (!mounted || url == null || url.isEmpty) return;
+    setState(() => _lazyCover = url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final l10n = AppLocalizations.of(context);
-    final fileType = getFileType(info);
-    final language = getLanguage(info);
+    final fileType = getFileType(widget.info);
+    final language = getLanguage(widget.info);
 
     // Check if book is downloaded (only if md5 is provided)
-    final isDownloaded = md5 != null
-        ? ref.watch(checkIdExists(md5!))
-        : const AsyncValue<bool>.data(false);
+    final isDownloaded = widget.downloaded && widget.md5 != null;
 
-    // LibGen search rows ship without covers; resolve one lazily from
-    // the book's ads.php page (it carries the cover URL).
-    final hasThumbnail = thumbnail != null && thumbnail!.isNotEmpty;
-    final lazyCover =
-        hasThumbnail ? null : ref.watch(resultCoverProvider(link)).valueOrNull;
-    final coverUrl = hasThumbnail ? thumbnail : lazyCover;
+    final hasThumbnail =
+        widget.thumbnail != null && widget.thumbnail!.isNotEmpty;
+    final coverUrl = hasThumbnail ? widget.thumbnail : _lazyCover;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onClick,
-        onLongPress: onLongPress,
+        onTap: widget.onClick,
+        onLongPress: widget.onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -158,7 +201,7 @@ class BookInfoCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  if (isDownloaded.valueOrNull == true)
+                  if (isDownloaded)
                     Positioned(
                       top: -4,
                       right: -4,
@@ -187,15 +230,15 @@ class BookInfoCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      widget.title,
                       style: theme.textTheme.titleMedium,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (publisher.trim().isNotEmpty) ...[
+                    if (widget.publisher.trim().isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        publisher,
+                        widget.publisher,
                         style: theme.textTheme.bodySmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -207,9 +250,9 @@ class BookInfoCard extends ConsumerWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (source != null && source!.isNotEmpty)
+                        if (widget.source != null && widget.source!.isNotEmpty)
                           _MetaBadge(
-                            label: source!,
+                            label: widget.source!,
                             background: scheme.primaryContainer,
                             foreground: scheme.onPrimaryContainer,
                           ),
@@ -226,7 +269,7 @@ class BookInfoCard extends ConsumerWidget {
                             foreground: scheme.onTertiaryContainer,
                           ),
                         Text(
-                          author,
+                          widget.author,
                           style: theme.textTheme.labelMedium,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

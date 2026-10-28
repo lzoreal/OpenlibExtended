@@ -2,32 +2,38 @@
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
+import 'package:openlib/state/state.dart' show FileName;
 import 'package:openlib/ui/core/components/detail_bottom_bar.dart';
 import 'package:openlib/ui/core/components/delete_dialog_widget.dart';
 import 'package:openlib/ui/core/open_book.dart';
 
-class FileOpenAndDeleteButtons extends ConsumerWidget {
+class FileOpenAndDeleteButtons extends StatelessWidget {
   final String id;
   final String format;
   final String? fileName;
-  final Function onDelete;
+
+  /// Removes the record and its file; the dialog reports success itself,
+  /// so the callback only has to refresh whatever list is on screen.
+  final Future<void> Function(FileName) onDeleteFile;
+
+  /// Runs after the delete was handed off - a library route pops itself,
+  /// while the detail page stays and re-renders.
+  final VoidCallback? onDelete;
 
   const FileOpenAndDeleteButtons(
       {super.key,
       required this.id,
       required this.format,
       this.fileName,
-      required this.onDelete});
+      required this.onDeleteFile,
+      this.onDelete});
 
   // Get actual filename - uses fileName if provided, otherwise falls back to id.format
   String get actualFileName => fileName ?? "$id.$format";
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
     return DetailBottomBar(
@@ -55,6 +61,7 @@ class FileOpenAndDeleteButtons extends ConsumerWidget {
                     id: id,
                     format: format,
                     fileName: fileName,
+                    onDeleteFile: onDeleteFile,
                     onDelete: onDelete,
                   );
                 });

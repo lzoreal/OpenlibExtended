@@ -2,28 +2,31 @@
 import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
-// Package imports:
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 // Project imports:
-import 'package:openlib/state/state.dart' show FileName, deleteFileFromMyLib;
+import 'package:openlib/state/state.dart' show FileName;
 import 'package:openlib/ui/core/components/snack_bar_widget.dart';
 
-class ShowDeleteDialog extends ConsumerWidget {
+/// Confirms deletion, then hands the file identity to the caller: the page
+/// owns the record/file removal so this dialog needs no state layer.
+class ShowDeleteDialog extends StatelessWidget {
   final String id;
   final String format;
   final String? fileName;
-  final Function onDelete;
+  final Future<void> Function(FileName) onDeleteFile;
+
+  /// Runs after the delete was handed off; a library route uses it to pop.
+  final VoidCallback? onDelete;
 
   const ShowDeleteDialog(
       {super.key,
       required this.id,
       required this.format,
       this.fileName,
-      required this.onDelete});
+      required this.onDeleteFile,
+      this.onDelete});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(l10n.deleteBook),
@@ -42,11 +45,16 @@ class ShowDeleteDialog extends ConsumerWidget {
             foregroundColor: Theme.of(context).colorScheme.onError,
           ),
           onPressed: () {
-            ref.read(deleteFileFromMyLib(
-                FileName(md5: id, format: format, fileName: fileName)));
+            // Pop and report first; the delete (and its membership
+            // refresh) runs in the background like it always has.
             Navigator.of(context).pop();
             showSnackBar(context: context, message: l10n.bookDeleted);
-            onDelete();
+            onDeleteFile(FileName(
+              md5: id,
+              format: format,
+              fileName: fileName,
+            ));
+            onDelete?.call();
           },
           child: Text(l10n.delete),
         ),

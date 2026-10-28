@@ -1,12 +1,9 @@
 // Flutter imports:
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/state/state.dart'
-    show downloadedBookIdsProvider, resultCoverProvider;
 import 'package:openlib/ui/features/results/widgets/search_result_card.dart';
 import 'package:openlib/ui/features/results/widgets/visible_builder.dart';
 
@@ -83,31 +80,25 @@ void main() {
     expect(visible, isNot(contains(5)));
   });
 
-  testWidgets('downloaded badge comes from the shared id set',
-      (tester) async {
-    Future<void> pumpCard(Set<String> ids) {
-      return tester.pumpWidget(ProviderScope(
-        key: ValueKey(ids.toString()),
-        overrides: [
-          downloadedBookIdsProvider.overrideWith((ref) async => ids),
-        ],
-        child: _app(SearchResultCard(
-          title: 'Downloaded',
-          author: 'Author',
-          thumbnail: null,
-          info: 'English, EPUB, 1 MB',
-          link: 'https://example.com/book',
-          md5: 'book-1',
-          onClick: () {},
-        )),
-      ));
+  testWidgets('downloaded badge comes from the row flag', (tester) async {
+    Future<void> pumpCard(bool downloaded) {
+      return tester.pumpWidget(_app(SearchResultCard(
+        title: 'Downloaded',
+        author: 'Author',
+        thumbnail: null,
+        info: 'English, EPUB, 1 MB',
+        link: 'https://example.com/book',
+        md5: 'book-1',
+        downloaded: downloaded,
+        onClick: () {},
+      )));
     }
 
-    await pumpCard({'book-1'});
+    await pumpCard(true);
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.check_rounded), findsOneWidget);
 
-    await pumpCard({'other'});
+    await pumpCard(false);
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.check_rounded), findsNothing);
   });
@@ -120,26 +111,22 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final lookups = <String>[];
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        resultCoverProvider.overrideWith((ref, link) {
+    await tester.pumpWidget(_app(ListView.builder(
+      itemCount: 20,
+      itemBuilder: (context, index) => SearchResultCard(
+        title: 'Book $index',
+        author: 'Author',
+        thumbnail: null,
+        info: 'English, EPUB, 1 MB',
+        link: 'https://libgen.li/ads.php?md5=$index',
+        md5: null,
+        resolveCover: (link) {
           lookups.add(link);
           return Future<String?>.value(null);
-        }),
-      ],
-      child: _app(ListView.builder(
-        itemCount: 20,
-        itemBuilder: (context, index) => SearchResultCard(
-          title: 'Book $index',
-          author: 'Author',
-          thumbnail: null,
-          info: 'English, EPUB, 1 MB',
-          link: 'https://libgen.li/ads.php?md5=$index',
-          md5: null,
-          onClick: () {},
-        ),
-      )),
-    ));
+        },
+        onClick: () {},
+      ),
+    )));
     await tester.pumpAndSettle();
 
     expect(lookups, isNotEmpty);
