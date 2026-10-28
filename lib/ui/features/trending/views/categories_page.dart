@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/data/services/goodreads.dart' show CategoryBookData;
 import 'package:openlib/ui/features/results/views/results_page.dart';
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/core/components/error_widget.dart';
@@ -464,10 +465,45 @@ class _CategoryListingPageState extends State<CategoryListingPage> {
             ? 3
             : 4;
     final cardWidth = (contentWidth - 8 * (columns - 1)) / columns;
-    // 72 covers the two-line title plus author and meta lines; 30 is the
-    // vertical gaps and card padding around them.
-    final textHeight = MediaQuery.textScalerOf(context).scale(72);
-    final cardHeight = cardWidth * 1.5 + textHeight + 30;
+    // Cards are laid out row by row so a row of one-line titles does not
+    // reserve the second title line. The cover is 2:3 of the inner width
+    // (the 8dp padding on each side is not artwork).
+    final scaler = MediaQuery.textScalerOf(context);
+    final innerWidth = cardWidth - 16;
+    final coverHeight = innerWidth * 1.5;
+    final titleLine = scaler.scale(SwissType.secondaryLine);
+    final microLine = scaler.scale(SwissType.captionLine);
+
+    String metaOf(CategoryBookData book) => [
+          if (book.rating != null && book.rating!.isNotEmpty)
+            '★ ${book.rating}',
+          if (book.published != null && book.published!.isNotEmpty)
+            book.published!,
+        ].join(' · ');
+
+    int titleLines(CategoryBookData book) {
+      final title = book.title;
+      if (title == null || title.isEmpty) return 1;
+      final painter = TextPainter(
+        text: TextSpan(text: title, style: SwissText.label),
+        maxLines: 2,
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout(maxWidth: innerWidth);
+      return painter.computeLineMetrics().length.clamp(1, 2);
+    }
+
+    double cardHeightOf(CategoryBookData book) {
+      final hasAuthor = book.author != null && book.author!.isNotEmpty;
+      final hasMeta = metaOf(book).isNotEmpty;
+      return 8 +
+          coverHeight +
+          8 +
+          titleLines(book) * titleLine +
+          (hasAuthor ? 4 + microLine : 0) +
+          (hasMeta ? 2 + microLine : 0) +
+          8;
+    }
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: ContentWidth(
@@ -493,110 +529,136 @@ class _CategoryListingPageState extends State<CategoryListingPage> {
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: cardWidth / cardHeight,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (BuildContext context, int index) {
-                        final book = data[index];
-                        final rating = book.rating;
-                        final published = book.published;
-                        final meta = [
-                          if (rating != null && rating.isNotEmpty) '★ $rating',
-                          if (published != null && published.isNotEmpty)
-                            published,
-                        ].join(' · ');
-                        return Card(
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () {
-                              _viewModel.prepareOpen();
-                              Navigator.push(context, MaterialPageRoute(
-                                  builder: (BuildContext context) {
-                                return ResultPage(searchQuery: book.title!);
-                              }));
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  AspectRatio(
-                                    aspectRatio: 2 / 3,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(
-                                          SwissRadius.field),
-                                      child: CachedNetworkImage(
-                                        imageUrl: book.thumbnail!,
-                                        memCacheWidth:
-                                            (cardWidth * dpr).round(),
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            ColoredBox(
-                                          color: scheme.surfaceContainerHighest,
-                                          child: Icon(
-                                            Icons.menu_book_outlined,
-                                            color: scheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) =>
-                                            ColoredBox(
-                                          color: scheme.surfaceContainerHighest,
-                                          child: Icon(
-                                            Icons.image_not_supported_outlined,
-                                            color: scheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    book.title!,
-                                    style: SwissText.label,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (book.author != null &&
-                                      book.author!.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      book.author!,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: SwissText.micro.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                  if (meta.isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      meta,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: SwissText.micro.copyWith(
-                                        color: scheme.outline,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
+                  sliver: SliverList.builder(
+                    itemCount: (data.length + columns - 1) ~/ columns,
+                    itemBuilder: (BuildContext context, int row) {
+                      final start = row * columns;
+                      final end = (start + columns).clamp(0, data.length);
+                      var rowHeight = 0.0;
+                      for (var i = start; i < end; i++) {
+                        final height = cardHeightOf(data[i]);
+                        if (height > rowHeight) rowHeight = height;
+                      }
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          bottom: (start + columns >= data.length) ? 0 : 8,
+                        ),
+                        child: SizedBox(
+                          height: rowHeight,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var i = start; i < start + columns; i++) ...[
+                                if (i > start) const SizedBox(width: 8),
+                                Expanded(
+                                  child: i < end
+                                      ? _buildBookCard(
+                                          context,
+                                          data[i],
+                                          scheme,
+                                          dpr,
+                                          cardWidth,
+                                          metaOf(data[i]),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
                           ),
-                        );
-                      },
-                      childCount: data.length,
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookCard(
+    BuildContext context,
+    CategoryBookData book,
+    ColorScheme scheme,
+    double dpr,
+    double cardWidth,
+    String meta,
+  ) {
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          _viewModel.prepareOpen();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (BuildContext context) =>
+                  ResultPage(searchQuery: book.title!),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 2 / 3,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(SwissRadius.field),
+                  child: CachedNetworkImage(
+                    imageUrl: book.thumbnail!,
+                    memCacheWidth: (cardWidth * dpr).round(),
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.menu_book_outlined,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                book.title!,
+                style: SwissText.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (book.author != null && book.author!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  book.author!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SwissText.micro.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              if (meta.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SwissText.micro.copyWith(color: scheme.outline),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
