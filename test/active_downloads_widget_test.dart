@@ -50,7 +50,38 @@ void main() {
     expect(find.byType(Card), findsNothing);
   });
 
-  testWidgets('tasks that are not failed cannot be dismissed', (tester) async {
+  testWidgets('completed tasks can be swiped away too', (tester) async {
+    final downloads = FakeDownloadRepository(active: {
+      'done': testDownloadTask(md5: 'done', status: DownloadStatus.completed),
+      'busy': testDownloadTask(md5: 'busy', status: DownloadStatus.downloading),
+    });
+    addTearDown(downloads.close);
+    final viewModel = ActiveDownloadsViewModel(downloads: downloads);
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      locale: const Locale('zh'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(body: ActiveDownloadsWidget(viewModel: viewModel)),
+    ));
+    await tester.pump();
+
+    await tester.drag(
+      find.byKey(const ValueKey('active-download-task-done')),
+      const Offset(600, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(downloads.cancelled, ['task-done']);
+    // The running task stays, without a swipe affordance.
+    expect(find.text('Title'), findsOneWidget);
+    expect(find.byType(Dismissible), findsNothing);
+  });
+
+  testWidgets('tasks that are still running cannot be dismissed', (tester) async {
     final downloads = FakeDownloadRepository(active: {
       'a': testDownloadTask(md5: 'a', status: DownloadStatus.downloading),
     });

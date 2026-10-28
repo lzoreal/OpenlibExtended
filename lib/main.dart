@@ -243,15 +243,23 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-/// Moves the root PageView to [next] with the same slide the settings
-/// tabs use, including taps that skip pages. The pages stay alive and each
-/// is its own repaint layer, so crossing them is paint-only after the
-/// first visit.
+/// Moves the root PageView to [next].
+///
+/// A slide builds every page it passes, and a cold page pays its first
+/// build inside that animation - the one hitch a bottom-bar tap showed.
+/// So a tab that skips more than one page, or one that has never been
+/// built ([visited]), is jumped to directly; neighbours that are already
+/// warm keep the settings-style slide.
 @visibleForTesting
-void switchToTab(PageController controller, int next) {
+void switchToTab(PageController controller, int next, {Set<int>? visited}) {
   if (!controller.hasClients) return;
   final current = controller.page?.round() ?? next;
   if (current == next) return;
+  final coldTarget = visited != null && !visited.contains(next);
+  if (coldTarget || (next - current).abs() > 1) {
+    controller.jumpToPage(next);
+    return;
+  }
   controller.animateToPage(
     next,
     duration: kPageSwitchDuration,
@@ -264,6 +272,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   late int _lastTabIndex;
   late final PageController _pageController;
   late final List<Widget> _pages;
+  // Tabs whose page has been built at least once; anything else is jumped
+  // to so its first build does not happen inside the slide animation.
+  late final Set<int> _visitedTabs = {_viewModel.tabIndex};
 
   @override
   void initState() {
@@ -310,7 +321,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void _onViewModelChanged() {
     if (_viewModel.tabIndex == _lastTabIndex) return;
     _lastTabIndex = _viewModel.tabIndex;
-    switchToTab(_pageController, _lastTabIndex);
+    switchToTab(_pageController, _lastTabIndex, visited: _visitedTabs);
+    _visitedTabs.add(_lastTabIndex);
   }
 
   @override
@@ -485,6 +497,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             child: ContentWidth(
               child: PageView(
                 controller: _pageController,
+                // Root tabs only change on a bottom-bar tap: a horizontal
+                // drag here fought every inner list and tab strip.
+                physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: _viewModel.selectTab,
                 children: [
                   for (var index = 0; index < _pages.length; index++)

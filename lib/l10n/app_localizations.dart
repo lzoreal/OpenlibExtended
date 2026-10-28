@@ -1610,6 +1610,30 @@ abstract class AppLocalizations {
   /// **'Easiest protection first, then fastest. Recommended.'**
   String get mirrorOrderAutoHint;
 
+  /// Mirror settings: what the automatic order puts first
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic order priority'**
+  String get mirrorSortPriorityTitle;
+
+  /// Mirror settings: hint for the automatic order priority
+  ///
+  /// In en, this message translates to:
+  /// **'\"Fastest\" orders by your measured latency first; \"Simplest protection\" puts mirrors without a browser check first.'**
+  String get mirrorSortPriorityHint;
+
+  /// Mirror settings: order by measured latency
+  ///
+  /// In en, this message translates to:
+  /// **'Fastest'**
+  String get mirrorSortPrioritySpeed;
+
+  /// Mirror settings: order by the protection gate
+  ///
+  /// In en, this message translates to:
+  /// **'Simplest protection'**
+  String get mirrorSortPriorityProtection;
+
   /// Mirrors settings page text: Manual: use the arrows to set your own order.
   ///
   /// In en, this message translates to:
@@ -3356,6 +3380,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preparing download…'**
   String get downloadPreparing;
+
+  /// Book detail download button while the WeLib page countdown runs
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting {seconds}s'**
+  String downloadWaitingSeconds(int seconds);
 
   /// UI text: downloadFailedRetry
   ///

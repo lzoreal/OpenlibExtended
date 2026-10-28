@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/logger.dart';
 import 'package:openlib/data/services/ddos_protection_handler.dart';
+import 'package:openlib/data/services/download_page_links.dart';
 
 class Webview extends StatefulWidget {
   const Webview({
@@ -63,6 +64,8 @@ class _WebviewState extends State<Webview> {
   @override
   void initState() {
     super.initState();
+    _logger.info('Opening download page',
+        tag: 'WebView', metadata: {'url': widget.url});
     // On Linux and Windows, use desktop_webview_window
     // On Windows, this avoids "Graphics Context is not valid" (InAppWebView) issues in some environments (Wine/VMs)
     if (PlatformUtils.isLinux || PlatformUtils.isWindows) {
@@ -197,7 +200,9 @@ class _WebviewState extends State<Webview> {
           }
         } catch (_) {}
 
-        if (urlStr.contains("slow_download")) {
+        final mode = downloadPageKindFor(urlStr);
+        if (mode == DownloadPageKind.wait) return;
+        if (mode == DownloadPageKind.fileLink) {
           // Extract slow_download link
           final result = await webview.evaluateJavaScript("""(function() {
               $_downloadAnchorJs
@@ -307,7 +312,9 @@ class _WebviewState extends State<Webview> {
     try {
       final currentUrl = (await controller.getUrl())?.toString() ?? widget.url;
       final links = <String>[];
-      if (currentUrl.contains('slow_download')) {
+      final mode = downloadPageKindFor(currentUrl);
+      if (mode == DownloadPageKind.wait) return;
+      if (mode == DownloadPageKind.fileLink) {
         final result = await controller.evaluateJavascript(source: '''
           (function() {
             $_downloadAnchorJs
@@ -437,6 +444,17 @@ class _WebviewState extends State<Webview> {
               },
               onLoadStart: (controller, url) {},
               onLoadStop: (controller, url) async {
+                try {
+                  final title = await controller.getTitle() ?? '';
+                  _logger.info('Download page loaded',
+                      tag: 'WebView',
+                      metadata: {
+                        'url': url?.toString() ?? '',
+                        'title': title,
+                      });
+                } catch (_) {
+                  // Title is diagnostic only.
+                }
                 // Extract and store cookies after page load
                 try {
                   final cookieManager = CookieManager.instance();

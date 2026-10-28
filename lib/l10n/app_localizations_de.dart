@@ -859,6 +859,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einfachster Schutz zuerst, dann der schnellste. Empfohlen.';
 
   @override
+  String get mirrorSortPriorityTitle =>
+      'Priorität der automatischen Sortierung';
+
+  @override
+  String get mirrorSortPriorityHint =>
+      '„Schnellste“ sortiert zuerst nach deiner gemessenen Latenz; „Einfachster Schutz“ stellt Spiegel ohne Browser-Prüfung voran.';
+
+  @override
+  String get mirrorSortPrioritySpeed => 'Schnellste';
+
+  @override
+  String get mirrorSortPriorityProtection => 'Einfachster Schutz';
+
+  @override
   String get mirrorOrderManualHint =>
       'Manuell: Mit den Pfeilen die eigene Reihenfolge festlegen.';
 
@@ -1882,6 +1896,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get downloadPreparing => 'Download wird vorbereitet…';
+
+  @override
+  String downloadWaitingSeconds(int seconds) {
+    return 'Warte ${seconds}s';
+  }
 
   @override
   String get downloadFailedRetry =>

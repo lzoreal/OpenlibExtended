@@ -45,7 +45,10 @@ class TrendingViewModel extends ChangeNotifier {
     await _fetch();
   }
 
-  Future<void> refresh() => _fetch();
+  /// Pull-to-refresh keeps the current strip on screen - the
+  /// RefreshIndicator shows the progress, so flipping [loading] here would
+  /// replace the list with a full-page spinner mid-gesture.
+  Future<void> refresh() => _fetch(showSpinner: false);
 
   /// A trending tap searches by title only, so the advanced filters are
   /// cleared before the results route builds its query.
@@ -53,8 +56,8 @@ class TrendingViewModel extends ChangeNotifier {
     _settings.setFiltersEnabled(filtersEnabled);
   }
 
-  Future<void> _fetch() async {
-    _loading = true;
+  Future<void> _fetch({bool showSpinner = true}) async {
+    if (showSpinner) _loading = true;
     _error = null;
     _errorStackTrace = null;
     _notify();

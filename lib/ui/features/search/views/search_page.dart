@@ -3,9 +3,11 @@ import 'dart:async';
 
 // Flutter imports:
 import 'package:flutter/material.dart';
+
 import 'package:openlib/l10n/app_localizations.dart';
 
 // Project imports:
+import 'package:openlib/ui/core/components/swipeable_tab_view.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/trending_book_data.dart';
@@ -307,7 +309,7 @@ class _SearchPageState extends State<SearchPage>
                 ],
               ),
               Expanded(
-                child: TabBarView(
+                child: SwipeableTabView(
                   controller: _modeController,
                   children: [
                     ListView(

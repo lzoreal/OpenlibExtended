@@ -1,11 +1,14 @@
 // Flutter imports:
 import 'package:flutter/material.dart';
 
+
 // Project imports:
+import 'package:openlib/ui/core/components/swipeable_tab_view.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/ui/core/components/active_downloads_widget.dart';
 import 'package:openlib/ui/core/components/page_header.dart';
 import 'package:openlib/ui/core/components/pill_tabs.dart';
+import 'package:openlib/ui/core/components/tab_keep_alive.dart';
 import 'package:openlib/ui/features/shell/widgets/content_width.dart';
 import 'package:openlib/ui/features/trending/views/categories_page.dart';
 import 'package:openlib/ui/features/trending/views/trending_page.dart';
@@ -88,9 +91,18 @@ class _HomePageState extends State<HomePage>
               ],
             ),
             Expanded(
-              child: TabBarView(
+              child: SwipeableTabView(
                 controller: _tabController,
-                children: _pages,
+                // Keeping both tabs alive stops the old behaviour where
+                // sliding to 分类 disposed 热门, so coming back re-ran its
+                // load and looked like a refresh.
+                children: [
+                  for (var index = 0; index < _pages.length; index++)
+                    TabKeepAlive(
+                      active: index == _selectedIndex,
+                      child: _pages[index],
+                    ),
+                ],
               ),
             ),
           ],

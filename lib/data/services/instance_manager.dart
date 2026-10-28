@@ -81,6 +81,7 @@ class InstanceManager {
   final AppLogger _logger = AppLogger();
 
   static const String _autoModeKey = 'instance_auto_mode';
+  static const String _sortSpeedFirstKey = 'instance_sort_speed_first';
   static const String _orderKey = 'instance_manual_order';
   static const String _disabledKey = 'instance_disabled_hosts';
   static const String _localLatencyKey = 'instance_local_latency';
@@ -102,6 +103,25 @@ class InstanceManager {
     _logger.info('Instance mode changed', tag: 'InstanceManager', metadata: {
       'mode': auto ? 'auto' : 'manual',
     });
+  }
+
+  /// Whether the automatic order puts the fastest mirror first (the
+  /// default) or the easiest protection gate first. Latency readings only
+  /// break ties inside a protection tier when this is false.
+  Future<bool> isSpeedFirst() async {
+    try {
+      final value = await _store?.read(_sortSpeedFirstKey);
+      return value == null ? true : value == true || value == 1;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> setSpeedFirst(bool value) async {
+    await _store?.write(_sortSpeedFirstKey, value);
+    _logger.info('Instance sort priority changed',
+        tag: 'InstanceManager',
+        metadata: {'priority': value ? 'speed' : 'protection'});
   }
 
   // ------------------------------------------------------------------
@@ -265,6 +285,7 @@ class InstanceManager {
     final ordered = SlumCatalogue.sortAuto(
       sites,
       localLatencyMs: freshLocalLatency,
+      speedFirst: await isSpeedFirst(),
     );
 
     final auto = await isAutoMode();

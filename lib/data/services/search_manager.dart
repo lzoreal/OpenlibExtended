@@ -1388,10 +1388,13 @@ class WelibProvider implements SearchProvider {
       }
     }
 
-    final slowDownload = document
-            .querySelector('a[href^="/slow_download/"]')
-            ?.attributes['href'] ??
-        '/slow_download/$id/0/0';
+    final slowAnchor = document
+        .querySelector('a[href^="/slow_download/"]')
+        ?.attributes['href'];
+    final slowDownload = slowAnchor ?? '/slow_download/$id/0/0';
+    _logger.debug('WeLib download page picked',
+        tag: 'WelibProvider',
+        metadata: {'page': slowDownload, 'fromBookPage': slowAnchor != null});
 
     final info = [
       language,

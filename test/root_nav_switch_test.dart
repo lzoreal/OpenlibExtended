@@ -39,7 +39,7 @@ void main() {
     return controller;
   }
 
-  testWidgets('a tap that skips pages animates instead of jumping',
+  testWidgets('a tap that skips pages jumps without building the ones between',
       (tester) async {
     final inits = <int>[];
     final controller = await pumpPages(tester, inits);
@@ -47,21 +47,29 @@ void main() {
 
     switchToTab(controller, 3);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
 
-    // Mid-flight, not already at the destination.
-    expect(controller.page, greaterThan(0));
-    expect(controller.page, lessThan(3));
-
-    await tester.pump(const Duration(milliseconds: 300));
+    // At the destination immediately, and the passed-over pages were never
+    // built - that build used to stall the first tap.
     expect(controller.page, 3);
+    expect(inits, [0, 3]);
+  });
+
+  testWidgets('a cold target jumps even when it is next door', (tester) async {
+    final inits = <int>[];
+    final controller = await pumpPages(tester, inits);
+
+    switchToTab(controller, 1, visited: {0});
+    await tester.pump();
+
+    expect(controller.page, 1);
+    expect(inits, [0, 1]);
   });
 
   testWidgets('a neighbouring tab tap slides too', (tester) async {
     final inits = <int>[];
     final controller = await pumpPages(tester, inits);
 
-    switchToTab(controller, 1);
+    switchToTab(controller, 1, visited: {0, 1});
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(controller.page, greaterThan(0));

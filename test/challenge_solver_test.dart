@@ -13,8 +13,14 @@ import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 
 void main() {
-  setUp(WebviewChallengeSolver.clearAutoSolveFailures);
-  tearDown(WebviewChallengeSolver.clearAutoSolveFailures);
+  setUp(() {
+    WebviewChallengeSolver.clearAutoSolveFailures();
+    WebviewChallengeSolver.clearSessionProbeFailures();
+  });
+  tearDown(() {
+    WebviewChallengeSolver.clearAutoSolveFailures();
+    WebviewChallengeSolver.clearSessionProbeFailures();
+  });
 
   group('ChallengeHtmlCache', () {
     setUp(() {
@@ -333,6 +339,112 @@ void main() {
 
       expect(fallbackCalls, 1);
       expect(result, '<html>visible</html>');
+    });
+
+    // A challenge that is still up after the silent budget needs a human:
+    // the page comes forward then, instead of after the full timeout.
+    test('a stalled silent attempt hands over to the visible page', () async {
+      var fallbackCalls = 0;
+      final pending = Completer<String?>();
+      WebviewChallengeSolver.guiEnabled = true;
+      WebviewChallengeSolver.headlessEnabled = true;
+      WebviewChallengeSolver.overrideIsMobile = true;
+      WebviewChallengeSolver.headlessManualAfter =
+          const Duration(milliseconds: 50);
+      WebviewChallengeSolver.debugHeadlessSolver =
+          (url, timeout) => pending.future;
+      WebviewChallengeSolver.debugSessionProbe = (url, timeout) async => true;
+      WebviewChallengeSolver.visibleSolverFallback = (url) async {
+        fallbackCalls++;
+        return '<html>manual</html>';
+      };
+      addTearDown(() {
+        if (!pending.isCompleted) pending.complete(null);
+        WebviewChallengeSolver.guiEnabled = true;
+        WebviewChallengeSolver.headlessEnabled = true;
+        WebviewChallengeSolver.overrideIsMobile = null;
+        WebviewChallengeSolver.headlessManualAfter =
+            const Duration(seconds: 20);
+        WebviewChallengeSolver.debugHeadlessSolver = null;
+        WebviewChallengeSolver.debugSessionProbe = null;
+        WebviewChallengeSolver.visibleSolverFallback = null;
+      });
+
+      const url = 'https://annas-archive.pk/search?q=stalled';
+      final result = await WebviewChallengeSolver.fetchHtmlAfterChallenge(url);
+
+      expect(result, '<html>manual</html>');
+      expect(fallbackCalls, 1);
+      expect(WebviewChallengeSolver.autoSolveRecentlyFailed(url), isFalse,
+          reason: 'a silent timeout is not a broken headless device');
+    });
+  });
+
+  // One manual verification must cover the whole flow: after the page
+  // clears, the solver keeps an invisible session for that host so the
+  // next search/detail/download fetch does not prompt again.
+  group('session adoption after a visible solve', () {
+    setUp(() {
+      WebviewChallengeSolver.clearSessionProbeFailures();
+    });
+    tearDown(WebviewChallengeSolver.clearSessionProbeFailures);
+
+    void useVisibleFallback(
+      List<String> probes,
+      bool Function(String url) probeResult,
+    ) {
+      WebviewChallengeSolver.guiEnabled = true;
+      WebviewChallengeSolver.overrideIsMobile = true;
+      // Off, like the device that prompted this: the visible page runs
+      // straight away and adoption is the only thing keeping a session.
+      WebviewChallengeSolver.headlessEnabled = false;
+      WebviewChallengeSolver.debugSessionProbe = (url, timeout) async {
+        probes.add(url);
+        return probeResult(url);
+      };
+      WebviewChallengeSolver.visibleSolverFallback =
+          (_) async => '<html>solved visibly</html>';
+      addTearDown(() {
+        WebviewChallengeSolver.guiEnabled = true;
+        WebviewChallengeSolver.headlessEnabled = true;
+        WebviewChallengeSolver.overrideIsMobile = null;
+        WebviewChallengeSolver.debugSessionProbe = null;
+        WebviewChallengeSolver.visibleSolverFallback = null;
+      });
+    }
+
+    test('probes the cleared host after the visible solve', () async {
+      final probes = <String>[];
+      useVisibleFallback(probes, (_) => true);
+
+      final html = await WebviewChallengeSolver.fetchHtmlAfterChallenge(
+          'https://welib.org/md5/abc');
+
+      expect(html, '<html>solved visibly</html>');
+      expect(probes, ['https://welib.org/md5/abc']);
+    });
+
+    test('stops probing a host whose hidden webview does not render',
+        () async {
+      final probes = <String>[];
+      useVisibleFallback(probes, (_) => false);
+
+      await WebviewChallengeSolver.fetchHtmlAfterChallenge(
+          'https://welib.org/md5/abc');
+      await WebviewChallengeSolver.fetchHtmlAfterChallenge(
+          'https://welib.org/md5/def');
+
+      expect(probes, ['https://welib.org/md5/abc']);
+    });
+
+    test('the verify-now banner adopts the session too', () async {
+      final probes = <String>[];
+      useVisibleFallback(probes, (_) => true);
+
+      await WebviewChallengeSolver.requestVisibleSolve(
+          'https://welib.org/md5/abc');
+
+      expect(probes, ['https://welib.org/md5/abc']);
     });
   });
 

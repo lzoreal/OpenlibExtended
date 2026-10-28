@@ -46,9 +46,13 @@ class TestTrendingRepository extends TrendingRepository {
   TestTrendingRepository([this.books = const []]) : super(sources: const []);
 
   final List<TrendingBookData> books;
+  int calls = 0;
 
   @override
-  Future<List<TrendingBookData>> trendingBooks() async => books;
+  Future<List<TrendingBookData>> trendingBooks() async {
+    calls++;
+    return books;
+  }
 }
 
 class TestSuggestions extends GoogleSuggestApi {

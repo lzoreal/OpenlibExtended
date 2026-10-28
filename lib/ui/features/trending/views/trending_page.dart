@@ -68,51 +68,55 @@ class _TrendingPageState extends State<TrendingPage> {
           );
         }
         final data = _viewModel.books;
-        return CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              sliver: SliverToBoxAdapter(
-                child: SectionHeader(
-                  title: l10n.trendingThisWeek,
-                  hint: l10n.trendingSource,
-                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
+        return RefreshIndicator(
+          onRefresh: _viewModel.refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                sliver: SliverToBoxAdapter(
+                  child: SectionHeader(
+                    title: l10n.trendingThisWeek,
+                    hint: l10n.trendingSource,
+                    padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
+                  ),
                 ),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                key: const ValueKey('trending-strip'),
-                height: 200 + labelHeight,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: data.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final book = data[index];
-                    return _TrendingBookCard(
-                      book: book,
-                      onTap: () {
-                        _viewModel.prepareOpen(filtersEnabled: false);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ResultPage(searchQuery: book.title!),
-                          ),
-                        );
-                      },
-                    );
-                  },
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  key: const ValueKey('trending-strip'),
+                  height: 200 + labelHeight,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: data.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final book = data[index];
+                      return _TrendingBookCard(
+                        book: book,
+                        onTap: () {
+                          _viewModel.prepareOpen(filtersEnabled: false);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ResultPage(searchQuery: book.title!),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: GenreShortcutSection(title: l10n.keepExploring),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-          ],
+              SliverToBoxAdapter(
+                child: GenreShortcutSection(title: l10n.keepExploring),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            ],
+          ),
         );
       },
     );

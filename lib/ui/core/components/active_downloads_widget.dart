@@ -119,17 +119,26 @@ class _ActiveDownloadsWidgetState extends State<ActiveDownloadsWidget> {
                         viewModel: _viewModel,
                         bytesToFileSize: _bytesToFileSize,
                       );
-                      if (task.status != DownloadStatus.failed) return item;
+                      // Failed rows and finished ones can both be swiped
+                      // away; a completed row would otherwise sit here
+                      // until the 30 s auto-removal.
+                      final swipable = task.status == DownloadStatus.failed ||
+                          task.status == DownloadStatus.completed;
+                      if (!swipable) return item;
+                      final destructive =
+                          task.status == DownloadStatus.failed;
                       return Dismissible(
                         key: ValueKey('active-download-${task.id}'),
                         direction: DismissDirection.horizontal,
                         background: _dismissBackground(
                           context,
                           Alignment.centerLeft,
+                          destructive: destructive,
                         ),
                         secondaryBackground: _dismissBackground(
                           context,
                           Alignment.centerRight,
+                          destructive: destructive,
                         ),
                         onDismissed: (_) => _viewModel.cancel(task.id),
                         child: item,
@@ -145,17 +154,24 @@ class _ActiveDownloadsWidgetState extends State<ActiveDownloadsWidget> {
     );
   }
 
-  Widget _dismissBackground(BuildContext context, Alignment alignment) {
+  Widget _dismissBackground(
+    BuildContext context,
+    Alignment alignment, {
+    bool destructive = true,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     return ColoredBox(
-      color: scheme.errorContainer,
+      color: destructive ? scheme.errorContainer : scheme.surfaceContainerHigh,
       child: Align(
         alignment: alignment,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Icon(
-            Icons.delete_outline_rounded,
-            color: scheme.onErrorContainer,
+            destructive
+                ? Icons.delete_outline_rounded
+                : Icons.remove_circle_outline_rounded,
+            color:
+                destructive ? scheme.onErrorContainer : scheme.onSurfaceVariant,
           ),
         ),
       ),

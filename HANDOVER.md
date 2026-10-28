@@ -27,7 +27,7 @@ OpenlibExtended 是一个 Flutter 跨平台电子书客户端，从 Anna's Archi
 - **搜索**：四个书源并行搜索；结果页可按“全部/单个来源”切换结果；语言/格式/年份/类型/排序筛选；作者/出版社高级检索；搜索建议；分页。
 - **发现**：Trending（Goodreads + Penguin Random House + BookDigits 合并打乱）、28 个硬编码分类。
 - **详情与下载**：按 URL 路由到正确书源；LibGen 直链、Z-Library DiamWall 解挑战后取签名 CDN、WeLib 打开来源下载页抓链接、Anna's Archive donation key 快速下载；多镜像回退。
-- **下载管理**：队列、暂停/继续/重试/取消、HTTP Range 断点续传、镜像间回退、瞬时错误退避、过期链接自动刷新、MD5 校验、系统通知、回到前台自动续传。
+- **下载管理**：队列、暂停/继续/重试/取消、HTTP Range 断点续传、镜像间回退、瞬时错误退避、过期链接自动刷新、MD5 校验、系统通知（完成通知 3 秒后自动清除；应用内下载卡片里失败/已完成任务可滑动移除）、回到前台自动续传。
 - **下载中心**：进行中任务的聚合进度/速度/剩余时间、全部/进行中/已完成三个可滑动标签（失败归入已完成）、批量暂停/继续；已完成记录点行进入书籍详情，点“打开”才交给外部阅读器；也可分享、在文件夹中显示（桌面）或删除记录（不删文件）。书库的标签、阅读状态、排序/筛选和磁盘同步入口已移除。
 - **阅读**：仅通过外部阅读器打开 EPUB/PDF/CBR/CBZ；应用不再提供内置阅读入口。
 - **镜像管理**：唯一数据源 open-slum.org；自动排序/手动排序、逐镜像启停、DOWN 镜像永不尝试；支持手动本机测速（只测已启用非 DOWN 节点），结果保留 24 小时并参与自动排序。
@@ -178,8 +178,9 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 - **排版**：保留 Nunito，但映射到 MD3 角色：页面标题 `headlineMedium`，卡片标题 `titleSmall`，正文 `bodyMedium`，辅助信息 `bodySmall`，按钮/标签 `labelLarge`。
 - **形状**：卡片 20dp 圆角 + 极浅描边，输入/选项 16dp，对话框 28dp，按钮与选项卡胶囊形；页面横向内边距统一 16dp。
 - **页头**：一级页统一用 `PageHeader`（小标签 + 26dp 标题 + 可选右侧操作，**不显示副标题**）；列表内节标题用 `SectionHeader`（标题 + 可选说明/右侧提示）。
-- **选项卡**：设置页、What's New、发现、搜索、下载中心统一用 `PillTabs + TabBarView`（tonal 轨道 + 白色滑动胶囊），页面和子标签都支持左右滑动；搜索/下载/设置的页头与标签固定，内容区独立滚动。根页面滑动只在页头/空白 chrome 区生效，内容区的横向手势属于内层子标签。
-- **底栏**：四个标签为“发现 / 搜索 / 下载中心 / 设置”；四页装在横向 `PageView` 中，滑动与底栏选中态同步；首页标签使用 `l10n.homeTitle`，不要再改回“首页”。
+- **发现页**：热门/分类用 `TabKeepAlive` 常驻，切标签不重新加载；热门支持下拉刷新（`RefreshIndicator`，刷新时保留当前榜单，只显示顶部指示器）。
+- **选项卡**：设置页、What's New、发现、搜索、下载中心统一用 `PillTabs + SwipeableTabView`（内部仍是 `TabBarView`；横滑超过 15% 页宽就切换，不再要求半页或快速甩动）（tonal 轨道 + 白色滑动胶囊），子标签支持左右滑动；主导航只能点底栏切换（根 PageView 禁用拖动）。首次访问或跨多页的标签直接 `jumpToPage`，避免在滑动动画里构建中间页造成首切卡顿；相邻且已构建的页保留 300ms 滑动。搜索/下载/设置的页头与标签固定，内容区独立滚动。
+- **底栏**：四个标签为“发现 / 搜索 / 下载中心 / 设置”；四页装在横向 `PageView` 中，**只能点底栏切换**（禁用拖动），首页标签使用 `l10n.homeTitle`，不要再改回“首页”。
 - **设置分组**：搜索来源 / 外观 / 高级 / 关于四个 Tab；存储位置在“高级 → 通用”，不要放回外观。语言默认收起，点击后展开两/三列选项卡（原生语言名 + 选中勾），选择后自动收起；主题用带缩略预览的三张选项卡，字号用「Aa 预览 + A−/A+ + 滑杆」；不要再改回下拉框。
 - **全站原型**：`design/ui_prototype.html` 覆盖首页、搜索、结果、详情、下载中心、设置四个 Tab、镜像、分类、关于、What's New、引导与验证页；改版时先改原型再落代码。
 - **共享视觉组件**：`PageHeader`、`PillTabs`、`SectionHeader`、`EdgeFade`、`BookInfoWidget`、`ActiveDownloadsWidget`、`CustomErrorWidget`、`ShowDeleteDialog`。新增页面应复用它们，而不是另写一套卡片/按钮。
@@ -238,8 +239,8 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 1. **LibGen**：`get.php` 直链，直接 `fast=true`。
 2. **Z-Library**：先 `resolveBookDownload()` 重新解析 `/dl/<id>`，处理 DiamWall、302 签名 CDN、204 死链；拿不到时保留镜像给出的拒绝原因（每日限额/需登录）。
-3. **WeLib**：不解析直链，直接把 `mirror`（`/slow_download/<md5>/0/0`）交给可见 WebView；用户在来源页过盾并触发下载，页面抓取器识别 `a.js-partner-download-link`（或 AA 的 `p.mb-4` 锚点）后自动返回并入队。WeLib 页面的遮罩关闭，保证验证页/下载按钮可交互。
-4. **Anna's Archive**：若配置了 donation key，调用 `getFastDownloadUrl()` 获取直接下载地址。
+3. **WeLib**：在隐藏 WebView 里静默打开 `mirror`（`/slow_download/<md5>/0/0`），`WelibDownloadWaiter` 每秒把页面倒计时报给详情页按钮（“等待下载 Xs”），链接出现后直接入队，不弹页面。站点跳到 `/account/`（需登录）、Cloudflare 验证 10 秒未过或 45 秒没拿到链接时，才回退到可见 WebView 下载页。**WeLib 现在要求登录**：慢速页会 302 到 `/account/?redirect_after_login=...`；登录后回跳 `slow_download`，可见页的抓取器经 `linkModeFor()` 在登录/注册页只等待、不抓链接；登录 cookie 留在 WebView 里，后续下载无需重复登录。
+4. **Anna's Archive**：若配置了 donation key，调用 `getFastDownloadUrl()` 获取直接下载地址；否则同样由 `DownloadPageWaiter` 在隐藏 WebView 里等 slow 页倒计时，拿到单链接按快速链接入队、拿到镜像列表直接入队，页面不可用时退回后台抓镜像。
 5. `chooseDownloadTarget()` 决定最终目标：只要拿到可用 URL 就用 URL；镜像明确拒绝且无 URL 时才显示拒绝原因（`lib/data/services/download_target.dart:38-47`）。
 6. Linux 且非快速链接：打开可见 WebView 页抓镜像后入队（`lib/ui/features/book_detail/views/book_info_page.dart:249-294`）；其他平台交给 `DownloadManager` 后台抓镜像。
 7. 入队后详情页底部按钮变为“正在下载 X% · 点击暂停”（按钮底色从左向右随进度填充，数据来自 `DownloadRepository.updates`，100ms 节流）；点击暂停/继续，失败变为“点击重试”，完成后自动切换为“打开/删除”（`BookDetailViewModel.task`）。
@@ -269,7 +270,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 
 **排序**（`InstanceManager` + `SlumCatalogue.sortAuto`）：
 
-- 自动模式：DOWN 永远最后且永不尝试；有新鲜本机测速结果的节点优先，按本机延迟升序；未测节点按保护难度 `none → diamwall → ddosGuard → cloudflare → unknown`，再按 SLUM 状态、延迟排序（`lib/data/services/slum_catalogue.dart`）。
+- 自动模式：DOWN 永远最后且永不尝试。排序依据可在 设置 → 搜索来源 →「自动排序依据」切换：**优先最快**（默认，有新鲜本机测速的节点优先，按本机延迟升序）或 **优先最简单防护**（先按 `none → diamwall → ddosGuard → cloudflare → unknown` 排，再在同层内按本机延迟/状态/SLUM 延迟）；偏好键 `instance_sort_speed_first`（`lib/data/services/slum_catalogue.dart`、`InstanceManager.isSpeedFirst`）。
 - 本机测速：`lib/data/services/mirror_latency.dart` 只测启用且非 DOWN 节点，HEAD → GET 回退、TTFB、6s 超时、4 并发；`InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时。过期结果继续显示“已过期”，但排序回退 SLUM（`lib/data/services/instance_manager.dart`）。
 - 手动模式：用户排序优先，未排序的接在自动顺序后面（`lib/data/services/instance_manager.dart:183-214`）。
 - 用户可单独禁用镜像；`enabledUrls()` 同时过滤 DOWN、用户禁用、以及 `headlessOnly` 时不可无头解决的镜像（`lib/data/services/instance_manager.dart:223-233`）。
@@ -277,10 +278,11 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 **过盾链**：
 
 - AA / WeLib 的 Cloudflare / DDoS-Guard：Dio 先抓，识别到挑战 → `WebviewChallengeSolver.fetchHtmlAfterChallenge()`。
-  - 移动：headless WebView 60 秒；失败回退到可见 `ChallengeSolverPage`（`lib/data/services/webview_challenge_solver.dart:102-128`）。
+  - 移动：headless WebView 静默运行，预算 20 秒（`headlessManualAfter`）；挑战仍未清除才回退到可见 `ChallengeSolverPage`。若预算到点时挑战**已清除**、只是抓取偏慢，再给 15 秒抓取宽限（`_captureGrace`）。静默超时不计入 headless 失败记录。注意：移动控制器是 `evaluateJavascript(source:)`，桌面窗口是 `evaluateJavaScript(String)`，写错会让 headless 永远抓不到 HTML、被误判成超时。
   - 可见回退页：先显示全屏“正在验证访问权限”加载态（盾牌 + 进度），加载完成后切换为顶部“需要手动验证”提示 + 可交互 WebView；右上角刷新可重试（`lib/ui/features/webview/views/challenge_solver_page.dart`）。
-  - 桌面：`desktop_webview_window` 可见窗口 3 分钟（`:244-314`）。
+  - Windows：`desktop_webview_window` **先隐藏创建**（`setWebviewWindowVisibility(false)`），静默过盾 3 分钟；超过 12 秒预算仍是挑战页时再 `show + bringToForeground()`。成功后关闭窗口。Linux 插件没有隐藏接口，窗口仍从创建起可见。
   - 成功后 HTML 存入 `ChallengeHtmlCache`，TTL 10 分钟（`lib/data/services/challenge_html_cache.dart:20-48`），后续解析直接命中缓存。
+  - **一次验证覆盖整个流程**：可见验证成功后，`adoptSession()` 用同一 host 已写入的 cookie 静默拉起隐藏会话（8s 探测，失败按 host 记忆 30 分钟）；之后的搜索/详情/下载页经 `fetchWithSession()` 直接复用，不再逐页弹验证。会话仅移动端（桌面没有隐藏会话）。
 - Z-Library DiamWall：解析 503 页面里的 seed，本地暴力 `SHA1(seed+i)` 求目标前缀，拿到 cookie 后重试（`lib/data/services/diamwall_solver.dart:41-111`）。
 - **cookie 不回灌 Dio**：DDoS 清除态绑定浏览器 TLS 指纹，存下来的 cookie 对纯 HTTP 客户端无效（`lib/data/services/ddos_protection_handler.dart:8-11`、`lib/data/services/annas_archieve.dart:286-288`）。
 

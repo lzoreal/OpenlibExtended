@@ -28,6 +28,10 @@ class MirrorRepository {
 
   Future<void> setAutoMode(bool auto) => _manager.setAutoMode(auto);
 
+  Future<bool> isSpeedFirst() => _manager.isSpeedFirst();
+
+  Future<void> setSpeedFirst(bool value) => _manager.setSpeedFirst(value);
+
   Future<void> setEnabled(MirrorService service, String host, bool enabled) =>
       _manager.setEnabled(service, host, enabled);
 

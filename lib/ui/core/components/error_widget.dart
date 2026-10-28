@@ -18,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:openlib/data/services/network_error.dart';
 import 'package:openlib/data/services/logger.dart';
 import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/ui/features/webview/views/challenge_solver_page.dart';
 
 String _networkErrorTitle(AppLocalizations l10n, NetworkError error) {
@@ -481,8 +482,12 @@ class CustomErrorWidget extends StatelessWidget {
         MaterialPageRoute(
           builder: (context) => ChallengeSolverPage(url: targetUrl),
         ),
-      ).then((solved) {
-        if (solved == true && onRefresh != null && context.mounted) {
+      ).then((solved) async {
+        if (solved != true) return;
+        // Keep the cleared host so the retry (and later steps) do not
+        // prompt again.
+        await WebviewChallengeSolver.adoptSession(targetUrl);
+        if (onRefresh != null && context.mounted) {
           onRefresh!();
         }
       });

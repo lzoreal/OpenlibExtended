@@ -7,9 +7,11 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
 import 'package:openlib/l10n/app_localizations.dart';
 
 // Project imports:
+import 'package:openlib/ui/core/components/swipeable_tab_view.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/download_manager.dart';
@@ -725,7 +727,7 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
                         ),
                       ],
                     )
-                  : TabBarView(
+                  : SwipeableTabView(
                       controller: _filterController,
                       children: [
                         for (final filter in _DownloadFilter.values)

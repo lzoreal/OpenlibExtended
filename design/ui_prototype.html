@@ -823,7 +823,7 @@
             <div class="tab"><span class="pill"><svg class="ic lg"><use href="#i-gear"/></svg></span>设置</div>
           </nav>
         </div>
-        <figcaption><em>01</em>发现</figcaption>
+        <figcaption><em>01</em>发现 · 热门/分类切换保留各自状态，热门下下拉刷新</figcaption>
       </figure>
 
       <!-- 02 分类 -->
@@ -1439,13 +1439,19 @@
           <div class="btn outline" style="flex:0 0 auto"><svg class="ic"><use href="#i-book"/></svg>打开</div>
           <div class="btn icon"><svg class="ic"><use href="#i-trash"/></svg></div>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <div class="btn primary" style="flex:0 0 auto;opacity:.9;background:linear-gradient(90deg,rgba(255,255,255,.28) 30%,rgba(255,255,255,0) 30%),var(--primary)">
+            等待下载 12s
+          </div>
+          <span class="desc" style="margin:0;flex:1;min-width:200px">WeLib 的等待页在后台静默打开，倒计时显示在按钮上；结束后自动取真实链接入队。</span>
+        </div>
         <p class="desc" style="margin:10px 0 0">
           点“下载本书”后，同一位置变为“正在下载 42%”，按钮底色从左向右随进度填充；点击可暂停/继续。完成后自动切换为“打开 / 删除”，失败则变为“重试”。
           进度来自 DownloadManager 的实时任务，离开详情页再回来仍能看到。手动下载页持续识别倒计时结束后动态出现的下载链接，获取后自动返回应用并创建任务。
         </p>
         <div class="inline-hint" style="margin-top:12px">
           <svg class="ic sm"><use href="#i-info"/></svg>
-          <span class="grow">WeLib 例外：点“下载本书”不后台解析直链，而是打开该书的来源下载页（<code>/slow_download/&lt;id&gt;/0/0</code>，可见 WebView，可手动过盾、与“在来源打开”一致）；页面里出现下载链接后自动返回应用并入队。LibGen / Z-Library / Anna's Archive 仍按原有直链或后台抓镜像流程。</span>
+          <span class="grow">WeLib：点“下载本书”先在后台静默打开该书的来源下载页（<code>/slow_download/&lt;id&gt;/0/0</code>），按钮显示剩余秒数；倒计时结束后自动抓取下载链接并入队，不弹页面。只有站点要求登录或验证过不去时，才退回可见下载页（可登录/过盾后继续）。LibGen / Z-Library / Anna's Archive 仍按原有直链或后台抓镜像流程。</span>
         </div>
         <div class="inline-hint warn" style="margin-top:12px;background:var(--error-c);color:var(--error)">
           <svg class="ic sm"><use href="#i-alert"/></svg>
@@ -1637,11 +1643,11 @@
         <figcaption><em>08</em>下载中心 · 完成与失败</figcaption>
       </figure>
 
-      <!-- 发现 / 搜索 · 失败任务滑动移除（状态说明，不单列一屏） -->
+      <!-- 发现 / 搜索 · 失败与已完成任务滑动移除（状态说明，不单列一屏） -->
       <div class="card" style="grid-column:1/-1;width:100%;max-width:640px;justify-self:center">
         <div class="card-head">
           <div class="tile-icon"><svg class="ic"><use href="#i-down"/></svg></div>
-          <div class="grow"><b>发现 / 搜索 · 失败任务滑动移除</b></div>
+          <div class="grow"><b>发现 / 搜索 · 失败与已完成任务滑动移除</b></div>
           <span class="badge fail">失败 1</span>
         </div>
         <div style="position:relative;margin-top:12px;border-radius:20px;background:var(--error-c);overflow:hidden">
@@ -1659,9 +1665,23 @@
             <div style="margin-top:8px;font-size:11px;color:var(--error)">签名链接已过期，可刷新链接后重试。</div>
           </div>
         </div>
+        <div style="position:relative;margin-top:10px;border-radius:20px;background:var(--t-container);overflow:hidden">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 22px;color:var(--muted)">
+            <svg class="ic"><use href="#i-close"/></svg>
+            <span style="font-size:11px;font-weight:700">滑动移除</span>
+            <svg class="ic"><use href="#i-close"/></svg>
+          </div>
+          <div style="position:relative;margin-left:52px;padding:14px 16px;background:var(--surface);border-left:1px solid var(--outline-v)">
+            <div style="display:flex;align-items:center;gap:10px">
+              <svg class="ic" style="color:var(--primary)"><use href="#i-check"/></svg>
+              <div class="grow"><b>The House of the Sleeping Beauties</b><small style="display:block;color:var(--muted)">下载完成 · 375 KB</small></div>
+              <div class="btn sm ghost">打开</div>
+            </div>
+          </div>
+        </div>
         <p class="desc" style="margin:10px 0 0">
-          发现页与搜索页共用此行为：失败任务可向左或向右滑动移除，露出删除底色与图标；进行中、暂停等其他任务不可滑动移除。
-          只移除当前失败任务，保留“重试 / 验证”入口；最后一项移除后整个下载容器隐藏。
+          发现页与搜索页共用此行为：失败任务和已完成任务都可向左或向右滑动移除——失败露出删除底色，已完成露出中性的移除底色；进行中、暂停等其他任务不可滑动移除。
+          不滑动也行：已完成任务会在 30 秒后自动消失。移除只影响这张应用内卡片（失败任务仍保留“重试 / 验证”入口），最后一项移除后整个下载容器隐藏。
         </p>
       </div>
 
@@ -1842,6 +1862,17 @@
                     <span class="lat"><span class="dot"></span>已关闭</span>
                     <span class="spacer"></span>
                     <span class="link">镜像</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="group-card" style="margin-top:12px">
+                <div class="gh">自动排序依据</div>
+                <div class="setrow" style="display:block">
+                  <small style="display:block;font-size:11px;color:var(--muted);line-height:16px">“优先最快”先按本机测速延迟排序；“优先最简单防护”先排不需要过盾的镜像</small>
+                  <div class="inline" style="margin-top:10px;gap:8px">
+                    <div class="btn primary sm" style="flex:1;justify-content:center">优先最快</div>
+                    <div class="btn outline sm" style="flex:1;justify-content:center">优先最简单防护</div>
                   </div>
                 </div>
               </div>
@@ -2678,7 +2709,7 @@
   </section>
 
   <footer class="deck-foot">
-    <span><b>23 个界面</b> · 全部可交互原型 · 底栏点击与设置标签同款滑动 · 底部页与分段标签可左右滑动</span>
+    <span><b>23 个界面</b> · 全部可交互原型 · 底栏点击切换页面（不可横向滑动） · 分段标签可左右滑动</span>
     <span>字阶 10 – 34 · 圆角 8 / 12 / 16 / 20 / 28 · 4 列 × 76 + 3 × 8</span>
     <span>主题源 lib/ui/core/themes.dart</span>
     <span class="spacer"></span>

@@ -1,10 +1,12 @@
 // Flutter imports:
 import 'package:flutter/material.dart';
 
+
 // Package imports:
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 // Project imports:
+import 'package:openlib/ui/core/components/swipeable_tab_view.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/main.dart' show MainScreen;
 import 'package:openlib/data/services/update_checker.dart';
@@ -134,7 +136,7 @@ class _WhatsNewPageState extends State<WhatsNewPage>
               ],
             ),
             Expanded(
-              child: TabBarView(
+              child: SwipeableTabView(
                 controller: _tabController,
                 children: [
                   _FeaturesTab(releaseNotes: _releaseNotes ?? ''),

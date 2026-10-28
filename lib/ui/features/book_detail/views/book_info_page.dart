@@ -255,6 +255,27 @@ class _DetailActionBar extends StatelessWidget {
       );
     }
 
+    // WeLib's slow page is being waited out invisibly: the button counts
+    // the seconds down instead of sitting on a spinner.
+    if (viewModel.waitingForPage) {
+      final seconds = viewModel.waitSeconds;
+      return DetailBottomBar(
+        children: [
+          Expanded(
+            child: _DownloadTaskButton(
+              label: seconds == null
+                  ? l10n.downloadPreparing
+                  : l10n.downloadWaitingSeconds(seconds),
+              progress: 0,
+              indeterminate: true,
+              failed: false,
+              onTap: null,
+            ),
+          ),
+        ],
+      );
+    }
+
     // A queued/downloading/paused/failed entry for this book replaces the
     // download button with its live progress; tapping pauses/resumes.
     final task = viewModel.task;

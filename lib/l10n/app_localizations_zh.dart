@@ -803,6 +803,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mirrorOrderAutoHint => '优先最简单的防护，其次最快。推荐。';
 
   @override
+  String get mirrorSortPriorityTitle => '自动排序依据';
+
+  @override
+  String get mirrorSortPriorityHint => '“优先最快”先按本机测速延迟排序；“优先最简单防护”先排不需要过盾的镜像。';
+
+  @override
+  String get mirrorSortPrioritySpeed => '优先最快';
+
+  @override
+  String get mirrorSortPriorityProtection => '优先最简单防护';
+
+  @override
   String get mirrorOrderManualHint => '手动：使用箭头自定义顺序。';
 
   @override
@@ -1762,6 +1774,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get downloadPreparing => '正在准备下载…';
+
+  @override
+  String downloadWaitingSeconds(int seconds) {
+    return '等待下载 ${seconds}s';
+  }
 
   @override
   String get downloadFailedRetry => '下载失败 · 点击重试';

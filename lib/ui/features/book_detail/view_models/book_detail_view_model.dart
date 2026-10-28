@@ -21,6 +21,7 @@ import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/stream_throttle.dart';
+import 'package:openlib/data/services/download_page_waiter.dart';
 import 'package:openlib/data/models/file_name.dart';
 
 /// What the detail page should do after the user taps download.
@@ -68,13 +69,15 @@ class BookDetailViewModel extends ChangeNotifier {
     required BookInfoRepository bookInfo,
     required MirrorRepository mirrors,
     required CoverRepository covers,
+    DownloadPageWaiter? pageWaiter,
   })  : _preview = preview,
         _library = library,
         _downloads = downloads,
         _settings = settings,
         _bookInfo = bookInfo,
         _mirrors = mirrors,
-        _covers = covers {
+        _covers = covers,
+        _pageWaiter = pageWaiter ?? const DownloadPageWaiter() {
     _settings.addListener(_notify);
     unawaited(_resolveCover());
     _task = _findTask(_downloads.active);
@@ -111,6 +114,7 @@ class BookDetailViewModel extends ChangeNotifier {
   final BookInfoRepository _bookInfo;
   final MirrorRepository _mirrors;
   final CoverRepository _covers;
+  final DownloadPageWaiter _pageWaiter;
 
   final ZlibraryProvider _zlibrary = ZlibraryProvider();
   final AnnasArchieve _annasArchive = AnnasArchieve();
@@ -127,6 +131,17 @@ class BookDetailViewModel extends ChangeNotifier {
   DownloadTask? _task;
   StreamSubscription<Map<String, DownloadTask>>? _taskSubscription;
   String? _resolvedCover;
+  bool _waitingForPage = false;
+  int? _waitSeconds;
+
+  /// True while WeLib's slow page is being waited out invisibly; the
+  /// action bar shows the remaining seconds instead of the download
+  /// button.
+  bool get waitingForPage => _waitingForPage;
+
+  /// Seconds left on the page's countdown, or null while it is still
+  /// loading or does not expose one.
+  int? get waitSeconds => _waitSeconds;
 
   /// The full detail page once it arrived, otherwise what the results row
   /// already knew - so a tap never lands on a blank spinner.
@@ -288,10 +303,21 @@ class BookDetailViewModel extends ChangeNotifier {
     if (isDirectLink) isFastDownload = true;
 
     // WeLib keeps the file link on its public-server page, so that page is
-    // the download step - the same thing "open at source" does. Resolving it
-    // headlessly first only hid the page (and the Cloudflare check) from the
-    // user.
-    if (isWelibUrl(downloadUrl)) return DownloadNeedsMirrors(downloadUrl!);
+    // the download step. It is opened invisibly: the countdown ticks on the
+    // detail button and the file link is queued as soon as it appears. The
+    // page is only shown when WeLib asks for a sign-in or stays gated.
+    if (isWelibUrl(downloadUrl)) {
+      final links = await _waitForPageLinks(downloadUrl!);
+      if (links.isEmpty) return DownloadNeedsMirrors(downloadUrl);
+      if (links.length == 1) {
+        downloadUrl = links.single;
+        isDirectLink = true;
+        isFastDownload = true;
+      } else {
+        await _queueMirrors(links);
+        return const DownloadStarted(false);
+      }
+    }
 
     // Z-Library /dl/ links sit behind a DiamWall proof-of-work and a 302 to
     // a signed CDN URL; a cached detail page keeps no signed mirror, so the
@@ -333,6 +359,24 @@ class BookDetailViewModel extends ChangeNotifier {
       }
     }
 
+    // Anna's Archive's slow page also counts down before revealing its
+    // mirror list. Wait it out invisibly so the button shows the countdown
+    // instead of a page; no links means the old background-scrape path.
+    if (!isDirectLink &&
+        !donationFastLink &&
+        zlibRefusal == null &&
+        downloadUrl != null) {
+      final links = await _waitForPageLinks(downloadUrl);
+      if (links.length == 1) {
+        downloadUrl = links.single;
+        isDirectLink = true;
+        isFastDownload = true;
+      } else if (links.length > 1) {
+        await _queueMirrors(links);
+        return const DownloadStarted(false);
+      }
+    }
+
     // A mirror that stated why it withheld the file only wins when nothing
     // else produced a link - starting a download against the refused /dl/
     // hop could only fail, hiding that message.
@@ -350,18 +394,8 @@ class BookDetailViewModel extends ChangeNotifier {
       return DownloadNeedsMirrors(effectiveUrl);
     }
 
-    final task = DownloadTask(
-      id: '${data.md5}_${DateTime.now().millisecondsSinceEpoch}',
-      md5: data.md5,
-      title: data.title,
-      author: data.author,
-      thumbnail: data.thumbnail,
-      publisher: data.publisher,
-      info: data.info,
-      format: data.format!,
-      description: data.description,
-      link: data.link,
-      mirrors: const [], // Fetched in the background from the mirror URL.
+    final task = _buildTask(
+      // Mirrors come from the background fetch of [mirrorUrl].
       mirrorUrl: effectiveUrl,
       isDirectLink: isFastDownload,
       // z-lib's signed CDN link expires; the manager re-resolves a fresh one
@@ -385,13 +419,57 @@ class BookDetailViewModel extends ChangeNotifier {
     return DownloadNeedsMirrors(mirror);
   }
 
+  /// Runs a slow-download page invisibly and reports its countdown to the
+  /// action bar. An empty list means "show the page instead": the site
+  /// wants a sign-in, is challenge-gated, or produced no link.
+  Future<List<String>> _waitForPageLinks(String pageUrl) async {
+    _waitingForPage = true;
+    _waitSeconds = null;
+    _notify();
+    try {
+      final result = await _pageWaiter.wait(
+        pageUrl,
+        onTick: (seconds) {
+          if (_disposed || seconds == _waitSeconds) return;
+          _waitSeconds = seconds;
+          _notify();
+        },
+        shouldContinue: () => !_disposed,
+      );
+      if (_disposed) return const [];
+      return result.outcome == DownloadWaitOutcome.links
+          ? result.links
+          : const [];
+    } finally {
+      _waitingForPage = false;
+      _waitSeconds = null;
+      _notify();
+    }
+  }
+
   /// Starts a download from mirrors the user captured in the WebView.
   /// [url] is the page they came from; it is not stored on the task
   /// because the mirrors themselves are already usable.
   Future<bool> startWithMirrors(String url, List<String> mirrors) async {
-    final data = _data;
-    if (data == null || mirrors.isEmpty) return false;
-    final task = DownloadTask(
+    if (_data == null || mirrors.isEmpty) return false;
+    await _queueMirrors(mirrors);
+    return true;
+  }
+
+  Future<void> _queueMirrors(List<String> mirrors) async {
+    if (_data == null || mirrors.isEmpty) return;
+    await _downloads.add(_buildTask(mirrors: mirrors));
+    await refreshMembership();
+  }
+
+  DownloadTask _buildTask({
+    List<String> mirrors = const [],
+    String? mirrorUrl,
+    bool isDirectLink = false,
+    Future<String?> Function(String pageUrl)? linkRefresher,
+  }) {
+    final data = _data!;
+    return DownloadTask(
       id: '${data.md5}_${DateTime.now().millisecondsSinceEpoch}',
       md5: data.md5,
       title: data.title,
@@ -403,10 +481,10 @@ class BookDetailViewModel extends ChangeNotifier {
       description: data.description,
       link: data.link,
       mirrors: mirrors,
+      mirrorUrl: mirrorUrl,
+      isDirectLink: isDirectLink,
+      linkRefresher: linkRefresher,
     );
-    await _downloads.add(task);
-    await refreshMembership();
-    return true;
   }
 
   /// Deletes the stored record and its file, then re-checks membership.

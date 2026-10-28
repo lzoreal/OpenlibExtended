@@ -199,6 +199,51 @@ void main() {
       expect(ordered.map((s) => s.host).toList(), ['has-local', 'no-local']);
     });
 
+    test('speed-first puts a measured gated mirror above an unmeasured one', () {
+      final ordered = SlumCatalogue.sortAuto(
+        [
+          site('plain', Protection.none, SlumStatus.up, latency: 300),
+          site('gated', Protection.cloudflare, SlumStatus.protected,
+              latency: 90),
+        ],
+        localLatencyMs: {'gated': 40},
+      );
+
+      expect(ordered.map((s) => s.host).toList(), ['gated', 'plain']);
+    });
+
+    test('protection-first keeps the easiest gate ahead of a faster one', () {
+      final ordered = SlumCatalogue.sortAuto(
+        [
+          site('plain', Protection.none, SlumStatus.up, latency: 300),
+          site('gated', Protection.cloudflare, SlumStatus.protected,
+              latency: 90),
+        ],
+        localLatencyMs: {'gated': 40},
+        speedFirst: false,
+      );
+
+      expect(ordered.map((s) => s.host).toList(), ['plain', 'gated']);
+    });
+
+    test('protection-first still orders measured mirrors inside one tier', () {
+      final ordered = SlumCatalogue.sortAuto(
+        [
+          site('gated-slow', Protection.cloudflare, SlumStatus.protected,
+              latency: 60),
+          site('gated-fast', Protection.cloudflare, SlumStatus.protected,
+              latency: 500),
+        ],
+        localLatencyMs: {'gated-fast': 45},
+        speedFirst: false,
+      );
+
+      expect(
+        ordered.map((s) => s.host).toList(),
+        ['gated-fast', 'gated-slow'],
+      );
+    });
+
     test('fresh local latency ranks above protection difficulty', () {
       final ordered = SlumCatalogue.sortAuto(
         [

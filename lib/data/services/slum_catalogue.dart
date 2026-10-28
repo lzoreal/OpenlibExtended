@@ -449,13 +449,16 @@ class SlumCatalogue {
   String _normalize(String url) =>
       url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 
-  /// Auto order: mirrors with a fresh local reading come first, fastest
-  /// first; mirrors without one keep SLUM's protection/status/latency
-  /// order after them. A mirror SLUM reports DOWN always sorts last and
-  /// is never attempted - callers filter with [SlumSite.isDown].
+  /// Auto order. By default fresh local readings come first, fastest first,
+  /// and mirrors without one keep SLUM's protection/status/latency order
+  /// after them. With [speedFirst] false the protection gate decides first
+  /// and the latency readings only order mirrors inside one tier. A mirror
+  /// SLUM reports DOWN always sorts last and is never attempted - callers
+  /// filter with [SlumSite.isDown].
   static List<SlumSite> sortAuto(
     Iterable<SlumSite> sites, {
     Map<String, int> localLatencyMs = const {},
+    bool speedFirst = true,
   }) {
     int latencyOf(SlumSite site) =>
         localLatencyMs[site.host] ?? site.latencyMs ?? 1 << 30;
@@ -463,6 +466,11 @@ class SlumCatalogue {
     final list = sites.toList();
     list.sort((a, b) {
       if (a.isDown != b.isDown) return a.isDown ? 1 : -1;
+
+      if (!speedFirst) {
+        final byProtection = a.protection.rank.compareTo(b.protection.rank);
+        if (byProtection != 0) return byProtection;
+      }
 
       final aLocal = localLatencyMs[a.host];
       final bLocal = localLatencyMs[b.host];
@@ -473,8 +481,10 @@ class SlumCatalogue {
         if (byLocal != 0) return byLocal;
       }
 
-      final byProtection = a.protection.rank.compareTo(b.protection.rank);
-      if (byProtection != 0) return byProtection;
+      if (speedFirst) {
+        final byProtection = a.protection.rank.compareTo(b.protection.rank);
+        if (byProtection != 0) return byProtection;
+      }
       final byStatus = a.statusTier.compareTo(b.statusTier);
       if (byStatus != 0) return byStatus;
       final byLatency = latencyOf(a).compareTo(latencyOf(b));

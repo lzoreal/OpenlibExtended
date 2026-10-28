@@ -6,6 +6,7 @@ import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/search_manager.dart';
 
@@ -19,9 +20,11 @@ class SettingsViewModel extends ChangeNotifier {
     required AppSettings settings,
     required SearchRepository search,
     required LibraryRepository library,
+    MirrorRepository? mirrors,
   })  : _settings = settings,
         _search = search,
-        _library = library {
+        _library = library,
+        _mirrors = mirrors ?? MirrorRepository() {
     _settings.addListener(_notify);
   }
 
@@ -29,15 +32,18 @@ class SettingsViewModel extends ChangeNotifier {
         settings: getIt<AppSettings>(),
         search: getIt<SearchRepository>(),
         library: getIt<LibraryRepository>(),
+        mirrors: getIt<MirrorRepository>(),
       );
 
   final AppSettings _settings;
   final SearchRepository _search;
   final LibraryRepository _library;
+  final MirrorRepository _mirrors;
 
   Set<SearchProviderId> _enabledSources = defaultSearchSourceOrder.toSet();
   List<SearchProviderId> _sourceOrder = defaultSearchSourceOrder;
   bool _sourcesLoaded = false;
+  bool _mirrorSpeedFirst = true;
   bool _disposed = false;
 
   ThemeMode get themeMode => _settings.themeMode;
@@ -59,6 +65,10 @@ class SettingsViewModel extends ChangeNotifier {
   Set<SearchProviderId> get enabledSources => _enabledSources;
 
   List<SearchProviderId> get sourceOrder => _sourceOrder;
+
+  /// True when the automatic mirror order puts the fastest mirror first,
+  /// false when the easiest protection gate wins.
+  bool get mirrorSpeedFirst => _mirrorSpeedFirst;
 
   /// False until the first successful read. The page keeps the source cards
   /// hidden until then, matching the old provider's loading state.
@@ -105,6 +115,24 @@ class SettingsViewModel extends ChangeNotifier {
   Future<void> setSourceOrder(List<SearchProviderId> order) async {
     await _search.setSourceOrder(order);
     await loadSources();
+  }
+
+  Future<void> loadMirrorSort() async {
+    try {
+      final speedFirst = await _mirrors.isSpeedFirst();
+      if (_disposed) return;
+      _mirrorSpeedFirst = speedFirst;
+      _notify();
+    } catch (_) {
+      // Keep the speed-first default.
+    }
+  }
+
+  Future<void> setMirrorSpeedFirst(bool value) async {
+    if (_mirrorSpeedFirst == value) return;
+    _mirrorSpeedFirst = value;
+    _notify();
+    await _mirrors.setSpeedFirst(value);
   }
 
   /// Tells every library listener (download center, detail pages) that the

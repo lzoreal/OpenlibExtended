@@ -8,8 +8,9 @@
 //
 //   - Android/iOS: HeadlessInAppWebView runs invisible and automatic. If a real
 //     human CAPTCHA appears, callers fall back to the visible solver page.
-//   - Linux/Windows/macOS: desktop_webview_window opens a visible window (the
-//     challenge usually auto-passes within seconds).
+//   - Windows: desktop_webview_window is created hidden, so the challenge
+//     passes off-screen; it only comes forward when the silent budget runs
+//     out. Linux has no hide API in the plugin, so its window is visible.
 //
 // Captured HTML is stored in ChallengeHtmlCache keyed by the request URL, so a
 // retry ("Try Again") or another mirror attempt can parse it directly.
@@ -48,6 +49,9 @@ class WebviewChallengeSolver {
   static Future<String?> Function(String url, Duration timeout)?
       debugHeadlessSolver;
 
+  @visibleForTesting
+  static Future<bool> Function(String url, Duration timeout)? debugSessionProbe;
+
   /// When false (user turned "verify in background" off in settings), the
   /// headless attempt is skipped on mobile and the visible window runs
   /// straight away - some devices never finish an invisible webview.
@@ -75,6 +79,31 @@ class WebviewChallengeSolver {
     if (!pendingChallenges.value.contains(url)) return;
     pendingChallenges.value =
         pendingChallenges.value.where((value) => value != url).toList();
+  }
+
+  /// How long an invisible attempt may run before the challenge is treated
+  /// as one that needs a human. Real auto-passes on this network cleared in
+  /// about 14 s (challenge plus page load), so the budget has to cover that;
+  /// an interactive Turnstile checkbox never clears and shows up as a page
+  /// after this long.
+  @visibleForTesting
+  static Duration headlessManualAfter = const Duration(seconds: 20);
+
+  /// Extra time for a capture that is still running after the budget: the
+  /// challenge already cleared, the page is just slow to finish loading.
+  static const Duration _captureGrace = Duration(seconds: 15);
+
+  /// Hosts whose headless page last showed real content, so a budget expiry
+  /// can tell "already cleared, still loading" from "needs a human".
+  static final Map<String, DateTime> _lastContentAt = {};
+
+  static void _markContent(String url) {
+    _lastContentAt[Uri.tryParse(url)?.host ?? url] = DateTime.now();
+  }
+
+  static bool _clearedSince(String url, DateTime since) {
+    final at = _lastContentAt[Uri.tryParse(url)?.host ?? url];
+    return at != null && at.isAfter(since);
   }
 
   /// Hosts whose headless attempt already failed: the invisible webview
@@ -208,6 +237,7 @@ class WebviewChallengeSolver {
       if (html != null) {
         ChallengeHtmlCache.store(url, html);
         _clearAutoSolveFailure(url);
+        await adoptSession(url);
       }
     } finally {
       _visibleSolveInFlight.remove(url);
@@ -216,6 +246,99 @@ class WebviewChallengeSolver {
   }
 
   static final Set<String> _visibleSolveInFlight = {};
+
+  /// Hosts where keeping an invisible session after a manual solve already
+  /// failed: some devices cannot render a hidden webview, and repeating the
+  /// probe only delays the next step.
+  static const Duration _sessionProbeRetryAfter = Duration(minutes: 30);
+  static const Duration _sessionProbeTimeout = Duration(seconds: 8);
+  static final Map<String, DateTime> _sessionProbeFailures = {};
+
+  @visibleForTesting
+  static void clearSessionProbeFailures() => _sessionProbeFailures.clear();
+
+  /// Keeps an invisible session for the host after a visible solve, so the
+  /// next search/detail/download fetch reuses the clearance instead of
+  /// prompting again. Runs even when [headlessEnabled] is off: it only loads
+  /// a page the browser has already been let through, it does not solve.
+  static Future<void> adoptSession(String url) async {
+    if (!guiEnabled || !isSupported || !_isMobile) return;
+    final host = Uri.tryParse(url)?.host;
+    if (host == null || _sessions.containsKey(host)) return;
+    final failedAt = _sessionProbeFailures[host];
+    if (failedAt != null) {
+      if (DateTime.now().difference(failedAt) < _sessionProbeRetryAfter) {
+        return;
+      }
+      _sessionProbeFailures.remove(host);
+    }
+    _logger.debug('Adopting a hidden session after the visible solve',
+        tag: 'ChallengeSolver', metadata: {'url': url});
+    final probe = debugSessionProbe ?? _probeSession;
+    final kept = await probe(url, _sessionProbeTimeout);
+    if (!kept) {
+      _sessionProbeFailures[host] = DateTime.now();
+      _logger.info(
+          'Hidden session probe failed; later steps will verify again',
+          tag: 'ChallengeSolver',
+          metadata: {'url': url});
+    } else {
+      _logger.info('Hidden session kept for later steps',
+          tag: 'ChallengeSolver', metadata: {'host': host});
+    }
+  }
+
+  /// Loads [url] in an invisible webview and keeps it as the host's session
+  /// once the page is past the challenge. The page only has to be usable,
+  /// not fully captured: waiting for a complete document here left hosts
+  /// without a session and pushed the next step back to the visible page.
+  static Future<bool> _probeSession(String url, Duration timeout) async {
+    HeadlessInAppWebView? headless;
+    InAppWebViewController? controller;
+    var kept = false;
+    try {
+      final holder = Completer<InAppWebViewController>();
+      headless = HeadlessInAppWebView(
+        initialUrlRequest: URLRequest(url: WebUri(url)),
+        initialSettings: InAppWebViewSettings(
+          javaScriptEnabled: true,
+          supportZoom: false,
+          incognito: false,
+          clearCache: false,
+        ),
+        onWebViewCreated: (controller) {
+          if (!holder.isCompleted) holder.complete(controller);
+        },
+      );
+      unawaited(headless.run());
+      final deadline = DateTime.now().add(timeout);
+      while (DateTime.now().isBefore(deadline)) {
+        controller ??= await _waitForController(holder);
+        if (controller != null) {
+          final title = (await controller.getTitle()) ?? '';
+          if (title.isNotEmpty &&
+              !isChallengePage(title: title, bodySnippet: '')) {
+            _keepSession(url, headless, controller);
+            kept = true;
+            return true;
+          }
+        }
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      return false;
+    } catch (e) {
+      _logger.debug('Hidden session probe failed',
+          tag: 'ChallengeSolver',
+          metadata: {'url': url, 'error': e.toString()});
+      return false;
+    } finally {
+      if (!kept) {
+        try {
+          await headless?.dispose();
+        } catch (_) {}
+      }
+    }
+  }
 
   /// Fetches [url] through the already-cleared browser session of its host,
   /// when one exists. This is what makes the second and later searches on
@@ -226,8 +349,14 @@ class WebviewChallengeSolver {
     final host = Uri.tryParse(url)?.host;
     if (host == null) return null;
     final session = _sessions[host];
-    if (session == null || session.busy) return null;
+    if (session == null || session.busy) {
+      _logger.debug('No cleared session to reuse',
+          tag: 'ChallengeSolver',
+          metadata: {'host': host, 'busy': session?.busy});
+      return null;
+    }
     session.busy = true;
+    var lastTitle = '';
     try {
       final controller = session.controller;
       await controller.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
@@ -236,10 +365,21 @@ class WebviewChallengeSolver {
         await Future<void>.delayed(const Duration(milliseconds: 700));
         try {
           final title = (await controller.getTitle()) ?? '';
+          if (title.isNotEmpty) lastTitle = title;
           if (title.isNotEmpty &&
               !isChallengePage(title: title, bodySnippet: '')) {
-            final html = await _captureHtml(controller);
-            if (html != null && html.isNotEmpty) {
+            _logger.debug('Cleared session served the page',
+                tag: 'ChallengeSolver', metadata: {'url': url});
+            // The session only has to be usable: gate on the page title,
+            // not on a complete document - WeLib keeps firing requests and
+            // never settled to readyState=complete inside the deadline.
+            await Future<void>.delayed(const Duration(milliseconds: 800));
+            final html = await _js(
+                controller, "document.documentElement.outerHTML");
+            if (html == null || html.isEmpty) {
+              _logger.debug('Cleared session page had no HTML yet',
+                  tag: 'ChallengeSolver', metadata: {'url': url});
+            } else {
               ChallengeHtmlCache.store(url, html);
               return html;
             }
@@ -248,6 +388,8 @@ class WebviewChallengeSolver {
           // Keep polling until the deadline.
         }
       }
+      _logger.info('Cleared session could not load the page',
+          tag: 'ChallengeSolver', metadata: {'url': url, 'title': lastTitle});
       return null;
     } catch (_) {
       return null;
@@ -260,6 +402,9 @@ class WebviewChallengeSolver {
       InAppWebViewController? controller) {
     final host = Uri.tryParse(url)?.host;
     if (host == null || controller == null) {
+      _logger.debug('Not keeping the session: missing host or controller',
+          tag: 'ChallengeSolver',
+          metadata: {'url': url, 'hasController': controller != null});
       return;
     }
     final existing = _sessions.remove(host);
@@ -341,13 +486,37 @@ class WebviewChallengeSolver {
     // wait the whole timeout again.
     final tryHeadless = shouldTryHeadless(url);
     final headlessSolver = debugHeadlessSolver ?? _solveHeadless;
-    var html = tryHeadless
-        ? (_isMobile
-            ? await headlessSolver(url, effectiveTimeout)
-            : await _solveDesktopWindow(url, effectiveTimeout))
-        : null;
+    var headlessTimedOut = false;
+    String? html;
+    if (tryHeadless && _isMobile) {
+      final startedAt = DateTime.now();
+      final headless = headlessSolver(url, effectiveTimeout);
+      try {
+        // Stay invisible, but not for the whole timeout: a challenge that
+        // is still up after the budget needs a human, not more waiting.
+        html = await headless.timeout(headlessManualAfter);
+      } on TimeoutException {
+        if (_clearedSince(url, startedAt)) {
+          // The challenge cleared; only the HTML capture is behind.
+          try {
+            html = await headless.timeout(_captureGrace);
+          } on TimeoutException {
+            headlessTimedOut = true;
+          }
+        } else {
+          headlessTimedOut = true;
+        }
+        if (headlessTimedOut) {
+          _logger.info('Silent solve still challenged; showing the page',
+              tag: 'ChallengeSolver',
+              metadata: {'url': url, 'budget': headlessManualAfter.inSeconds});
+        }
+      }
+    } else if (tryHeadless) {
+      html = await _solveDesktopWindow(url, effectiveTimeout);
+    }
 
-    if (tryHeadless) {
+    if (tryHeadless && !headlessTimedOut) {
       if (html == null && _isMobile) {
         _rememberHeadlessFailure(url);
       } else if (html != null) {
@@ -366,6 +535,9 @@ class WebviewChallengeSolver {
     if (html != null) {
       ChallengeHtmlCache.store(url, html);
       _clearAutoSolveFailure(url);
+      // A headless success already kept its session; after a manual solve
+      // this is what stops the next step from prompting all over again.
+      await adoptSession(url);
     } else {
       _rememberAutoSolveFailure(url);
     }
@@ -418,10 +590,14 @@ class WebviewChallengeSolver {
             if (isChallengePage(title: title, bodySnippet: bodySnippet)) {
               return; // challenge page; wait for next load
             }
+            _markContent(url);
             // Not ready yet (readyState != complete)? Just wait — the poll
             // loop picks the page up. Never complete with null here: that
             // used to kill the solve right after the challenge was cleared.
             final html = await _captureHtml(controller);
+            _logger.debug('Headless load capture',
+                tag: 'ChallengeSolver',
+                metadata: {'title': title, 'length': html?.length ?? 0});
             if (shouldCompleteFromLoadStop(title, html) &&
                 !completer.isCompleted) {
               completer.complete(html);
@@ -459,6 +635,7 @@ class WebviewChallengeSolver {
             final title = (await controller.getTitle()) ?? '';
             if (title.isNotEmpty &&
                 !isChallengePage(title: title, bodySnippet: '')) {
+              _markContent(url);
               final html = await _captureHtml(controller);
               if (html != null && html.isNotEmpty && !completer.isCompleted) {
                 completer.complete(html);
@@ -514,6 +691,12 @@ class WebviewChallengeSolver {
       String url, Duration timeout) async {
     desktop_webview.Webview? webview;
     var closedByUser = false;
+    // Windows can create the window hidden, so the challenge passes without
+    // taking over the screen; the window only appears when the silent
+    // budget runs out and the page needs a human. Linux has no hide API in
+    // the plugin, so it starts visible there.
+    var hidden = false;
+    final startedAt = DateTime.now();
     try {
       webview = await desktop_webview.WebviewWindow.create(
         configuration: const desktop_webview.CreateConfiguration(
@@ -526,6 +709,16 @@ class WebviewChallengeSolver {
       // The plugin cancels the first navigation and only re-issues it after a
       // Dart URL-request callback; without one the window stays about:blank.
       webview.setOnUrlRequestCallback((_) => true);
+      if (PlatformUtils.isWindows) {
+        try {
+          await webview.setWebviewWindowVisibility(false);
+          hidden = true;
+          _logger.debug('Challenge window hidden while it solves',
+              tag: 'ChallengeSolver', metadata: {'url': url});
+        } catch (_) {
+          // Older runtimes: keep the window visible.
+        }
+      }
       webview.launch(url, triggerOnUrlRequestEvent: false);
 
       final deadline = DateTime.now().add(timeout);
@@ -544,6 +737,19 @@ class WebviewChallengeSolver {
               "(document.body ? document.body.innerHTML.slice(0, 3000) : '')",
             ) ??
             '';
+
+        if (hidden &&
+            DateTime.now().difference(startedAt) > headlessManualAfter) {
+          _logger.info('Silent desktop solve needs a human; showing the window',
+              tag: 'ChallengeSolver', metadata: {'url': url});
+          hidden = false;
+          try {
+            await webview.setWebviewWindowVisibility(true);
+            await webview.bringToForeground();
+          } catch (_) {
+            // The user can still find the window in the task bar.
+          }
+        }
 
         if (title.isEmpty && bodySnippet.isEmpty) continue;
 
@@ -616,7 +822,11 @@ class WebviewChallengeSolver {
   /// Captures outerHTML once the document is complete and settled.
   static Future<String?> _captureHtml(dynamic controllerOrWebview) async {
     final ready = await _js(controllerOrWebview, "document.readyState") ?? '';
-    if (ready != 'complete') return null;
+    if (ready != 'complete') {
+      _logger.debug('Page not ready for capture',
+          tag: 'ChallengeSolver', metadata: {'readyState': ready});
+      return null;
+    }
     // Settle delay so late XHR content lands in the DOM.
     await Future.delayed(const Duration(milliseconds: 2000));
     final html =
@@ -625,9 +835,16 @@ class WebviewChallengeSolver {
   }
 
   /// Evaluates JS and decodes the result, handling JSON-encoded bridges.
+  ///
+  /// The mobile controller exposes `evaluateJavascript(source:)` while the
+  /// desktop window keeps `evaluateJavaScript(String)`. Calling the wrong
+  /// one threw inside the try and silently returned null, which made every
+  /// headless solve "time out" even after the challenge had cleared.
   static Future<String?> _js(dynamic view, String script) async {
     try {
-      final result = await view.evaluateJavaScript(script);
+      final result = view is InAppWebViewController
+          ? await view.evaluateJavascript(source: script)
+          : await view.evaluateJavaScript(script);
       if (result == null) return null;
       var s = result.toString();
       if (s == 'null') return null;

@@ -14,7 +14,7 @@
 - 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；模型 `lib/data/models/`（`BookData`、`MyBook`、`SearchProviderId` 等）；服务 `lib/data/services/`；页面 `lib/ui/features/<feature>/{views,widgets}/`、共享主题与组件 `lib/ui/core/`；数据库 `lib/data/services/database.dart`。
 - 发布平台：Android、iOS（未签名侧载）、Windows、Linux。**Web 不可用**；macOS 有工程但未发布。
 - “我的书库”已重构为“下载中心”：标签、阅读状态筛选、排序/筛选、磁盘同步入口均已删除，不要恢复。
-- 主导航与子标签均支持左右滑动；镜像页支持本机测速并按本机延迟自动排序。
+- 主导航只能点底栏切换（根 PageView 禁用拖动）；子标签仍支持左右滑动。镜像页支持本机测速并按本机延迟自动排序。
 - CI 固定 Flutter **3.47.2**；Dart SDK `>=3.3.0 <4.0.0`。
 
 ---
@@ -53,7 +53,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
    - DOWN 镜像永不请求；用户禁用和 `headlessOnly` 过滤必须保留。
    - 本机测速只在 `lib/data/services/mirror_latency.dart` 发起（HEAD → GET 回退，TTFB，6s 超时，最多 4 并发）；不要从 UI 直接做网络探测。
    - 测速结果用 `InstanceManager.localLatencies()` / `saveLocalLatencies()` 持久化 24 小时；过期结果仅展示“已过期”，不再参与排序。
-   - 自动排序：已测且可达的节点优先，按本机延迟升序；未测节点回退保护等级/状态/SLUM 延迟；DOWN 永远最后。手动模式不受影响。
+   - 自动排序：已测且可达的节点优先，按本机延迟升序；未测节点回退保护等级/状态/SLUM 延迟；DOWN 永远最后。手动模式不受影响。排序依据（优先最快 / 优先最简单防护）在 设置 → 搜索来源 切换，偏好键 `instance_sort_speed_first`。
 
 2. **书源协议**
    - 实现 `SearchProvider`：搜索成功但无结果返回 `[]`；不可达/解析失败抛异常。
@@ -68,7 +68,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
 4. **下载只能走 DownloadManager**
    - UI 不要直接写文件或发下载请求；构造 `DownloadTask` 后调用 `addDownload` / `addDownloadWithMirrorUrl`。
    - 保留以下行为：同 md5 单任务、HTTPS 优先/IPFS 最后、Range 续传、瞬时错误退避、`linkRefresher`、完成前 MD5 校验、完成后写库。
-   - Z-Library 的签名链接会过期，必须保留 `linkRefresher`；WeLib 的下载按钮固定打开来源下载页（`/slow_download/...`，可见 WebView 抓链接），不要改回无头解析直链。
+   - Z-Library 的签名链接会过期，必须保留 `linkRefresher`；WeLib 与 Anna's Archive 的下载都先在隐藏 WebView 里等 slow 页倒计时（`DownloadPageWaiter`，按钮显示剩余秒数），拿到链接再入队；登录墙或验证过不去才退回可见页/后台抓镜像。可见页抓取器必须经 `linkModeFor()`/`downloadPageKindFor()` 在登录页等待，登录后回跳再抓，否则会把导航链接当镜像入队。
    - 下载队列是内存态；不要假装重启后可恢复。
 
 5. **持久化只走 MyLibraryDb**
@@ -86,7 +86,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
    - 用 `PlatformUtils` 或 `dart:io` 的 `Platform`，保持现有分支。
    - 不要声称支持 Web；`main.dart` 依赖 `dart:io`。
    - Linux 后台 headless 抓镜像不可用，必须保留可见 WebView 手动流程。
-   - 过盾求解器：移动 headless + 可见回退；桌面可见窗口。不要缩短/移除超时与缓存逻辑。
+   - 过盾求解器：先静默（移动 headless / Windows 隐藏窗口），只有超过 20 秒预算仍未过盾才把可见页提到前台（挑战已清除、抓取偏慢再给 15 秒宽限）；Linux 插件无隐藏接口，保持可见窗口。不要缩短/移除其余超时与缓存逻辑。可见验证成功后必须经 `adoptSession()` 保留同 host 隐藏会话，让详情/下载复用，不要退回“每个 URL 各弹一次验证”。
 
 8. **不要随意升级钉死的依赖**
    - `html: 0.15.6`、`permission_handler_android: 13.0.1`、`sqlite3_flutter_libs: 0.5.42` 都有兼容性原因。
@@ -104,8 +104,8 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
     - 颜色/形状/文字样式只从 `Theme.of(context)` 取；主题源是 `lib/ui/core/themes.dart`（暖纸 + 翡翠绿 `#0F6B5C`，light/dark）。
     - 使用语义角色：`primary`/`primaryContainer`、`onSurface`/`onSurfaceVariant`、`surfaceContainerLow/High/Highest`、`error`/`errorContainer`；不要新增硬编码 `Colors.*` 或十六进制色值（深色遮罩上的白字除外）。
     - 使用 MD3 组件：`Card`、`FilledButton`/`OutlinedButton`/`TextButton`、`FilterChip`、`SearchBar`、`AlertDialog`、`BottomSheet`；分段统一用 `PillTabs` + `TabBarView`。
-    - 主导航用 `PageView`；发现/搜索/下载中心的子标签与设置页一样用 `PillTabs + TabBarView`。搜索、下载、设置的页头与标签固定，内容区独立滚动。
-    - 根页面滑动只在页头/标题/空白 chrome 区生效；内容区横向手势属于内层子标签，不要试图让两层同时抢占同一手势。
+    - 主导航用 `PageView`；发现/搜索/下载中心的子标签与设置页一样用 `PillTabs + SwipeableTabView`（`TabBarView` 外面包一层：横滑超过 15% 页宽即切换，避免轻扫被弹回）。搜索、下载、设置的页头与标签固定，内容区独立滚动。
+    - 根页面禁用横向拖动（`NeverScrollableScrollPhysics`），切换页只走底栏点击的 `switchToTab`：冷页或跨两页以上直接 `jumpToPage`（首次 build 不要放进滑动动画里），相邻且已构建的页才滑动。横向手势全部属于内层子标签。
     - 一级页统一 `PageHeader`（小标签 + 标题 + 可选操作，**不带副标题**），列表节标题统一 `SectionHeader`，设置/What's New/主页面选项卡统一 `PillTabs`。
     - 设置分组固定为搜索来源 / 外观 / 高级 / 关于；存储位置在“高级 → 通用”，不要放回外观。
     - 语言默认收起、点击展开；主题用带预览的选项卡，不用下拉框。
@@ -176,6 +176,7 @@ flutter test
 - **Linux 需要 WebKitGTK 4.1**；否则过盾/桌面 WebView 失败。
 - **可见过盾页必须可交互**：加载时显示设计的全屏加载态，加载完成后显示顶部“需要手动验证”提示并露出 WebView；不要用遮罩长期挡住验证页面。
 - **本机测速结果成为自动排序主键后**，较快的受保护节点可能排在未受保护节点前；手动模式仍可覆盖。
+- **移动 WebView 的控制器的 JS 方法是 `evaluateJavascript(source:)`**，桌面窗口才是 `evaluateJavaScript(String)`；混用会静默失败（headless 抓不到 HTML、会话复用失效）。
 - **`getPreference` 会抛异常**；不要假设返回 null。
 - **桌面数据库需要 FFI 初始化**；新增入口/测试时要先初始化。
 - **测试里的 `test/fixtures` 是真实页面快照**；改解析器前先看 fixture 结构。
@@ -200,7 +201,7 @@ flutter test
 - [ ] `flutter test` 通过；联网用例仍保持 skip。
 - [ ] 新增/修改的解析器有 fixture 测试。
 - [ ] 用户可见文案已进入五份 ARB 并重新生成。
-- [ ] 改导航/标签时，根页面与子标签的左右滑动均可用，且 200% 字体不溢出。
+- [ ] 改导航/标签时，底栏点击可切换页面、子标签左右滑动可用，且 200% 字体不溢出。
 - [ ] 改应用图标时已重新渲染 PNG 并运行 `dart run flutter_launcher_icons`，关于页同步。
 - [ ] 没有硬编码镜像 host、密钥、cookie。
 - [ ] 没有改动 `pubspec.yaml` 的发布版本号（除非用户明确要求）。

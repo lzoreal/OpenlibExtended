@@ -1092,6 +1092,22 @@
   "@mirrorOrderAutoHint": {
     "description": "Mirrors settings page text: Easiest protection first, then fastest. Recommended."
   },
+  "mirrorSortPriorityTitle": "Automatic order priority",
+  "@mirrorSortPriorityTitle": {
+    "description": "Mirror settings: what the automatic order puts first"
+  },
+  "mirrorSortPriorityHint": "\"Fastest\" orders by your measured latency first; \"Simplest protection\" puts mirrors without a browser check first.",
+  "@mirrorSortPriorityHint": {
+    "description": "Mirror settings: hint for the automatic order priority"
+  },
+  "mirrorSortPrioritySpeed": "Fastest",
+  "@mirrorSortPrioritySpeed": {
+    "description": "Mirror settings: order by measured latency"
+  },
+  "mirrorSortPriorityProtection": "Simplest protection",
+  "@mirrorSortPriorityProtection": {
+    "description": "Mirror settings: order by the protection gate"
+  },
   "mirrorOrderManualHint": "Manual: use the arrows to set your own order.",
   "@mirrorOrderManualHint": {
     "description": "Mirrors settings page text: Manual: use the arrows to set your own order."
@@ -2458,6 +2474,13 @@
     }
   },
   "downloadPreparing": "Preparing download…",
+  "downloadWaitingSeconds": "Waiting {seconds}s",
+  "@downloadWaitingSeconds": {
+    "description": "Book detail download button while the WeLib page countdown runs",
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
   "@downloadPreparing": {
     "description": "UI text: downloadPreparing"
   },

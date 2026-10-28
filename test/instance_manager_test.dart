@@ -127,6 +127,14 @@ void main() {
       expect(await manager.isAutoMode(), isTrue);
     });
 
+    test('sort priority defaults to fastest and is remembered', () async {
+      expect(await manager.isSpeedFirst(), isTrue);
+      await manager.setSpeedFirst(false);
+      expect(await manager.isSpeedFirst(), isFalse);
+      await manager.setSpeedFirst(true);
+      expect(await manager.isSpeedFirst(), isTrue);
+    });
+
     test('orders DiamWall mirrors before the browser-only gates', () async {
       final urls =
           await manager.enabledUrls(MirrorService.zlibrary, force: true);

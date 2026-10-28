@@ -23,6 +23,7 @@ import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/database.dart';
@@ -38,6 +39,22 @@ final _paths = FakePathProvider('settings');
 /// In-memory source toggles/order; the real repository queues a network
 /// manager and reads preferences from sqlite, neither of which the widget
 /// test fake async zone can settle.
+/// In-memory sort-priority preference: the widget test fake async zone
+/// cannot settle a real sqlite read.
+class _FakeMirrorRepository extends MirrorRepository {
+  bool speedFirst = true;
+  final List<bool> writes = [];
+
+  @override
+  Future<bool> isSpeedFirst() async => speedFirst;
+
+  @override
+  Future<void> setSpeedFirst(bool value) async {
+    speedFirst = value;
+    writes.add(value);
+  }
+}
+
 class _FakeSearchRepository extends SearchRepository {
   _FakeSearchRepository() : super(manager: SearchManager(providers: const []));
 
@@ -75,6 +92,7 @@ void main() {
   late AppSettings settings;
   late _FakeSearchRepository searchRepository;
   late _FakeLibraryRepository libraryRepository;
+  late _FakeMirrorRepository mirrorRepository;
   late SettingsViewModel viewModel;
 
   setUpAll(() {
@@ -112,10 +130,12 @@ void main() {
     );
     searchRepository = _FakeSearchRepository();
     libraryRepository = _FakeLibraryRepository();
+    mirrorRepository = _FakeMirrorRepository();
     viewModel = SettingsViewModel(
       settings: settings,
       search: searchRepository,
       library: libraryRepository,
+      mirrors: mirrorRepository,
     );
     // The locale row refreshes the download notifications through the DI
     // container even though the page itself is driven by the injected
@@ -193,6 +213,15 @@ void main() {
     );
     expect(find.text('Mirrors & Providers'), findsOneWidget);
     expect(find.text("Anna's Archive Donation Key"), findsOneWidget);
+
+    // The automatic-order priority lives in this tab, not on the mirrors
+    // page.
+    expect(find.text('AUTOMATIC ORDER PRIORITY'), findsOneWidget);
+    await tester.ensureVisible(find.text('Simplest protection'));
+    await tester.tap(find.text('Simplest protection'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(mirrorRepository.speedFirst, isFalse,
+        reason: 'picking the protection-first segment persists it');
 
     await openTab(tester, 1);
     await tester.pump(const Duration(milliseconds: 100));

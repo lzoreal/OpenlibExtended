@@ -11,6 +11,7 @@ import 'package:openlib/data/services/backup_service.dart';
 // Flutter imports:
 import 'package:flutter/material.dart';
 
+
 // Package imports:
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -21,6 +22,7 @@ import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/update_checker.dart';
 
 // Project imports:
+import 'package:openlib/ui/core/components/swipeable_tab_view.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/book_import.dart';
@@ -190,6 +192,7 @@ class _SettingsPageState extends State<SettingsPage>
     _ownsViewModel = widget.viewModel == null;
     _viewModel = widget.viewModel ?? SettingsViewModel.fromDi();
     unawaited(_viewModel.loadSources());
+    unawaited(_viewModel.loadMirrorSort());
   }
 
   @override
@@ -230,7 +233,7 @@ class _SettingsPageState extends State<SettingsPage>
                 ],
               ),
               Expanded(
-                child: TabBarView(
+                child: SwipeableTabView(
                   controller: _tabController,
                   children: [
                     _sourcesTab(context, dataBase, l10n),
@@ -253,6 +256,47 @@ class _SettingsPageState extends State<SettingsPage>
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         _SearchProvidersWidget(viewModel: _viewModel),
+        const SizedBox(height: 12),
+        _SettingsGroup(
+          title: l10n.mirrorSortPriorityTitle,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.mirrorSortPriorityHint,
+                    style: SwissText.micro.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<bool>(
+                    key: const ValueKey('mirror-sort-priority'),
+                    segments: [
+                      ButtonSegment(
+                        value: true,
+                        icon: const Icon(Icons.speed_rounded, size: 16),
+                        label: Text(l10n.mirrorSortPrioritySpeed),
+                      ),
+                      ButtonSegment(
+                        value: false,
+                        icon: const Icon(Icons.shield_outlined, size: 16),
+                        label: Text(l10n.mirrorSortPriorityProtection),
+                      ),
+                    ],
+                    selected: {_viewModel.mirrorSpeedFirst},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) async {
+                      await _viewModel.setMirrorSpeedFirst(selection.first);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         _SettingsGroup(
           title: l10n.sourceBehaviorSection,

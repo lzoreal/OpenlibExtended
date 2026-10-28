@@ -79,6 +79,41 @@ void main() {
     expect(tester.widget<TabBar>(find.byType(TabBar)).controller!.index, 1);
   });
 
+  testWidgets('switching tabs does not refetch; pull-down refreshes',
+      (tester) async {
+    final trending = TestTrendingRepository([
+      TrendingBookData(title: 'Book', thumbnail: ''),
+    ]);
+    await setupTestDi(trending: trending);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(body: HomePage()),
+    ));
+    await tester.pumpAndSettle();
+    expect(trending.calls, 1);
+
+    await tester.fling(find.byType(TabBarView), const Offset(-320, 0), 1200);
+    await tester.pumpAndSettle();
+    await tester.fling(find.byType(TabBarView), const Offset(320, 0), 1200);
+    await tester.pumpAndSettle();
+    expect(trending.calls, 1,
+        reason: 'coming back to 热门 must show the kept page, not reload it');
+
+    await tester.fling(
+      find.descendant(
+        of: find.byType(RefreshIndicator),
+        matching: find.byType(CustomScrollView),
+      ),
+      const Offset(0, 320),
+      1200,
+    );
+    await tester.pumpAndSettle();
+    expect(trending.calls, 2, reason: 'pull-down refreshes the strip');
+  });
+
   testWidgets('home fits 200% text and keeps swipeable tabs', (tester) async {
     await setupTestDi(
       trending: TestTrendingRepository([

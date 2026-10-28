@@ -848,6 +848,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Easiest protection first, then fastest. Recommended.';
 
   @override
+  String get mirrorSortPriorityTitle => 'Automatic order priority';
+
+  @override
+  String get mirrorSortPriorityHint =>
+      '\"Fastest\" orders by your measured latency first; \"Simplest protection\" puts mirrors without a browser check first.';
+
+  @override
+  String get mirrorSortPrioritySpeed => 'Fastest';
+
+  @override
+  String get mirrorSortPriorityProtection => 'Simplest protection';
+
+  @override
   String get mirrorOrderManualHint =>
       'Manual: use the arrows to set your own order.';
 
@@ -1860,6 +1873,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get downloadPreparing => 'Preparing download…';
+
+  @override
+  String downloadWaitingSeconds(int seconds) {
+    return 'Waiting ${seconds}s';
+  }
 
   @override
   String get downloadFailedRetry => 'Download failed · tap to retry';

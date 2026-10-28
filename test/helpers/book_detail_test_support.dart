@@ -19,6 +19,7 @@ import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/download_manager.dart';
 import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/download_page_waiter.dart';
 import 'package:openlib/ui/features/book_detail/view_models/book_detail_view_model.dart';
 
 class FakeLibraryRepository extends LibraryRepository {
@@ -214,6 +215,7 @@ BookDetailViewModel testBookDetailViewModel({
   BookInfoRepository? bookInfo,
   MirrorRepository? mirrors,
   CoverRepository? covers,
+  DownloadPageWaiter? pageWaiter,
 }) {
   return BookDetailViewModel(
     url: url,
@@ -225,5 +227,6 @@ BookDetailViewModel testBookDetailViewModel({
     bookInfo: bookInfo ?? FakeBookInfoRepository(),
     mirrors: mirrors ?? FakeMirrorRepository(),
     covers: covers ?? FakeCoverRepository(),
+    pageWaiter: pageWaiter,
   );
 }
