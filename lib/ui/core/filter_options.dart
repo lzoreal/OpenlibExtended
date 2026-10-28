@@ -106,24 +106,20 @@ Map<String, String> languageCodeToDisplay = {
   "da": "DA",
 };
 
-// Year filter values for publishing year range
-List<String> yearValues = [
-  "All",
-  "2025",
-  "2024",
-  "2023",
-  "2022",
-  "2021",
-  "2020",
-  "2019",
-  "2018",
-  "2017",
-  "2016",
-  "2015",
-  "2010-2014",
-  "2005-2009",
-  "2000-2004",
-  "1990-1999",
-  "1980-1989",
-  "Before 1980",
-];
+// Year filter values for publishing year range. Years before 2015 are
+// grouped so the list does not grow one entry per year indefinitely.
+List<String> yearValuesFor(int currentYear) {
+  final newestYear = currentYear < 2015 ? 2015 : currentYear;
+  return [
+    "All",
+    for (var year = newestYear; year >= 2015; year--) "$year",
+    "2010-2014",
+    "2005-2009",
+    "2000-2004",
+    "1990-1999",
+    "1980-1989",
+    "Before 1980",
+  ];
+}
+
+List<String> get yearValues => yearValuesFor(DateTime.now().year);

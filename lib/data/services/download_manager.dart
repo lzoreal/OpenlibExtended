@@ -28,6 +28,13 @@ enum DownloadStatus {
   cancelled
 }
 
+/// True only for values that can actually be a file MD5. Z-Library's
+/// `md5` field is its `/book/<id>` id, not a hash, so comparing it with
+/// the downloaded file always reported a false checksum failure.
+final RegExp _md5Pattern = RegExp(r'^[0-9a-fA-F]{32}$');
+
+bool isVerifiableMd5(String value) => _md5Pattern.hasMatch(value);
+
 /// Human label for a download mirror's host, shown in notifications
 /// and the active-downloads list so users always see where a file is
 /// coming from.
@@ -997,10 +1004,17 @@ class DownloadManager {
       progress: 100,
     );
 
+    final bool verifiableMd5 = isVerifiableMd5(task.md5);
     bool checkSumValid;
     try {
-      checkSumValid =
+      checkSumValid = !verifiableMd5 ||
           await _verifyFileCheckSum(md5Hash: task.md5, fileName: fileName);
+      if (!verifiableMd5) {
+        _logger.info(
+            'Skipping file MD5 check: the source id is not a file hash',
+            tag: 'DownloadManager',
+            metadata: {'source_id': task.md5});
+      }
     } catch (e, st) {
       _logger.error('Checksum verification failed',
           tag: 'DownloadManager', error: e, stackTrace: st);

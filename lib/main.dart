@@ -278,6 +278,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     ];
     _pageController = PageController(initialPage: _viewModel.tabIndex);
     _viewModel.addListener(_onViewModelChanged);
+    DownloadNotificationService().onDownloadTap =
+        _openDownloadsFromNotification;
+    if (DownloadNotificationService().launchedFromNotification) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openDownloadsFromNotification();
+      });
+    }
     WidgetsBinding.instance.addObserver(this);
     // Request notification permission after first frame (only on mobile)
     if (PlatformUtils.isMobile) {
@@ -294,6 +301,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshMirrorsOnStartup();
     });
+  }
+
+  void _openDownloadsFromNotification() {
+    _viewModel.selectTab(2);
   }
 
   void _onViewModelChanged() {
@@ -315,6 +326,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    DownloadNotificationService().onDownloadTap = null;
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChanged);
     _pageController.dispose();
@@ -331,6 +343,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Future<void> _checkForUpdatesOnStartup() async {
     // Small delay to let the UI settle
     await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    try {
+      final autoUpdate =
+          await MyLibraryDb.instance.getPreference('enableAutoUpdate');
+      if (!shouldCheckUpdatesAtStartup(autoUpdate)) return;
+    } catch (_) {
+      // Missing preference (older installs): keep the historical behavior.
+    }
     if (!mounted) return;
 
     try {

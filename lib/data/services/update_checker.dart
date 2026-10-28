@@ -23,6 +23,12 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/logger.dart';
 
+/// The onboarding switch stores 0/false when the user turns automatic
+/// update checks off. Missing values (older installs) keep checking.
+bool shouldCheckUpdatesAtStartup(Object? autoUpdatePreference) {
+  return autoUpdatePreference != 0 && autoUpdatePreference != false;
+}
+
 // Release information from GitHub
 class ReleaseInfo {
   final String version;

@@ -125,6 +125,16 @@ class _RangeServer {
 }
 
 void main() {
+  group('isVerifiableMd5', () {
+    test('accepts only 32 hexadecimal characters', () {
+      expect(isVerifiableMd5('0123456789abcdef0123456789abcdef'), isTrue);
+      expect(isVerifiableMd5('0123456789ABCDEF0123456789ABCDEF'), isTrue);
+      expect(isVerifiableMd5('0123456789abcdef0123456789abcde'), isFalse);
+      expect(isVerifiableMd5('127710566'), isFalse);
+      expect(isVerifiableMd5('some-title'), isFalse);
+    });
+  });
+
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
@@ -727,11 +737,9 @@ void main() {
     test('names the big catalogs by host', () {
       expect(mirrorSourceLabel('https://libgen.li/get.php?md5=x'), 'LibGen');
       expect(mirrorSourceLabel('https://libgen.vg/ads.php?md5=x'), 'LibGen');
-      expect(
-          mirrorSourceLabel('https://z-lib.gd/dl/abc/def'), 'Z-Library');
+      expect(mirrorSourceLabel('https://z-lib.gd/dl/abc/def'), 'Z-Library');
       expect(mirrorSourceLabel('https://ipfs.io/ipfs/QmX'), 'IPFS');
-      expect(
-          mirrorSourceLabel('https://annas-archive.org/md5/x'),
+      expect(mirrorSourceLabel('https://annas-archive.org/md5/x'),
           "Anna's Archive");
     });
 

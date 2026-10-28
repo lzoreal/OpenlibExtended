@@ -32,10 +32,11 @@ class MirrorFetcherService {
 
     final Completer<List<String>> completer = Completer<List<String>>();
     final List<String> bookDownloadLinks = [];
+    HeadlessInAppWebView? headlessWebView;
 
     try {
       // Create a headless webview to load the page
-      final headlessWebView = HeadlessInAppWebView(
+      final webView = headlessWebView = HeadlessInAppWebView(
         initialUrlRequest: URLRequest(url: WebUri(url)),
         onLoadStop: (controller, url) async {
           if (url == null) {
@@ -97,7 +98,7 @@ class MirrorFetcherService {
       );
 
       // Run the headless webview
-      await headlessWebView.run();
+      await webView.run();
       _logger.debug('Headless webview started', tag: 'MirrorFetcher');
 
       // Wait for the page to load and links to be extracted
@@ -111,17 +112,24 @@ class MirrorFetcherService {
         },
       );
 
-      // Dispose the headless webview
-      await headlessWebView.dispose();
-      _logger.debug('Headless webview disposed',
-          tag: 'MirrorFetcher', metadata: {'mirrors_found': result.length});
-
       return result;
     } catch (e, stackTrace) {
       _logger.error('Failed to fetch mirrors',
           tag: 'MirrorFetcher', error: e, stackTrace: stackTrace);
       // Return empty list on error
       return [];
+    } finally {
+      // Dispose on every path: a webview that failed to run still owns
+      // platform resources.
+      if (headlessWebView != null) {
+        try {
+          await headlessWebView.dispose();
+          _logger.debug('Headless webview disposed', tag: 'MirrorFetcher');
+        } catch (e) {
+          _logger.warning('Failed to dispose headless webview',
+              tag: 'MirrorFetcher', error: e);
+        }
+      }
     }
   }
 }

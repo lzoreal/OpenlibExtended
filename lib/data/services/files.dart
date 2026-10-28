@@ -11,7 +11,9 @@ import 'package:openlib/data/services/database.dart';
 
 MyLibraryDb dataBase = MyLibraryDb.instance;
 
-// Generate a safe filename: Title.extension
+// Generate a safe filename: Title_hash.extension. The short hash keeps
+// different books with identical titles (or titles the filesystem
+// rejects) from overwriting each other.
 String generateBookFileName({
   required String title,
   String? author,
@@ -19,13 +21,15 @@ String generateBookFileName({
   required String format,
   required String md5,
 }) {
-  // Remove emojis, icons and non-ASCII characters
+  // Remove control characters, emojis and path separators, but keep
+  // non-ASCII letters so CJK titles survive instead of collapsing to a
+  // hash.
   String removeSpecialChars(String text) {
     return text
+        .replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), '')
         .replaceAll(RegExp(r'[\u{1F300}-\u{1F9FF}]', unicode: true), '')
         .replaceAll(RegExp(r'[\u{2600}-\u{26FF}]', unicode: true), '')
         .replaceAll(RegExp(r'[\u{2700}-\u{27BF}]', unicode: true), '')
-        .replaceAll(RegExp(r'[^\x00-\x7F]+'), '')
         .trim();
   }
 
@@ -52,8 +56,12 @@ String generateBookFileName({
     // Remove numbering patterns like "- 184"
     mainTitle = mainTitle.replaceAll(RegExp(r'\s*-\s*\d+\s*'), ' ');
 
-    // Remove special characters
-    mainTitle = mainTitle.replaceAll(RegExp(r'[<>:"/\\|?*·,;]'), '').trim();
+    // Remove characters that are invalid on at least one target
+    // platform, and trailing dots/spaces that Windows drops.
+    mainTitle = mainTitle
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
+        .replaceAll(RegExp(r'[.\s]+$'), '')
+        .trim();
 
     // Convert main title to PascalCase
     String toPascalCase(String input) {
@@ -72,8 +80,10 @@ String generateBookFileName({
 
     // Add parenthetical content as separate parts
     for (var content in parentheticalContent) {
-      String cleanedContent =
-          content.replaceAll(RegExp(r'[<>:"/\\|?*·,;]'), '').trim();
+      String cleanedContent = content
+          .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
+          .replaceAll(RegExp(r'[.\s]+$'), '')
+          .trim();
       String pascalContent = toPascalCase(cleanedContent);
       if (pascalContent.isNotEmpty) {
         result = "${result}_$pascalContent";
@@ -83,23 +93,35 @@ String generateBookFileName({
     return result;
   }
 
-  // Truncate string to max length
+  // Truncate by runes so a multi-byte character is never split.
   String truncate(String text, int maxLength) {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength);
+    if (text.runes.length <= maxLength) return text;
+    return String.fromCharCodes(text.runes.take(maxLength));
   }
 
   String safeTitle = extractAndCombineTitle(title);
 
-  // Ensure filename is not too long (max 200 chars before extension)
-  String baseName = truncate(safeTitle, 200);
+  // Leave room for the id suffix and extension within filesystem limits
+  String baseName = truncate(safeTitle, 180);
 
   // Remove trailing underscores
   baseName = baseName.replaceAll(RegExp(r'_+$'), '');
 
-  // Fallback to md5 if title is empty
+  // The book id is the best available stable unique key; keep it short
+  // but never let it add path separators or spaces to the name.
+  final hash = md5.replaceAll(RegExp(r'[^0-9A-Za-z]'), '');
+  final hashSuffix = hash.length >= 8 ? hash.substring(0, 8) : hash;
+
   if (baseName.isEmpty) {
-    baseName = md5.substring(0, 8);
+    baseName = hashSuffix.isNotEmpty ? hashSuffix : 'book';
+  } else if (hashSuffix.isNotEmpty) {
+    baseName = '${baseName}_$hashSuffix';
+  }
+
+  // Windows reserves these device names at every directory level.
+  if (RegExp(r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])$', caseSensitive: false)
+      .hasMatch(baseName)) {
+    baseName = '${baseName}_book';
   }
 
   return "$baseName.$format";
@@ -210,4 +232,3 @@ Future<String> getFilePath(String fileName) async {
   }
   throw "File Not Exists";
 }
-

@@ -33,6 +33,16 @@ class DownloadNotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  bool _launchedFromNotification = false;
+
+  /// Set by the shell so a notification tap brings the downloads tab
+  /// forward instead of only opening the app.
+  void Function()? onDownloadTap;
+
+  /// True when this process was started by tapping a download
+  /// notification. The shell consumes it after registering
+  /// [onDownloadTap].
+  bool get launchedFromNotification => _launchedFromNotification;
 
   String _channelName = 'Downloads';
   String _channelDescription = 'Book download progress notifications';
@@ -78,15 +88,22 @@ class DownloadNotificationService {
 
       await _notificationsPlugin.initialize(
         settings: initSettings,
-        onDidReceiveNotificationResponse: _onNotificationTap,
+        onDidReceiveNotificationResponse: handleNotificationResponse,
       );
+
+      final launchDetails =
+          await _notificationsPlugin.getNotificationAppLaunchDetails();
+      _launchedFromNotification =
+          launchDetails?.didNotificationLaunchApp ?? false;
 
       _initialized = true;
     }
   }
 
-  void _onNotificationTap(NotificationResponse response) {
+  @visibleForTesting
+  void handleNotificationResponse(NotificationResponse response) {
     debugPrint('Notification tapped: ${response.payload}');
+    onDownloadTap?.call();
   }
 
   Future<void> showDownloadNotification({

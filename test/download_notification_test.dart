@@ -3,12 +3,28 @@
 // boundaries that chunked streams almost never hit.
 
 // Flutter imports:
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/data/services/download_notification.dart';
 
 void main() {
+  group('download notification taps', () {
+    test('invokes the registered download-tab callback', () {
+      final service = DownloadNotificationService();
+      var taps = 0;
+      service.onDownloadTap = () => taps++;
+
+      service.handleNotificationResponse(const NotificationResponse(
+        notificationResponseType: NotificationResponseType.selectedNotification,
+      ));
+
+      expect(taps, 1);
+      service.onDownloadTap = null;
+    });
+  });
+
   group('shouldNotifyProgress', () {
     test('small movements within the step do not re-post', () {
       expect(shouldNotifyProgress(10, 11), isFalse);

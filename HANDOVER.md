@@ -258,10 +258,10 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 - **断点续传**：文件已存在则发 `Range: bytes=N-`；服务端忽略 Range 返回 200 时截断重下；416 视为已完成（`:781-899`）。
 - **重试**：429/500/502/503/504/超时/连接错误在同一镜像上退避重试，最多 3 次；403 等永久错误直接换镜像（`:227-236,654-732`）。
 - **链接刷新**：Z-Library/WeLib 的签名链接过期后，通过 `linkRefresher` 重新解析，最多 2 轮（`:739-769`）。
-- **完成**：校验 MD5（`:206-221`）→ 写入 `mybooks` → 状态 completed → 30 秒后从活动列表移除（`:926-986`）。
-- **中断恢复**：回到前台时恢复 paused/failed 任务；failed 任务保留部分文件以 Range 续传（`:436-482`）。
+- **完成**：校验 MD5（仅当来源 id 是 32 位十六进制；`:249-266`）→ 写入 `mybooks` → 状态 completed → 30 秒后从活动列表移除（`:994-1063`）。
+- **中断恢复**：回到前台时恢复 paused/failed 任务；failed 任务保留部分文件以 Range 续传（`:503-526`）。
 
-> 任务队列**只在内存**（`lib/data/services/download_manager.dart:144`），进程被杀后任务列表丢失，不会自动续传；只有进程存活期间的暂停/失败可恢复。
+> 任务队列**只在内存**（`lib/data/services/download_manager.dart:187`），进程被杀后任务列表丢失，不会自动续传；只有进程存活期间的暂停/失败可恢复。
 
 ### 5.4 镜像与反爬
 
@@ -409,25 +409,16 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 
 按影响排序，均可在代码中复核：
 
-1. **下载队列不持久化**：`_activeDownloads` 是内存 Map（`lib/data/services/download_manager.dart:144`），进程被杀后任务全丢；`resumeInterruptedDownloads()` 只能恢复仍在本进程内的 paused/failed 任务（`:436-459`）。Android 没有前台 Service，退后台可能被挂起。
-2. **应用内更新无完整性校验**：只检查文件存在且 ≥10240 字节，没有 SHA-256/签名校验（`lib/data/services/update_checker.dart:566-585`）；Android 更新还固定优先 arm64，不检查设备 ABI（`:310-314`）。
-3. **版本号双轨**：`pubspec.yaml:19` 是 1.0.11+14，发布版本由 CI 注入；本地构建、About 页、更新比较都可能受旧版本号影响。
-4. **“自动更新”开关无效**：Onboarding 写入 `enableAutoUpdate`（`lib/ui/features/onboarding/views/onboarding_page.dart:106`），但没有任何代码读取它；启动时总会检查更新（`_checkForUpdatesOnStartup`，`lib/main.dart`）。真正生效的是 `includePrereleaseUpdates`。
-5. **搜索是并行聚合**：所有启用书源同时查询，按配置顺序合并并跨源去重；结果页用来源卡片切换单源视图。新增书源时不要把 UI 假设改回“顺序兜底、首个命中即停”。
-6. **Z-Library 下载 MD5 校验必然失败**：Z-Library 的 `md5` 字段实际是 `/book/<id>` 的书籍 id（`ZlibraryProvider.parseResults`，`lib/data/services/search_manager.dart`），`_verifyFileCheckSum` 拿它和文件 MD5 比较必然不等（`lib/data/services/download_manager.dart:206-221`），完成通知可能显示 “checksum failed”，但文件仍会入库。
-7. **文件名清洗丢弃非 ASCII**：`removeSpecialChars` 删除所有非 ASCII（`lib/data/services/files.dart:24-31`），纯中文标题会退化为 md5 前 8 位；且文件名没有唯一后缀，同标题/同格式的书可能互相覆盖（`:17-108`）。
-8. **分类页解析器有明显笔误**：`img"]` 选择器与 `attributes['herf']`（应为 `href`）导致分类内容解析为空或抛错（`lib/data/services/goodreads.dart:40-44`）；分类列表本身是 28 个硬编码分类和远程封面。
-9. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`、用 `Platform` 分支（`main()`），README 仍把 Web 列为 roadmap。
-10. **macOS 未进入发布流程**：有工程与 Podfile，但 CI 没有 macOS job，README Roadmap 仍列 “MacOs release”。
-11. **iOS 最低版本配置不一致**：Xcode 工程 deployment target 12.0，Podfile 强制 15.0（`ios/Podfile:8`）；CI 用 `nm` 检查 iOS 17-only Swift 符号作为回归护栏（`.github/workflows/build.yml:225-246`）。修改依赖/Pod 时要保持 Podfile 与工程一致。
-12. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/data/services/mirror_fetcher.dart:25-28`），详情页因此走可见 WebView 手动流程（`lib/ui/features/book_detail/views/book_info_page.dart:249-294`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
-13. **通知能力仅 Android**：`DownloadNotificationService` 只在 Android 初始化；通知点击目前只 `debugPrint`，不会打开应用/任务（`lib/data/services/download_notification.dart:56-82`）。
-14. **备份不含书籍文件**：仅备份数据库表，换机后需自行迁移书籍目录。
-15. **本地化覆盖**：5 个语言、531 个 key，测试强制五份 ARB key 完全一致（`test/localization_test.dart:31-52`）；仍有少量硬编码英文（如设置页部分说明、实例页）。
-16. **依赖锁有明确原因，不要随意升级**：`html` 0.15.6、`permission_handler_android` 13.0.1、`sqlite3_flutter_libs` 0.5.42 都是为兼容当前 Flutter/插件而钉死的（`pubspec.yaml:39-92`）。
-17. **年份筛选硬编码到 2025**：`yearValues`（`lib/ui/core/filter_options.dart`）没有 2026，跨年后需要更新。
-18. **`MirrorFetcherService` 错误路径不释放 WebView**：超时/异常返回时没有 `dispose()`（`lib/data/services/mirror_fetcher.dart:95-112`），长期运行可能泄漏。
-19. **`setCompleted` 仍会清空阅读位置**：标记完成时以 `position: ''` 覆盖同一行（`MyLibraryDb.setCompleted`，`lib/data/services/database.dart`）；内置阅读器已删除，应用内不再写入阅读位置，但旧数据/备份仍可能包含。
+1. **下载队列不持久化**：`_activeDownloads` 是内存 Map（`lib/data/services/download_manager.dart:187`），进程被杀后任务全丢；`resumeInterruptedDownloads()` 只能恢复仍在本进程内的 paused/failed 任务（`:503-526`）。Android 没有前台 Service，退后台可能被挂起。
+2. **应用内更新无完整性校验**：只检查文件存在且 ≥10240 字节，没有 SHA-256/签名校验（`lib/data/services/update_checker.dart:580-592`）；Android 更新还固定优先 arm64，不检查设备 ABI（`:320-323`）。
+3. **版本号双轨**：`pubspec.yaml:19` 是 1.0.11+14；CI 在构建前把 `pubspec.yaml` 改成 tag 版本（`.github/workflows/build.yml:172` 等），所以发布包与 About 页正确，本地构建会显示旧版本。
+4. **搜索是并行聚合（设计约束）**：所有启用书源同时查询，按配置顺序合并并跨源去重；结果页用来源卡片切换单源视图。新增书源时不要把 UI 假设改回“顺序兜底、首个命中即停”。
+5. **分类目录硬编码**：28 个分类和 28 张远程封面写死在 `lib/ui/features/trending/views/categories_page.dart:31`；改分类需要发版，且依赖第三方 raw 图片。
+6. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`（`lib/main.dart:2`），README 仍把 Web 列为 roadmap（`README.md:45`）。
+7. **macOS 未进入发布流程**：有工程与 Podfile；CI 的 `build-ios` 跑在 macOS runner 上（`.github/workflows/build.yml:197`），但没有 macOS 桌面构建/签名/发布，README Roadmap 仍列 “MacOs release”（`README.md:49`）。
+8. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/data/services/mirror_fetcher.dart:27-30`），详情页因此走可见 WebView 手动流程（`lib/ui/features/book_detail/view_models/book_detail_view_model.dart:409`；入口 `lib/ui/features/book_detail/views/book_info_page.dart:306,352`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
+9. **备份不含书籍文件**：仅备份数据库表（`lib/data/services/backup_service.dart:41-57`），换机后需自行迁移书籍目录。
+10. **依赖锁有明确原因，不要随意升级**：`html: 0.15.6`、`permission_handler_android: 13.0.1`、`sqlite3_flutter_libs: ^0.5.42` 都是为兼容当前 Flutter/插件而钉死的（`pubspec.yaml:40,57,87`）。
 
 ---
 

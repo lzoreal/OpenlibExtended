@@ -10,7 +10,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/services/files.dart';
 
-
 class MyLibraryDb {
   static final MyLibraryDb instance = MyLibraryDb._internal();
   static Database? _database;
@@ -190,11 +189,18 @@ class MyLibraryDb {
 
   Future<void> saveBookState(String fileName, String position) async {
     final dbInstance = await instance.database;
-    await dbInstance.insert(
+    final updated = await dbInstance.update(
       'bookposition',
-      {'fileName': fileName, 'position': position},
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      {'position': position},
+      where: 'fileName = ?',
+      whereArgs: [fileName],
     );
+    if (updated == 0) {
+      await dbInstance.insert(
+        'bookposition',
+        {'fileName': fileName, 'position': position},
+      );
+    }
   }
 
   // ------------------------------------------------------------------
@@ -261,11 +267,18 @@ class MyLibraryDb {
   /// the bookposition table.
   Future<void> setCompleted(String fileName, bool completed) async {
     final dbInstance = await instance.database;
-    await dbInstance.insert(
+    final updated = await dbInstance.update(
       'bookposition',
-      {'fileName': fileName, 'position': '', 'completed': completed ? 1 : 0},
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      {'completed': completed ? 1 : 0},
+      where: 'fileName = ?',
+      whereArgs: [fileName],
     );
+    if (updated == 0) {
+      await dbInstance.insert(
+        'bookposition',
+        {'fileName': fileName, 'position': '', 'completed': completed ? 1 : 0},
+      );
+    }
   }
 
   /// True when the book is flagged completed.
