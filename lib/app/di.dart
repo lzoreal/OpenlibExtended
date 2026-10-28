@@ -23,7 +23,7 @@ Future<void> initDi({
   }
   getIt.registerSingleton<AppSettings>(settings);
   getIt.registerLazySingleton<PreferencesService>(
-      () => PreferencesService(database: db));
+      () => PreferencesService(database: getIt<MyLibraryDb>()));
   getIt.registerLazySingleton<DownloadManager>(() => DownloadManager());
   getIt.registerLazySingleton<InstanceManager>(() => InstanceManager());
 }
