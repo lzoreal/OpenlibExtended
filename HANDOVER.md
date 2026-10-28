@@ -79,9 +79,9 @@ flutter build linux --release
 
 ### 2.3 首次运行注意
 
-- 桌面端启动时会初始化 sqflite FFI（`lib/main.dart:66-69`）。
-- 启动会做四件事：加载偏好、检查升级、后台刷新镜像、2 秒后检查更新（`lib/main.dart:162-194,312-368`）。
-- 首次安装进入 Onboarding；升级后进入 What's New；否则进入四 Tab 主界面（`lib/main.dart:282-289`）。
+- 桌面端启动时会初始化 sqflite FFI（`main()`，`lib/main.dart`）。
+- 启动会做四件事：加载偏好、检查升级、后台刷新镜像、2 秒后检查更新（`main()`、`_MainScreenState.initState`，`lib/main.dart`）。
+- 首次安装进入 Onboarding；升级后进入 What's New；否则进入四 Tab 主界面（`MyApp.build`，`lib/main.dart`）。
 - 当前 `pubspec.yaml` 版本号不是发布版本；本地构建显示 1.0.11，CI 构建才注入 tag 版本。
 
 ---
@@ -93,7 +93,9 @@ lib/
 ├─ main.dart                  # 启动、偏好注入、主题/本地化、主壳与底部导航
 ├─ l10n/                      # ARB 源文件 + 生成代码（5 语言，557 个 key）
 ├─ state/state.dart           # 全局 Riverpod provider、派生数据、阅读进度写入
-├─ services/
+├─ app/                       # app_settings.dart（启动期偏好）、di.dart（get_it 装配）
+├─ data/models/               # BookData、MyBook、SearchProviderId、SearchManagerResult 等模型
+├─ data/services/             # 原 lib/services/，下面各项都在这个目录里
 │  ├─ search_manager.dart     # 4 个 SearchProvider + 并行搜索 + 去重
 │  ├─ annas_archieve.dart     # Anna's Archive 抓取/解析/过盾/快速下载
 │  ├─ libgen_service.dart     # LibGen 详情/下载/封面
@@ -153,20 +155,21 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 约定：
 
 - **UI 不直接发网络请求或写文件**；下载统一走 `DownloadManager`，下载记录/偏好读写统一走 `MyLibraryDb`。
-- 全局偏好由 `main()` 读库后通过 `ProviderScope.overrides` 注入（`lib/main.dart:196-219`），页面再 `watch` 对应 provider。
-- 重要服务都是单例：`MyLibraryDb.instance`、`DownloadManager()`、`InstanceManager()`、`AppLogger()`。
+- 启动期偏好由 `AppSettings.load`（`lib/app/app_settings.dart`）读库，`main()` 把结果传给 `initDi()`（`lib/app/di.dart`）；迁移期 Riverpod 仍通过 `ProviderScope.overrides` 收到同一份启动值，页面再 `watch` 对应 provider。
+- 重要服务都是单例：`AppSettings`（容器内注册）、`MyLibraryDb.instance`、`DownloadManager()`、`InstanceManager()`、`AppLogger()`。
 - 书源、镜像、下载目标都有明确的“服务 + 数据模型 + 纯函数”拆分，便于测试注入（如 `SearchManager(providers: ...)`、`InstanceManager.forTest`）。
 
 ### 4.2 启动时序
 
-1. Linux/Windows 先处理桌面 WebView 标题栏插件参数（`lib/main.dart:59-63`）。
-2. 桌面端初始化 sqflite FFI（`lib/main.dart:66-69`）。
-3. 打开 SQLite（首次建表 v7），初始化 `DownloadManager` 并清空旧通知（`lib/main.dart:71-73`）。
-4. 从 `preferences` / `browserOptions` 读取：主题、字号、语言、手动下载按钮、后台验证、donation key、UA/cookie、5 个搜索筛选、onboarding 状态（`lib/main.dart:75-166`）。
-5. 检测版本升级（`UpgradeDetector`，写 `lastRunVersion`，`lib/main.dart:168-176`）。
-6. Android 额外迁移旧内部存储文件（`lib/main.dart:178-182`）。
-7. 注册“headless 过盾失败 → 可见验证页”的 UI 回调（`lib/main.dart:187-194`）。
-8. `runApp`；主壳在首帧后请求通知权限、2 秒后检查更新、1 秒后预热镜像目录（`lib/main.dart:312-368`）；回前台时恢复中断下载（`lib/main.dart:334-342`）。
+1. Linux/Windows 先处理桌面 WebView 标题栏插件参数（`main()`）。
+2. 桌面端初始化 sqflite FFI（`main()`）。
+3. 打开 SQLite（首次建表 v7），初始化 `DownloadManager` 并清空旧通知（`main()`）。
+4. `AppSettings.load` 从 `preferences` / `browserOptions` 读取主题、字号、语言、手动下载按钮、后台验证、donation key、UA/cookie、5 个搜索筛选（`lib/app/app_settings.dart`）；`main()` 另读 onboarding 状态。
+5. 挂载 get_it 容器（`initDi`，`lib/app/di.dart`），把 `AppSettings` 与各服务注册为单例。
+6. 检测版本升级（`UpgradeDetector`，写 `lastRunVersion`，`main()`）。
+7. Android 额外迁移旧内部存储文件（`main()`）。
+8. 注册“headless 过盾失败 → 可见验证页”的 UI 回调（`main()`）。
+9. `runApp`；主壳在首帧后请求通知权限、2 秒后检查更新、1 秒后预热镜像目录（`_MainScreenState.initState`、`_checkForUpdatesOnStartup`、`_refreshMirrorsOnStartup`）；回前台时恢复中断下载（`_MainScreenState.didChangeAppLifecycleState`）。以上均在 `lib/main.dart`。
 
 ### 4.3 MD3 设计系统
 
@@ -212,9 +215,9 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 | 作者/出版社 | ✅ `author:"…"` | ✅ `columns[]` | ❌ | ❌ |
 | 分页 | ✅ | ✅ | ✅ | ✅ |
 
-实现位置：AA `lib/data/services/annas_archieve.dart:612-687`；LibGen `lib/data/services/search_manager.dart:256-335`；Z-Library `lib/data/services/search_manager.dart:399-470`；WeLib `lib/data/services/search_manager.dart:900-983`。
+实现位置：AA `AnnasArchieve.searchBooks`（`lib/data/services/annas_archieve.dart`）；LibGen `LibgenProvider.search`；Z-Library `ZlibraryProvider.search`；WeLib `WelibProvider.search`（三者都在 `lib/data/services/search_manager.dart`）。
 
-每页搜索结果用 `SearchPageKey(query, page)` 作为 provider family key 缓存（`lib/state/state.dart:385-433`）；结果页滚动到距底部 200px 加载下一页（`lib/ui/results_page.dart:82-110`）。
+每页搜索结果用 `SearchPageKey(query, page)` 作为 provider family key 缓存（`SearchPageKey` / `searchProvider`，`lib/state/state.dart`）；结果页滚动到距底部 200px 加载下一页（`lib/ui/results_page.dart:82-110`）。
 
 ### 5.2 详情路由
 
@@ -225,7 +228,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 3. 路径以 `/book/` 开头 → Z-Library（URL 形状兜底）。
 4. 其余 → Anna's Archive（catch-all；WeLib 的 `/md5/` 在目录可用时会先被 host 命中 `welib`，只有冷目录/未知 host 才落到这里）。
 
-`bookInfoProvider` 根据路由调用对应服务（`lib/state/state.dart:449-476`）。**不要新增硬编码 host 白名单**：镜像会变，目录是唯一事实来源。
+`bookInfoProvider` 根据路由调用对应服务（路由在 `_fetchBookInfo`，均属 `lib/state/state.dart`）。**不要新增硬编码 host 白名单**：镜像会变，目录是唯一事实来源。
 
 ### 5.3 下载
 
@@ -306,7 +309,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 
 ### 6.1 SQLite schema v7
 
-定义在 `lib/data/services/database.dart:81-172`：
+定义在 `MyLibraryDb._initDatabase`（`lib/data/services/database.dart`）：
 
 | 表 | 主键 | 用途 |
 |---|---|---|
@@ -316,7 +319,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 | `browserOptions` | `name` | `userAgent`、`cookie`、按域 cookie |
 | `booktags` | `(bookId, tag)` | 旧书库标签（schema 保留兼容，UI 不再使用） |
 
-数据库位置：桌面 `getApplicationSupportDirectory()`，移动 `getDatabasesPath()`（`lib/data/services/database.dart:81-93`）。桌面需先初始化 FFI（`lib/main.dart:66-69`）。
+数据库位置：桌面 `getApplicationSupportDirectory()`，移动 `getDatabasesPath()`（`MyLibraryDb._initDatabase`，`lib/data/services/database.dart`）。桌面需先初始化 FFI（`main()`，`lib/main.dart`）。
 
 ### 6.2 偏好键
 
@@ -332,7 +335,7 @@ queued → fetchingMirrors → downloadingMirrors → downloading → verifying 
 | 镜像 | `instance_auto_mode`、`instance_manual_order`、`instance_disabled_hosts`、`instance_local_latency`、`slum_catalogue_cache` |
 | 浏览器 | `browserOptions.userAgent`、`browserOptions.cookie`、`browserOptions.cookies_<domain>` |
 
-注意：`getPreference()` 会把能解析为整数的值返回为 `int`，否则返回 `String`；键不存在时**抛异常**，调用方普遍依赖 `.catchError` 兜底（`lib/data/services/database.dart:391-408`）。`savePreference()` 只接受 `bool/int/String`，bool 自动转 0/1（`:373-389`）。
+注意：`getPreference()` 会把能解析为整数的值返回为 `int`，否则返回 `String`；键不存在时**抛异常**，调用方普遍依赖 `.catchError` 兜底（`MyLibraryDb.getPreference`，`lib/data/services/database.dart`）。`savePreference()` 只接受 `bool/int/String`，bool 自动转 0/1（`MyLibraryDb.savePreference`）。
 
 ---
 
@@ -405,12 +408,12 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 1. **下载队列不持久化**：`_activeDownloads` 是内存 Map（`lib/data/services/download_manager.dart:144`），进程被杀后任务全丢；`resumeInterruptedDownloads()` 只能恢复仍在本进程内的 paused/failed 任务（`:436-459`）。Android 没有前台 Service，退后台可能被挂起。
 2. **应用内更新无完整性校验**：只检查文件存在且 ≥10240 字节，没有 SHA-256/签名校验（`lib/data/services/update_checker.dart:566-585`）；Android 更新还固定优先 arm64，不检查设备 ABI（`:310-314`）。
 3. **版本号双轨**：`pubspec.yaml:19` 是 1.0.11+14，发布版本由 CI 注入；本地构建、About 页、更新比较都可能受旧版本号影响。
-4. **“自动更新”开关无效**：Onboarding 写入 `enableAutoUpdate`（`lib/ui/onboarding/onboarding_page.dart:106`），但没有任何代码读取它；启动时总会检查更新（`lib/main.dart:357-367`）。真正生效的是 `includePrereleaseUpdates`。
+4. **“自动更新”开关无效**：Onboarding 写入 `enableAutoUpdate`（`lib/ui/onboarding/onboarding_page.dart:106`），但没有任何代码读取它；启动时总会检查更新（`_checkForUpdatesOnStartup`，`lib/main.dart`）。真正生效的是 `includePrereleaseUpdates`。
 5. **搜索是并行聚合**：所有启用书源同时查询，按配置顺序合并并跨源去重；结果页用来源卡片切换单源视图。新增书源时不要把 UI 假设改回“顺序兜底、首个命中即停”。
-6. **Z-Library 下载 MD5 校验必然失败**：Z-Library 的 `md5` 字段实际是 `/book/<id>` 的书籍 id（`lib/data/services/search_manager.dart:511-514`），`_verifyFileCheckSum` 拿它和文件 MD5 比较必然不等（`lib/data/services/download_manager.dart:206-221`），完成通知可能显示 “checksum failed”，但文件仍会入库。
+6. **Z-Library 下载 MD5 校验必然失败**：Z-Library 的 `md5` 字段实际是 `/book/<id>` 的书籍 id（`ZlibraryProvider.parseResults`，`lib/data/services/search_manager.dart`），`_verifyFileCheckSum` 拿它和文件 MD5 比较必然不等（`lib/data/services/download_manager.dart:206-221`），完成通知可能显示 “checksum failed”，但文件仍会入库。
 7. **文件名清洗丢弃非 ASCII**：`removeSpecialChars` 删除所有非 ASCII（`lib/data/services/files.dart:24-31`），纯中文标题会退化为 md5 前 8 位；且文件名没有唯一后缀，同标题/同格式的书可能互相覆盖（`:17-108`）。
 8. **分类页解析器有明显笔误**：`img"]` 选择器与 `attributes['herf']`（应为 `href`）导致分类内容解析为空或抛错（`lib/data/services/goodreads.dart:40-44`）；分类列表本身是 28 个硬编码分类和远程封面。
-9. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`、用 `Platform` 分支（`lib/main.dart:2,59,66`），README 仍把 Web 列为 roadmap。
+9. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`、用 `Platform` 分支（`main()`），README 仍把 Web 列为 roadmap。
 10. **macOS 未进入发布流程**：有工程与 Podfile，但 CI 没有 macOS job，README Roadmap 仍列 “MacOs release”。
 11. **iOS 最低版本配置不一致**：Xcode 工程 deployment target 12.0，Podfile 强制 15.0（`ios/Podfile:8`）；CI 用 `nm` 检查 iOS 17-only Swift 符号作为回归护栏（`.github/workflows/build.yml:225-246`）。修改依赖/Pod 时要保持 Podfile 与工程一致。
 12. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/data/services/mirror_fetcher.dart:25-28`），详情页因此走可见 WebView 手动流程（`lib/ui/book_info_page.dart:249-294`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
@@ -418,9 +421,9 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 14. **备份不含书籍文件**：仅备份数据库表，换机后需自行迁移书籍目录。
 15. **本地化覆盖**：5 个语言、531 个 key，测试强制五份 ARB key 完全一致（`test/localization_test.dart:31-52`）；仍有少量硬编码英文（如设置页部分说明、实例页）。
 16. **依赖锁有明确原因，不要随意升级**：`html` 0.15.6、`permission_handler_android` 13.0.1、`sqlite3_flutter_libs` 0.5.42 都是为兼容当前 Flutter/插件而钉死的（`pubspec.yaml:39-92`）。
-17. **年份筛选硬编码到 2025**：`yearValues` 列表没有 2026（`lib/state/state.dart:128-147`），跨年后需要更新。
+17. **年份筛选硬编码到 2025**：`yearValues`（`lib/state/state.dart`）没有 2026，跨年后需要更新。
 18. **`MirrorFetcherService` 错误路径不释放 WebView**：超时/异常返回时没有 `dispose()`（`lib/data/services/mirror_fetcher.dart:95-112`），长期运行可能泄漏。
-19. **`setCompleted` 仍会清空阅读位置**：标记完成时以 `position: ''` 覆盖同一行（`lib/data/services/database.dart:314-320`）；内置阅读器已删除，应用内不再写入阅读位置，但旧数据/备份仍可能包含。
+19. **`setCompleted` 仍会清空阅读位置**：标记完成时以 `position: ''` 覆盖同一行（`MyLibraryDb.setCompleted`，`lib/data/services/database.dart`）；内置阅读器已删除，应用内不再写入阅读位置，但旧数据/备份仍可能包含。
 
 ---
 
@@ -428,7 +431,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 
 ### 新增一个书源
 
-1. 在 `SearchProviderId` 增加枚举，并实现 `SearchProvider`（`lib/data/services/search_manager.dart:22-36`）。
+1. 在 `SearchProviderId` 增加枚举（`lib/data/models/search_result.dart`），并实现 `SearchProvider`（`lib/data/services/search_manager.dart`）。
 2. 在 `SearchManager` 默认 provider 列表注册；顺序决定合并优先级与默认视图。
 3. 在 `MirrorService` / SLUM 页面映射中确认镜像归属（`lib/data/services/slum_catalogue.dart:22-30,171-177`）。
 4. 在 `routeBookDetail` 中加入详情路由规则（优先用目录 host，其次 URL 形状）。
@@ -437,8 +440,8 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 
 ### 新增一个设置项
 
-1. 在 `lib/state/state.dart` 定义 provider。
-2. 在 `main()` 读取偏好并通过 `ProviderScope.overrides` 注入（`lib/main.dart:196-219`）。
+1. 在 `AppSettings`（`lib/app/app_settings.dart`）加字段与 setter，并在 `AppSettings.load` 里读偏好。
+2. `main()` 把 `AppSettings.load(...)` 的结果传给 `initDi()`（`lib/app/di.dart`）；迁移期 Riverpod 仍通过 `ProviderScope.overrides` 收到同一份启动值，页面再从 provider 取。
 3. 在 `lib/ui/settings_page.dart` 加 `_SettingsTile` / `_SettingsSwitchTile`，切换时写库。
 4. 若需要即时生效，同步更新对应服务的静态开关（参考 `backgroundVerification`）。
 
@@ -470,6 +473,8 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 | 想了解 | 先看 |
 |---|---|
 | 启动、导航、主题 | `lib/main.dart` |
+| 启动期偏好与 DI 容器 | `lib/app/app_settings.dart`、`lib/app/di.dart` |
+| 数据模型 | `lib/data/models/book_data.dart`、`lib/data/models/my_book.dart`、`lib/data/models/search_result.dart`、`lib/data/models/trending_book_data.dart` |
 | 所有全局状态/数据源 | `lib/state/state.dart` |
 | 搜索与书源 | `lib/data/services/search_manager.dart` |
 | Anna's Archive | `lib/data/services/annas_archieve.dart` |

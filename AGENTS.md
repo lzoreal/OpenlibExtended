@@ -11,7 +11,7 @@
 ## 1. 项目速览
 
 - Flutter 跨平台电子书客户端：Anna's Archive / LibGen / Z-Library / WeLib 搜索 → 下载中心 → 外部阅读器打开 EPUB/PDF。
-- 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；服务 `lib/data/services/`；页面 `lib/ui/`；数据库 `lib/data/services/database.dart`（本轮先加 `lib/app/` 与 `lib/data/`，`lib/state/` 在 W7 前仍存在）。
+- 入口 `lib/main.dart`；全局设置 `lib/app/app_settings.dart`；模型 `lib/data/models/`（`BookData`、`MyBook`、`SearchProviderId` 等）；服务 `lib/data/services/`；页面 `lib/ui/`；数据库 `lib/data/services/database.dart`（本轮先加 `lib/app/` 与 `lib/data/`，`lib/state/` 在 W7 前仍存在）。
 - 发布平台：Android、iOS（未签名侧载）、Windows、Linux。**Web 不可用**；macOS 有工程但未发布。
 - “我的书库”已重构为“下载中心”：标签、阅读状态筛选、排序/筛选、磁盘同步入口均已删除，不要恢复。
 - 主导航与子标签均支持左右滑动；镜像页支持本机测速并按本机延迟自动排序。
