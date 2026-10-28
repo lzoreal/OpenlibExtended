@@ -2443,6 +2443,36 @@
       }
     }
   },
+  "downloadInProgressPercent": "Downloading {percent}% · tap to pause",
+  "@downloadInProgressPercent": {
+    "description": "UI text: downloadInProgressPercent",
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "downloadPausedPercent": "Paused at {percent}% · tap to resume",
+  "@downloadPausedPercent": {
+    "description": "UI text: downloadPausedPercent",
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "downloadPreparing": "Preparing download…",
+  "@downloadPreparing": {
+    "description": "UI text: downloadPreparing"
+  },
+  "downloadVerifying": "Verifying file…",
+  "@downloadVerifying": {
+    "description": "UI text: downloadVerifying"
+  },
+  "downloadFailedRetry": "Download failed · tap to retry",
+  "@downloadFailedRetry": {
+    "description": "UI text: downloadFailedRetry"
+  },
+  "downloadCompletedShort": "Downloaded",
+  "@downloadCompletedShort": {
+    "description": "UI text: downloadCompletedShort"
+  },
   "downloadThisBook": "Download book",
   "@downloadThisBook": {
     "description": "Primary action on the book detail page"

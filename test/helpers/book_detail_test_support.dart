@@ -1,6 +1,9 @@
 // Shared book-detail fakes. The page takes its view model through the
 // constructor, so widget tests need no Riverpod at all.
 
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
 
@@ -54,8 +57,22 @@ class FakeLibraryRepository extends LibraryRepository {
 }
 
 class FakeDownloadRepository extends DownloadRepository {
+  FakeDownloadRepository({Map<String, DownloadTask>? active})
+      : _active = {...?active};
+
+  final Map<String, DownloadTask> _active;
+  final _controller = StreamController<Map<String, DownloadTask>>.broadcast();
   final List<DownloadTask> added = [];
   final List<({DownloadTask task, String mirrorUrl})> addedWithMirrorUrl = [];
+  final List<String> paused = [];
+  final List<String> resumed = [];
+  final List<String> retried = [];
+
+  @override
+  Map<String, DownloadTask> get active => Map.unmodifiable(_active);
+
+  @override
+  Stream<Map<String, DownloadTask>> get updates => _controller.stream;
 
   @override
   Future<void> add(DownloadTask task) async {
@@ -66,6 +83,42 @@ class FakeDownloadRepository extends DownloadRepository {
   Future<void> addWithMirrorUrl(DownloadTask task, String mirrorUrl) async {
     addedWithMirrorUrl.add((task: task, mirrorUrl: mirrorUrl));
   }
+
+  @override
+  Future<void> pause(String taskId) async => paused.add(taskId);
+
+  @override
+  Future<void> resume(String taskId) async => resumed.add(taskId);
+
+  @override
+  Future<void> retryKeepingPartial(String taskId) async =>
+      retried.add(taskId);
+
+  void emit(Map<String, DownloadTask> tasks) {
+    _active
+      ..clear()
+      ..addAll(tasks);
+    _controller.add(Map.of(tasks));
+  }
+
+  Future<void> close() => _controller.close();
+}
+
+DownloadTask testDownloadTask({
+  String md5 = 'abc',
+  DownloadStatus status = DownloadStatus.downloading,
+  double progress = 0,
+}) {
+  return DownloadTask(
+    id: 'task-$md5',
+    md5: md5,
+    title: 'Title',
+    format: 'EPUB',
+    link: 'https://example.com/md5/$md5',
+    mirrors: const [],
+    status: status,
+    progress: progress,
+  );
 }
 
 class FakeBookInfoRepository extends BookInfoRepository {

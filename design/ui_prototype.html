@@ -1425,6 +1425,27 @@
         <figcaption><em>06</em>书籍详情 · 首屏先用检索结果渲染，简介区显示骨架</figcaption>
       </figure>
 
+      <!-- 详情页下载按钮三态（状态说明，不单列一屏） -->
+      <div class="card" style="grid-column:1/-1;width:100%;max-width:820px;justify-self:center">
+        <div class="card-head">
+          <div class="tile-icon"><svg class="ic"><use href="#i-down"/></svg></div>
+          <div class="grow"><b>详情页下载按钮 · 三态</b></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <div class="btn primary" style="flex:0 0 auto"><svg class="ic"><use href="#i-down"/></svg>下载本书</div>
+          <div class="btn primary" style="flex:1;min-width:220px;position:relative;overflow:hidden;padding-bottom:8px">
+            正在下载 42%
+            <div class="progress" style="position:absolute;left:0;right:0;bottom:0;margin:0;border-radius:0"><i style="width:42%"></i></div>
+          </div>
+          <div class="btn outline" style="flex:0 0 auto"><svg class="ic"><use href="#i-book"/></svg>打开</div>
+          <div class="btn icon"><svg class="ic"><use href="#i-trash"/></svg></div>
+        </div>
+        <p class="desc" style="margin:10px 0 0">
+          点“下载本书”后，同一位置变为“正在下载 42%”并在按钮底部走细进度条；完成后自动切换为“打开 / 删除”，失败则变为“重试”。
+          进度来自 DownloadManager 的实时任务，离开详情页再回来仍能看到。
+        </p>
+      </div>
+
     </div>
   </section>
 

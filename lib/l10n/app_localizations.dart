@@ -2156,10 +2156,10 @@ abstract class AppLocalizations {
   /// **'Paused'**
   String get downloadPaused;
 
-  /// UI text: Verifying
+  /// UI text: downloadVerifying
   ///
   /// In en, this message translates to:
-  /// **'Verifying'**
+  /// **'Verifying file…'**
   String get downloadVerifying;
 
   /// UI text: Cancelled
@@ -3338,6 +3338,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'From the {source} mirror; MD5 is verified after download.'**
   String sourceMirrorHint(String source);
+
+  /// UI text: downloadInProgressPercent
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {percent}% · tap to pause'**
+  String downloadInProgressPercent(int percent);
+
+  /// UI text: downloadPausedPercent
+  ///
+  /// In en, this message translates to:
+  /// **'Paused at {percent}% · tap to resume'**
+  String downloadPausedPercent(int percent);
+
+  /// UI text: downloadPreparing
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing download…'**
+  String get downloadPreparing;
+
+  /// UI text: downloadFailedRetry
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed · tap to retry'**
+  String get downloadFailedRetry;
+
+  /// UI text: downloadCompletedShort
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded'**
+  String get downloadCompletedShort;
 
   /// Primary action on the book detail page
   ///

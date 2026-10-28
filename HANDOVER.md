@@ -242,6 +242,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 4. **Anna's Archive**：若配置了 donation key，调用 `getFastDownloadUrl()` 获取直接下载地址。
 5. `chooseDownloadTarget()` 决定最终目标：只要拿到可用 URL 就用 URL；镜像明确拒绝且无 URL 时才显示拒绝原因（`lib/data/services/download_target.dart:38-47`）。
 6. Linux 且非快速链接：打开可见 WebView 页抓镜像后入队（`lib/ui/features/book_detail/views/book_info_page.dart:249-294`）；其他平台交给 `DownloadManager` 后台抓镜像。
+7. 入队后详情页底部按钮变为“正在下载 X% · 点击暂停”（底部细进度条，数据来自 `DownloadRepository.updates`，100ms 节流）；点击暂停/继续，失败变为“点击重试”，完成后自动切换为“打开/删除”（`BookDetailViewModel.task`）。
 
 下载状态机（`lib/data/services/download_manager.dart:16-26`）：
 

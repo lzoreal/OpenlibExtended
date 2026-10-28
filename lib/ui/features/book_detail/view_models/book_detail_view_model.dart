@@ -20,6 +20,7 @@ import 'package:openlib/data/services/download_target.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/data/services/stream_throttle.dart';
 import 'package:openlib/data/models/file_name.dart';
 
 /// What the detail page should do after the user taps download.
@@ -73,6 +74,11 @@ class BookDetailViewModel extends ChangeNotifier {
         _bookInfo = bookInfo,
         _mirrors = mirrors {
     _settings.addListener(_notify);
+    _task = _findTask(_downloads.active);
+    _taskSubscription = throttleLatest(
+      _downloads.updates,
+      const Duration(milliseconds: 100),
+    ).listen(_onTasks);
   }
 
   factory BookDetailViewModel.fromDi({
@@ -121,6 +127,8 @@ class BookDetailViewModel extends ChangeNotifier {
   bool _loadStarted = false;
   bool _fetching = false;
   bool _disposed = false;
+  DownloadTask? _task;
+  StreamSubscription<Map<String, DownloadTask>>? _taskSubscription;
 
   /// The full detail page once it arrived, otherwise what the results row
   /// already knew - so a tap never lands on a blank spinner.
@@ -145,6 +153,66 @@ class BookDetailViewModel extends ChangeNotifier {
   MyBook? get libraryBook => _libraryBook;
 
   String? get annaArchiveBaseUrl => _annaArchiveBaseUrl;
+
+  /// The live queue entry for this book, if any. The action bar renders its
+  /// progress instead of the download button while it is active.
+  DownloadTask? get task => _task;
+
+  bool get taskCompleted => _task?.status == DownloadStatus.completed;
+
+  bool get taskFailed => _task?.status == DownloadStatus.failed;
+
+  bool get taskPaused => _task?.status == DownloadStatus.paused;
+
+  bool get taskVerifying => _task?.status == DownloadStatus.verifying;
+
+  /// Mirror resolution, queueing and the initial hop carry no byte progress.
+  bool get taskPreparing {
+    final status = _task?.status;
+    return status == DownloadStatus.queued ||
+        status == DownloadStatus.fetchingMirrors ||
+        status == DownloadStatus.downloadingMirrors;
+  }
+
+  double get taskProgress => (_task?.progress ?? 0).clamp(0.0, 1.0);
+
+  String? get _md5 => _data?.md5 ?? _preview?.md5;
+
+  DownloadTask? _findTask(Map<String, DownloadTask> tasks) {
+    final md5 = _md5;
+    if (md5 == null || md5.isEmpty) return null;
+    for (final task in tasks.values) {
+      if (task.md5 == md5 && task.status != DownloadStatus.cancelled) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  void _onTasks(Map<String, DownloadTask> tasks) {
+    if (_disposed) return;
+    final previous = _task;
+    final next = _findTask(tasks);
+    _task = next;
+    final completed = previous?.status != DownloadStatus.completed &&
+        next?.status == DownloadStatus.completed;
+    if (next != null || previous != null) _notify();
+    if (completed) unawaited(refreshMembership());
+  }
+
+  /// Pauses an active task, resumes a paused one, retries a failed one.
+  Future<void> toggleTask() async {
+    final task = _task;
+    if (task == null) return;
+    switch (task.status) {
+      case DownloadStatus.paused:
+        await _downloads.resume(task.id);
+      case DownloadStatus.failed:
+        await _downloads.retryKeepingPartial(task.id);
+      default:
+        await _downloads.pause(task.id);
+    }
+  }
 
   bool get showManualButton => _settings.showManualDownloadButton;
 
@@ -368,6 +436,7 @@ class BookDetailViewModel extends ChangeNotifier {
       _data = data;
       _error = null;
       _errorStackTrace = null;
+      _task = _findTask(_downloads.active);
       _notify();
       await refreshMembership();
     } catch (error, stackTrace) {
@@ -403,6 +472,7 @@ class BookDetailViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _taskSubscription?.cancel();
     _settings.removeListener(_notify);
     super.dispose();
   }

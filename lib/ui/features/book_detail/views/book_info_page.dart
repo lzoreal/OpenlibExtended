@@ -252,6 +252,38 @@ class _DetailActionBar extends StatelessWidget {
       );
     }
 
+    // A queued/downloading/paused/failed entry for this book replaces the
+    // download button with its live progress; tapping pauses/resumes.
+    final task = viewModel.task;
+    if (task != null) {
+      final percent = (viewModel.taskProgress * 100).round();
+      final label = viewModel.taskFailed
+          ? l10n.downloadFailedRetry
+          : viewModel.taskCompleted
+              ? l10n.downloadCompletedShort
+              : viewModel.taskPaused
+                  ? l10n.downloadPausedPercent(percent)
+                  : viewModel.taskVerifying
+                      ? l10n.downloadVerifying
+                      : viewModel.taskPreparing
+                          ? l10n.downloadPreparing
+                          : l10n.downloadInProgressPercent(percent);
+      return DetailBottomBar(
+        children: [
+          Expanded(
+            child: _DownloadTaskButton(
+              label: label,
+              progress: viewModel.taskProgress,
+              indeterminate:
+                  viewModel.taskPreparing || viewModel.taskVerifying,
+              failed: viewModel.taskFailed,
+              onTap: viewModel.taskCompleted ? null : viewModel.toggleTask,
+            ),
+          ),
+        ],
+      );
+    }
+
     return DetailBottomBar(
       children: [
         Expanded(
@@ -364,4 +396,69 @@ String refusalMessage(AppLocalizations l10n, String? refusal) {
     DownloadRefusal.zlibNoDownloadLink => l10n.zlibNoDownloadLink,
     _ => refusal,
   };
+}
+
+/// Primary pill that carries the live download progress in its bottom edge.
+class _DownloadTaskButton extends StatelessWidget {
+  const _DownloadTaskButton({
+    required this.label,
+    required this.progress,
+    required this.indeterminate,
+    required this.failed,
+    required this.onTap,
+  });
+
+  final String label;
+  final double progress;
+  final bool indeterminate;
+  final bool failed;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = failed ? scheme.errorContainer : scheme.primary;
+    final foreground = failed ? scheme.onErrorContainer : scheme.onPrimary;
+    return Material(
+      color: background,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 48,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SwissText.label.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: LinearProgressIndicator(
+                  value: indeterminate ? null : progress,
+                  minHeight: 3,
+                  backgroundColor: foreground.withValues(alpha: 0.18),
+                  color: foreground,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

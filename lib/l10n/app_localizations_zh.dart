@@ -1087,7 +1087,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadPaused => '已暂停';
 
   @override
-  String get downloadVerifying => '校验中';
+  String get downloadVerifying => '正在校验文件…';
 
   @override
   String get downloadCancelled => '已取消';
@@ -1749,6 +1749,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String sourceMirrorHint(String source) {
     return '来自 $source 镜像，下载后自动校验 MD5。';
   }
+
+  @override
+  String downloadInProgressPercent(int percent) {
+    return '正在下载 $percent% · 点击暂停';
+  }
+
+  @override
+  String downloadPausedPercent(int percent) {
+    return '已暂停 $percent% · 点击继续';
+  }
+
+  @override
+  String get downloadPreparing => '正在准备下载…';
+
+  @override
+  String get downloadFailedRetry => '下载失败 · 点击重试';
+
+  @override
+  String get downloadCompletedShort => '已下载';
 
   @override
   String get downloadThisBook => '下载本书';

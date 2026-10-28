@@ -1150,7 +1150,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get downloadPaused => 'En pausa';
 
   @override
-  String get downloadVerifying => 'Verificando';
+  String get downloadVerifying => 'Verificando el archivo…';
 
   @override
   String get downloadCancelled => 'Cancelado';
@@ -1865,6 +1865,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String sourceMirrorHint(String source) {
     return 'Desde el espejo $source; el MD5 se verifica tras la descarga.';
   }
+
+  @override
+  String downloadInProgressPercent(int percent) {
+    return 'Descargando $percent % · toca para pausar';
+  }
+
+  @override
+  String downloadPausedPercent(int percent) {
+    return 'En pausa al $percent % · toca para reanudar';
+  }
+
+  @override
+  String get downloadPreparing => 'Preparando la descarga…';
+
+  @override
+  String get downloadFailedRetry => 'La descarga falló · toca para reintentar';
+
+  @override
+  String get downloadCompletedShort => 'Descargado';
 
   @override
   String get downloadThisBook => 'Descargar libro';
