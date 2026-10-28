@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/data/models/search_filters.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/database.dart';
-import 'package:openlib/data/services/preferences.dart';
 
 /// Startup values that used to be passed as ProviderScope overrides.
 /// Pages listen to this instead of receiving a fresh override list.
@@ -33,7 +34,7 @@ class AppSettings extends ChangeNotifier {
 
   static Future<AppSettings> load({
     required ThemeMode initialThemeMode,
-    required PreferencesService preferences,
+    required PreferencesRepository preferences,
   }) async {
     final db = preferences.database;
     final filters = await preferences.loadSearchFilters();

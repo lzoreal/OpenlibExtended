@@ -8,8 +8,9 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
 import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/data/models/search_filters.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/database.dart';
-import 'package:openlib/data/services/preferences.dart';
 
 import 'helpers/fake_path_provider.dart';
 
@@ -30,7 +31,7 @@ void main() {
     await seeded.delete('preferences',
         where: 'name = ?', whereArgs: ['showManualDownloadButton']);
 
-    final preferences = PreferencesService(database: MyLibraryDb.instance);
+    final preferences = PreferencesRepository(database: MyLibraryDb.instance);
     final settings = await AppSettings.load(
       initialThemeMode: ThemeMode.system,
       preferences: preferences,
@@ -59,7 +60,7 @@ void main() {
 
     final settings = await AppSettings.load(
       initialThemeMode: ThemeMode.dark,
-      preferences: PreferencesService(database: db),
+      preferences: PreferencesRepository(database: db),
     );
 
     expect(settings.themeMode, ThemeMode.dark);
@@ -74,7 +75,7 @@ void main() {
   test('setters update state and notify listeners', () async {
     final settings = await AppSettings.load(
       initialThemeMode: ThemeMode.system,
-      preferences: PreferencesService(database: MyLibraryDb.instance),
+      preferences: PreferencesRepository(database: MyLibraryDb.instance),
     );
     var notified = 0;
     settings.addListener(() => notified++);

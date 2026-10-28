@@ -24,7 +24,7 @@ import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/book_import.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/logger.dart';
-import 'package:openlib/data/services/preferences.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/storage_permission.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
@@ -187,7 +187,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   Future<String?> _readStorageDirectory() {
-    return PreferencesService().bookStorageDirectory();
+    return PreferencesRepository().bookStorageDirectory();
   }
 
   @override
@@ -330,7 +330,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                     String? pickedDirectory = await pickBookStorageDirectory();
                     if (pickedDirectory == null) return;
                     final currentDirectory =
-                        await PreferencesService().bookStorageDirectory() ??
+                        await PreferencesRepository().bookStorageDirectory() ??
                             pickedDirectory;
                     await requestStoragePermission();
 

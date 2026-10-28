@@ -19,7 +19,7 @@ import 'package:openlib/data/services/download_manager.dart';
 import 'package:openlib/data/services/files.dart' show deleteFile, getFilePath;
 import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/share_book.dart';
-import 'package:openlib/data/services/preferences.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/state/state.dart'
     show
         activeDownloadsProvider,
@@ -63,7 +63,7 @@ final completedDownloadsProvider =
   final books = await ref.watch(myLibraryProvider.future);
   // Resolve the folder once: reading the preference per book turned
   // opening the tab into N database queries on top of N stat calls.
-  final storageDirectory = await PreferencesService().bookStorageDirectory();
+  final storageDirectory = await PreferencesRepository().bookStorageDirectory();
   final entries = await Future.wait(books.map((book) async {
     int? size;
     DateTime? modified;
@@ -389,7 +389,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
     if (deleteLocalFile) {
       try {
         final directory =
-            await PreferencesService().bookStorageDirectory();
+            await PreferencesRepository().bookStorageDirectory();
         if (directory != null) {
           await deleteFile('$directory/${item.fileName}');
         }
@@ -407,7 +407,7 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
   Future<void> _openStorageFolder() async {
     final l10n = AppLocalizations.of(context);
     try {
-      final directory = await PreferencesService().bookStorageDirectory();
+      final directory = await PreferencesRepository().bookStorageDirectory();
       if (directory == null) return;
       if (PlatformUtils.isWindows) {
         await Process.run('explorer.exe', [directory]);

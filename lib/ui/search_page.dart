@@ -9,10 +9,11 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
+import 'package:openlib/data/models/search_filters.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/google_suggest_api.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
-import 'package:openlib/data/services/preferences.dart';
 import 'package:openlib/data/services/recent_searches.dart';
 import 'package:openlib/state/state.dart'
     show
@@ -254,7 +255,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
 
   Future<void> _persistFilterDefaults() async {
     try {
-      await PreferencesService().resetSearchFilters();
+      await PreferencesRepository().resetSearchFilters();
     } catch (_) {
       // The in-memory filters are already reset; persistence is best-effort.
     }
@@ -795,7 +796,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     );
     if (selected == null) return;
     ref.read(selectedTypeState.notifier).state = selected;
-    await PreferencesService()
+    await PreferencesRepository()
         .saveSearchFilter(SearchFilterKind.type, selected);
   }
 
@@ -810,7 +811,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     );
     if (selected == null) return;
     ref.read(selectedYearState.notifier).state = selected;
-    await PreferencesService()
+    await PreferencesRepository()
         .saveSearchFilter(SearchFilterKind.year, selected);
   }
 
@@ -825,7 +826,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     );
     if (selected == null) return;
     ref.read(selectedLanguageState.notifier).state = selected;
-    await PreferencesService()
+    await PreferencesRepository()
         .saveSearchFilter(SearchFilterKind.language, selected);
   }
 
@@ -966,7 +967,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                       selected: fileTypeValue == value,
                       onTap: () {
                         ref.read(selectedFileTypeState.notifier).state = value;
-                        PreferencesService().saveSearchFilter(
+                        PreferencesRepository().saveSearchFilter(
                             SearchFilterKind.fileType, value);
                       },
                     ),
@@ -985,7 +986,7 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                       selected: sortValue == value,
                       onTap: () {
                         ref.read(selectedSortState.notifier).state = value;
-                        PreferencesService()
+                        PreferencesRepository()
                             .saveSearchFilter(SearchFilterKind.sort, value);
                       },
                     ),

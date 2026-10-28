@@ -5,7 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/data/services/preferences.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -13,7 +13,7 @@ final GetIt getIt = GetIt.instance;
 Future<void> initDi({
   required AppSettings settings,
   required MyLibraryDb database,
-  required PreferencesService preferences,
+  required PreferencesRepository preferences,
 }) async {
   if (getIt.isRegistered<AppSettings>()) {
     throw StateError('initDi called twice');
@@ -21,7 +21,7 @@ Future<void> initDi({
 
   getIt.registerSingleton<MyLibraryDb>(database);
   getIt.registerSingleton<AppSettings>(settings);
-  getIt.registerLazySingleton<PreferencesService>(() => preferences);
+  getIt.registerLazySingleton<PreferencesRepository>(() => preferences);
   getIt.registerLazySingleton<DownloadManager>(() => DownloadManager());
 }
 

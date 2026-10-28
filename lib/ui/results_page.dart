@@ -11,8 +11,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/book_data.dart' show BookData;
+import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/search_result.dart';
-import 'package:openlib/data/services/preferences.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/state/state.dart' as app_state;
 import 'package:openlib/state/results_pager.dart';
@@ -162,7 +163,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     );
     if (selected == null || selected == current) return;
     ref.read(app_state.selectedSortState.notifier).state = selected;
-    await PreferencesService()
+    await PreferencesRepository()
         .saveSearchFilter(SearchFilterKind.sort, selected);
     _retryPageOne();
   }
@@ -244,7 +245,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
 
   Future<void> _persistFilterDefaults() async {
     try {
-      await PreferencesService().resetSearchFilters();
+      await PreferencesRepository().resetSearchFilters();
     } catch (_) {
       // In-memory filters already reset; persistence is a convenience.
     }

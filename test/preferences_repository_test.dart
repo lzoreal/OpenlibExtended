@@ -10,8 +10,9 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
+import 'package:openlib/data/models/search_filters.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/database.dart';
-import 'package:openlib/data/services/preferences.dart';
 
 import 'helpers/fake_path_provider.dart';
 
@@ -25,7 +26,7 @@ void main() {
   });
 
   test('loadSearchFilters falls back to defaults for missing rows', () async {
-    final filters = await PreferencesService().loadSearchFilters();
+    final filters = await PreferencesRepository().loadSearchFilters();
 
     expect(filters.type, 'All');
     expect(filters.sort, 'Most Relevant');
@@ -35,7 +36,7 @@ void main() {
   });
 
   test('saveSearchFilter persists each kind and loads it back', () async {
-    final service = PreferencesService();
+    final service = PreferencesRepository();
 
     await service.saveSearchFilter(SearchFilterKind.type, 'Fiction Books');
     await service.saveSearchFilter(SearchFilterKind.sort, 'Newest');
@@ -52,7 +53,7 @@ void main() {
   });
 
   test('resetSearchFilters restores the documented defaults', () async {
-    final service = PreferencesService();
+    final service = PreferencesRepository();
 
     await service.saveSearchFilter(SearchFilterKind.type, 'Comic Books');
     await service.saveSearchFilter(SearchFilterKind.year, 'Before 1980');
@@ -72,7 +73,7 @@ void main() {
     await MyLibraryDb.instance
         .savePreference('bookStorageDirectory', directory);
 
-    expect(await PreferencesService().bookStorageDirectory(), directory);
+    expect(await PreferencesRepository().bookStorageDirectory(), directory);
   });
 
   test('bookStorageDirectory returns null when the row is missing', () async {
@@ -80,6 +81,6 @@ void main() {
     await db.delete('preferences',
         where: 'name = ?', whereArgs: ['bookStorageDirectory']);
 
-    expect(await PreferencesService().bookStorageDirectory(), isNull);
+    expect(await PreferencesRepository().bookStorageDirectory(), isNull);
   });
 }
