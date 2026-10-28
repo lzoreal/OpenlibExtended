@@ -62,7 +62,7 @@ void main() {
       find.byKey(const ValueKey('detail-description-skeleton')),
       findsOneWidget,
     );
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     final loadingButton = tester.widget<ButtonStyleButton>(
       find.byKey(const ValueKey('detail-loading-download')),
     );

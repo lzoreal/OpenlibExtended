@@ -40,6 +40,7 @@ class _WebviewState extends State<Webview> {
   InAppWebViewController? webViewController;
   bool _isDesktopWebviewOpen = false;
   bool _linksFound = false;
+  bool _mobileCaptureInProgress = false;
   final List<String> _capturedDownloadLinks = [];
   Timer? _pollingTimer;
   desktop_webview.Webview? _desktopWebview;
@@ -279,6 +280,61 @@ class _WebviewState extends State<Webview> {
     }
   }
 
+  void _startMobilePolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _captureMobileLinks(),
+    );
+  }
+
+  Future<void> _captureMobileLinks() async {
+    if (_linksFound || _mobileCaptureInProgress || !mounted) return;
+    final controller = webViewController;
+    if (controller == null) return;
+    _mobileCaptureInProgress = true;
+    try {
+      final currentUrl = (await controller.getUrl())?.toString() ?? widget.url;
+      final links = <String>[];
+      if (currentUrl.contains('slow_download')) {
+        final result = await controller.evaluateJavascript(source: '''
+          (function() {
+            var paragraph = document.querySelector('p[class="mb-4 text-xl font-bold"]');
+            var anchor = paragraph == null ? null : paragraph.querySelector('a[href]');
+            return anchor == null ? null : anchor.href;
+          })()
+        ''');
+        if (result is String && result.startsWith('http')) links.add(result);
+      } else {
+        final result = await controller.evaluateJavascript(source: '''
+          (function() {
+            var links = [];
+            document.querySelectorAll('ul>li>a[href]').forEach(function(anchor) {
+              if (anchor.href.startsWith('http')) links.push(anchor.href);
+            });
+            return links;
+          })()
+        ''');
+        if (result is List) {
+          links.addAll(result.whereType<String>().where(
+                (link) => link.startsWith('http'),
+              ));
+        }
+      }
+      if (links.isEmpty || _linksFound || !mounted) return;
+      _linksFound = true;
+      _pollingTimer?.cancel();
+      _logger.info('Returning mobile download links',
+          tag: 'WebView', metadata: {'count': links.length});
+      Navigator.pop(context, links);
+    } catch (e) {
+      _logger.debug('Mobile download link capture is not ready',
+          tag: 'WebView', metadata: {'error': e.toString()});
+    } finally {
+      _mobileCaptureInProgress = false;
+    }
+  }
+
   @override
   void dispose() {
     _pollingTimer?.cancel();
@@ -367,6 +423,7 @@ class _WebviewState extends State<Webview> {
               initialUrlRequest: URLRequest(url: WebUri(widget.url)),
               onWebViewCreated: (controller) {
                 webViewController = controller;
+                _startMobilePolling();
               },
               onLoadStart: (controller, url) {},
               onLoadStop: (controller, url) async {
@@ -393,30 +450,7 @@ class _WebviewState extends State<Webview> {
                   _logger.debug('Failed to extract cookies from WebView',
                       tag: 'WebView', metadata: {'error': e.toString()});
                 }
-
-                List<String> bookDownloadLinks = [];
-                if (url.toString().contains("slow_download")) {
-                  String query =
-                      """var paragraphTag=document.querySelector('p[class="mb-4 text-xl font-bold"]');var anchorTagHref=paragraphTag.querySelector('a').href;var url=()=>{return anchorTagHref};url();""";
-                  String? mirrorLink = await webViewController
-                      ?.evaluateJavascript(source: query);
-                  if (mirrorLink != null) {
-                    bookDownloadLinks.add(mirrorLink);
-                  }
-                } else {
-                  String query =
-                      """var ipfsLinkTags=document.querySelectorAll('ul>li>a');var ipfsLinks=[];var getIpfsLinks=()=>{ipfsLinkTags.forEach(e=>{ipfsLinks.push(e.href)});return ipfsLinks};getIpfsLinks();""";
-                  List<dynamic> mirrorLinks = await webViewController
-                      ?.evaluateJavascript(source: query);
-                  bookDownloadLinks = mirrorLinks.cast<String>();
-                }
-
-                if (bookDownloadLinks.isNotEmpty) {
-                  Future.delayed(const Duration(milliseconds: 70), () {
-                    // ignore: use_build_context_synchronously
-                    Navigator.pop(context, bookDownloadLinks);
-                  });
-                }
+                await _captureMobileLinks();
               },
             ),
             // Loading overlay to hide countdown - only shown when showOverlay is true

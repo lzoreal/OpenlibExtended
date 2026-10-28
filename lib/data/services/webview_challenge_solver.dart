@@ -111,6 +111,7 @@ class WebviewChallengeSolver {
   static void _clearAutoSolveFailure(String url) {
     final host = _failureHost(url);
     _autoSolveFailures.remove(host);
+    _headlessFailures.remove(host);
     failedChallenges.value = [
       for (final candidate in failedChallenges.value)
         if (_failureHost(candidate) != host) candidate,

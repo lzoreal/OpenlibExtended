@@ -215,6 +215,28 @@ void main() {
       expect(ChallengeHtmlCache.get(url), '<html>solved visibly</html>');
     });
 
+    test('visible success clears the headless failure for later URLs', () async {
+      WebviewChallengeSolver.overrideIsMobile = true;
+      WebviewChallengeSolver.clearHeadlessFailures();
+      WebviewChallengeSolver.visibleSolverFallback =
+          (_) async => '<html>solved visibly</html>';
+      addTearDown(() {
+        WebviewChallengeSolver.overrideIsMobile = null;
+        WebviewChallengeSolver.visibleSolverFallback = null;
+        WebviewChallengeSolver.clearHeadlessFailures();
+      });
+
+      const url = 'https://annas-archive.gl/search?q=first';
+      WebviewChallengeSolver.debugRememberHeadlessFailure(url);
+      await WebviewChallengeSolver.fetchHtmlAfterChallenge(url);
+
+      expect(
+        WebviewChallengeSolver.shouldTryHeadless(
+            'https://annas-archive.gl/search?q=second'),
+        isTrue,
+      );
+    });
+
     test('returns null without caching when the user backs out', () async {
       WebviewChallengeSolver.guiEnabled = false;
       WebviewChallengeSolver.overrideIsMobile = true;

@@ -132,7 +132,6 @@ class _BookInfoPageState extends State<BookInfoPage> {
                 _DetailErrorStrip(
                   onRetry: _vm.retry,
                 ),
-              if (loading) const LinearProgressIndicator(minHeight: 2),
               Expanded(
                 child: ContentWidth(
                   maxWidth: 840,
