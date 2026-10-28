@@ -371,55 +371,80 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final l10n = AppLocalizations.of(context);
+        final theme = Theme.of(context);
+        final scheme = theme.colorScheme;
+        Future<void> enable() async {
+          Navigator.of(context).pop();
+          await DownloadNotificationService().requestNotificationPermission();
+          await MyLibraryDb.instance
+              .savePreference('hasAskedNotificationPermission', 1);
+        }
+
         return AlertDialog(
+          iconPadding: const EdgeInsets.only(top: 24),
+          icon: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.notifications_active_rounded,
+              size: 28,
+              color: scheme.onPrimaryContainer,
+            ),
+          ),
           title: Text(
-            AppLocalizations.of(context).enableNotifications,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
+            l10n.enableNotifications,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: scheme.onSurface,
             ),
           ),
           content: Text(
-            AppLocalizations.of(context).notificationsExplanation,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .tertiary
-                      .withValues(alpha: 0.78),
-                ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Don't mark as asked so we can ask again later
-              },
-              child: Text(
-                AppLocalizations.of(context).maybeLater,
-                style: TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .tertiary
-                      .withValues(alpha: 0.67),
-                ),
-              ),
+            l10n.notificationsExplanation,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+              height: 1.45,
             ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                // Request permission when user clicks Enable
-                await DownloadNotificationService()
-                    .requestNotificationPermission();
-                // Mark that we've asked
-                await MyLibraryDb.instance
-                    .savePreference('hasAskedNotificationPermission', 1);
-              },
-              child: Text(
-                AppLocalizations.of(context).enable,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        // Don't mark as asked so we can ask again later.
+                      },
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                      ),
+                      child: Text(l10n.maybeLater),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: enable,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                      ),
+                      child: Text(
+                        l10n.enable,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

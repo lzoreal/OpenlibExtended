@@ -541,8 +541,11 @@ class _DownloadCenterPageState extends State<DownloadCenterPage>
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               tabs: [
                 Tab(text: '${l10n.downloadCenterAll} $allCount'),
-                Tab(text: l10n.downloadCenterActive),
-                Tab(text: l10n.downloadCenterCompleted),
+                Tab(text: '${l10n.downloadCenterActive} $activeCount'),
+                Tab(
+                  text:
+                      '${l10n.downloadCenterCompleted} ${completed.length + failedCount}',
+                ),
               ],
             ),
           Expanded(

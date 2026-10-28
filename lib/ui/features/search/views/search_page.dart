@@ -1324,16 +1324,14 @@ class _RecentSearchesSection extends StatelessWidget {
           action: TextButton(
             onPressed: vm.clearRecents,
             style: TextButton.styleFrom(
-              minimumSize: Size.zero,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              foregroundColor: scheme.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 32),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: Text(
               l10n.clearAll,
-              style: SwissText.micro.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
         ),
@@ -1570,17 +1568,14 @@ class _SearchSourceSelector extends StatelessWidget {
             TextButton(
               onPressed: () => onManageSources?.call(),
               style: TextButton.styleFrom(
-                minimumSize: Size.zero,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                foregroundColor: scheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(
                 l10n.settingsManage,
-                style: SwissText.micro.copyWith(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
           ],

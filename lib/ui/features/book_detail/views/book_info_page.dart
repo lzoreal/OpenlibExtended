@@ -398,7 +398,7 @@ String refusalMessage(AppLocalizations l10n, String? refusal) {
   };
 }
 
-/// Primary pill that carries the live download progress in its bottom edge.
+/// Pill whose background fills left-to-right with the download progress.
 class _DownloadTaskButton extends StatelessWidget {
   const _DownloadTaskButton({
     required this.label,
@@ -417,11 +417,22 @@ class _DownloadTaskButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final background = failed ? scheme.errorContainer : scheme.primary;
-    final foreground = failed ? scheme.onErrorContainer : scheme.onPrimary;
+    final base =
+        failed ? scheme.errorContainer : scheme.surfaceContainerHighest;
+    final fill = failed
+        ? scheme.error.withValues(alpha: 0.28)
+        : scheme.primaryContainer;
+    final foreground =
+        failed ? scheme.onErrorContainer : scheme.onPrimaryContainer;
     return Material(
-      color: background,
-      shape: const StadiumBorder(),
+      color: base,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: failed
+              ? scheme.error.withValues(alpha: 0.45)
+              : scheme.outlineVariant,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -430,6 +441,32 @@ class _DownloadTaskButton extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(
+                  end: indeterminate ? 0 : progress.clamp(0.0, 1.0),
+                ),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                builder: (context, value, _) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: value,
+                    heightFactor: 1,
+                    child: ColoredBox(color: fill),
+                  ),
+                ),
+              ),
+              if (indeterminate)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: LinearProgressIndicator(
+                    minHeight: 3,
+                    backgroundColor: Colors.transparent,
+                    color: foreground,
+                  ),
+                ),
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -442,17 +479,6 @@ class _DownloadTaskButton extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: LinearProgressIndicator(
-                  value: indeterminate ? null : progress,
-                  minHeight: 3,
-                  backgroundColor: foreground.withValues(alpha: 0.18),
-                  color: foreground,
                 ),
               ),
             ],

@@ -1433,15 +1433,14 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
           <div class="btn primary" style="flex:0 0 auto"><svg class="ic"><use href="#i-down"/></svg>下载本书</div>
-          <div class="btn primary" style="flex:1;min-width:220px;position:relative;overflow:hidden;padding-bottom:8px">
-            正在下载 42%
-            <div class="progress" style="position:absolute;left:0;right:0;bottom:0;margin:0;border-radius:0"><i style="width:42%"></i></div>
+          <div class="btn" style="flex:1;min-width:220px;border:1.5px solid var(--outline-v);color:var(--on-p-container);background:linear-gradient(90deg,var(--p-container) 42%,var(--surface) 42%)">
+            正在下载 42% · 点击暂停
           </div>
           <div class="btn outline" style="flex:0 0 auto"><svg class="ic"><use href="#i-book"/></svg>打开</div>
           <div class="btn icon"><svg class="ic"><use href="#i-trash"/></svg></div>
         </div>
         <p class="desc" style="margin:10px 0 0">
-          点“下载本书”后，同一位置变为“正在下载 42%”并在按钮底部走细进度条；完成后自动切换为“打开 / 删除”，失败则变为“重试”。
+          点“下载本书”后，同一位置变为“正在下载 42%”，按钮底色从左向右随进度填充；点击可暂停/继续。完成后自动切换为“打开 / 删除”，失败则变为“重试”。
           进度来自 DownloadManager 的实时任务，离开详情页再回来仍能看到。
         </p>
       </div>
@@ -2370,6 +2369,27 @@
         </div>
         <figcaption><em>17</em>对话框 · 确认移除</figcaption>
       </figure>
+
+      <!-- 通知权限对话框（状态说明，不单列一屏） -->
+      <div class="card" style="grid-column:1/-1;width:100%;max-width:520px;justify-self:center">
+        <div class="card-head">
+          <div class="tile-icon"><svg class="ic"><use href="#i-alert"/></svg></div>
+          <div class="grow"><b>通知权限对话框</b></div>
+        </div>
+        <div style="margin-top:12px;border-radius:28px;background:var(--surface);padding:24px;box-shadow:var(--sh-2);text-align:center">
+          <div style="width:60px;height:60px;border-radius:50%;background:var(--p-container);color:var(--on-p-container);display:grid;place-items:center;margin:0 auto 14px">
+            <svg class="ic" style="width:28px;height:28px"><use href="#i-alert"/></svg>
+          </div>
+          <b style="display:block;font-size:17px;font-weight:800;letter-spacing:-.3px">启用通知</b>
+          <p style="margin:8px 0 0;font-size:12px;line-height:20px;color:var(--muted)">
+            为了在后台显示下载进度，OpenlibExtended 需要通知权限。这样即使应用最小化，也能跟踪书籍下载进度。
+          </p>
+          <div style="display:flex;gap:10px;margin-top:20px">
+            <div class="btn outline" style="flex:1">以后再说</div>
+            <div class="btn primary" style="flex:1">启用</div>
+          </div>
+        </div>
+      </div>
 
     </div>
   </section>
