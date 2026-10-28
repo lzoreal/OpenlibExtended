@@ -1,5 +1,6 @@
 // Dart imports:
 import 'dart:async';
+import 'dart:isolate';
 
 // Flutter imports:
 import 'package:flutter/foundation.dart';
@@ -49,6 +50,11 @@ abstract class SearchProvider {
   /// Runs a search. Must return [] when nothing matches; throws when the
   /// provider is unreachable. A throw is contained by the manager.
   Future<List<BookData>> search(SearchQuery query);
+
+  /// True when every mirror this provider may request has a fresh local
+  /// timeout reading. The manager then skips the source for this search.
+  /// Fake/injected providers keep the default false.
+  Future<bool> locallyUnreachable() async => false;
 }
 
 /// The filters the results page collects, in provider-neutral form.
@@ -93,6 +99,10 @@ class SearchQuery {
 }
 
 /// The plain-HTML header most library mirrors expect from a browser.
+/// Parsing a big results page on the UI isolate can drop frames right when
+/// the results arrive. Smaller pages stay synchronous; big ones move off.
+const int _isolateParseThreshold = 20 * 1024;
+
 const _browserHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/125.0 Safari/537.36',
@@ -101,9 +111,21 @@ const _browserHeaders = {
 /// Anna's Archive behind the provider interface: the existing
 /// AnnasArchieve service with its challenge handling, unchanged.
 class AnnasArchiveProvider implements SearchProvider {
-  AnnasArchiveProvider({AnnasArchieve? api}) : _api = api ?? AnnasArchieve();
+  AnnasArchiveProvider({AnnasArchieve? api, InstanceManager? instanceManager})
+      : _api = api ?? AnnasArchieve(),
+        _injectedApi = api != null,
+        _instanceManager = instanceManager;
 
   final AnnasArchieve _api;
+  final bool _injectedApi;
+  final InstanceManager? _instanceManager;
+
+  @override
+  Future<bool> locallyUnreachable() async {
+    if (_injectedApi && _instanceManager == null) return false;
+    return (_instanceManager ?? InstanceManager())
+        .isLocallyUnreachable(MirrorService.annasArchive);
+  }
 
   @override
   SearchProviderId get id => SearchProviderId.annasArchive;
@@ -132,18 +154,30 @@ class AnnasArchiveProvider implements SearchProvider {
 /// row per book. Mirror order comes from the instance manager so the
 /// user's enabled/prioritized mirrors in settings are respected.
 class LibgenProvider implements SearchProvider {
-  LibgenProvider({Dio? dio, List<String>? mirrors})
-      : _dio = dio ??
+  LibgenProvider({
+    Dio? dio,
+    List<String>? mirrors,
+    InstanceManager? instanceManager,
+  })  : _dio = dio ??
             createDioWithLogging(
                 options: BaseOptions(
               connectTimeout: const Duration(seconds: 15),
               receiveTimeout: const Duration(seconds: 30),
               headers: _browserHeaders,
             )),
-        _mirrors = mirrors;
+        _mirrors = mirrors,
+        _instanceManager = instanceManager;
 
   final Dio _dio;
   final List<String>? _mirrors;
+  final InstanceManager? _instanceManager;
+
+  @override
+  Future<bool> locallyUnreachable() async {
+    if (_mirrors != null && _instanceManager == null) return false;
+    return (_instanceManager ?? InstanceManager())
+        .isLocallyUnreachable(MirrorService.libgen);
+  }
   final AppLogger _logger = AppLogger();
 
   @override
@@ -173,6 +207,13 @@ class LibgenProvider implements SearchProvider {
         .map((row) => _legacyRowToBook(row, baseUrl))
         .whereType<BookData>()
         .toList();
+  }
+
+  Future<List<BookData>> _parseOffMain(String html, String baseUrl) {
+    if (html.length < _isolateParseThreshold) {
+      return Future.value(parseResults(html, baseUrl));
+    }
+    return Isolate.run(() => LibgenProvider().parseResults(html, baseUrl));
   }
 
   BookData? _liRowToBook(dom.Element row, String baseUrl) {
@@ -313,8 +354,9 @@ class LibgenProvider implements SearchProvider {
       params.write('&page=${query.page}');
     }
 
-    final mirrors =
-        _mirrors ?? await InstanceManager().enabledUrls(MirrorService.libgen);
+    final mirrors = _mirrors ??
+        await (_instanceManager ?? InstanceManager())
+            .enabledUrls(MirrorService.libgen);
 
     if (mirrors.isEmpty) {
       // Every libgen mirror SLUM knows is DOWN (or switched off by the
@@ -342,7 +384,7 @@ class LibgenProvider implements SearchProvider {
               metadata: {'mirror': mirror, 'status': response.statusCode});
           return null;
         }
-        return parseResults(response.data.toString(), mirror);
+        return await _parseOffMain(response.data.toString(), mirror);
       } catch (e) {
         lastError = e;
         _logger.warning('Libgen mirror failed, trying next',
@@ -464,6 +506,16 @@ class ZlibraryProvider implements SearchProvider {
   String get displayName => 'Z-Library';
 
   @override
+  Future<bool> locallyUnreachable() async {
+    final memory = _mirrorMemory;
+    if (memory == null) return false;
+    return memory.isLocallyUnreachable(
+      MirrorService.zlibrary,
+      headlessOnly: !WebviewChallengeSolver.isSupported,
+    );
+  }
+
+  @override
   Future<List<BookData>> search(SearchQuery query) async {
     final mirrors = await _orderedMirrors();
 
@@ -522,7 +574,7 @@ class ZlibraryProvider implements SearchProvider {
               metadata: {'mirror': mirror, 'status': response.statusCode});
           continue;
         }
-        final books = parseResults(response.data.toString(), mirror);
+        final books = await _parseOffMain(response.data.toString(), mirror);
         if (books.isNotEmpty) {
           _logger.info('Z-Library search returned ${books.length} books',
               tag: 'ZlibraryProvider', metadata: {'mirror': mirror});
@@ -549,6 +601,13 @@ class ZlibraryProvider implements SearchProvider {
   /// with metadata in attributes (`extension`, `filesize`, `year`,
   /// `language`, `publisher`, `rating`) and in `slot=` divs (`title`,
   /// `author`).
+  Future<List<BookData>> _parseOffMain(String html, String baseUrl) {
+    if (html.length < _isolateParseThreshold) {
+      return Future.value(parseResults(html, baseUrl));
+    }
+    return Isolate.run(() => ZlibraryProvider().parseResults(html, baseUrl));
+  }
+
   List<BookData> parseResults(String html, String baseUrl) {
     final document = html_parser.parse(html);
     final books = <BookData>[];
@@ -994,22 +1053,34 @@ bool isWelibUrl(String? url) {
 /// browser - but Cloudflare fingerprints a plain HTTP client on some
 /// paths, so the solver path is kept as fallback there too.
 class WelibProvider implements SearchProvider {
-  WelibProvider({Dio? dio, List<String>? mirrors})
-      : _dio = dio ??
+  WelibProvider({
+    Dio? dio,
+    List<String>? mirrors,
+    InstanceManager? instanceManager,
+  })  : _dio = dio ??
             createDioWithLogging(
                 options: BaseOptions(
               connectTimeout: const Duration(seconds: 6),
               receiveTimeout: const Duration(seconds: 15),
               headers: _browserHeaders,
             )),
-        _mirrors = mirrors;
+        _mirrors = mirrors,
+        _instanceManager = instanceManager;
 
   final Dio _dio;
   final List<String>? _mirrors;
+  final InstanceManager? _instanceManager;
   final AppLogger _logger = AppLogger();
 
   @override
   SearchProviderId get id => SearchProviderId.welib;
+
+  @override
+  Future<bool> locallyUnreachable() async {
+    if (_mirrors != null && _instanceManager == null) return false;
+    return (_instanceManager ?? InstanceManager())
+        .isLocallyUnreachable(MirrorService.welib);
+  }
 
   @override
   String get displayName => 'WeLib';
@@ -1018,7 +1089,7 @@ class WelibProvider implements SearchProvider {
   /// never attempted. With a webview solver the Cloudflare-gated search
   /// is solvable, so the mirror stays in the list.
   Future<List<String>> _resolveMirrors() =>
-      InstanceManager().enabledUrls(MirrorService.welib);
+      (_instanceManager ?? InstanceManager()).enabledUrls(MirrorService.welib);
 
   @override
   Future<List<BookData>> search(SearchQuery query) async {
@@ -1033,7 +1104,7 @@ class WelibProvider implements SearchProvider {
       try {
         final html = await _fetchHtml('$mirror/search${_queryString(query)}');
         if (html == null) continue;
-        final books = parseResults(html, mirror);
+        final books = await _parseOffMain(html, mirror);
         if (books.isNotEmpty) return books;
       } catch (e) {
         _logger.warning('WeLib mirror failed, trying next',
@@ -1148,6 +1219,13 @@ class WelibProvider implements SearchProvider {
   /// the author and an `<img>` whose `data-title`/`data-author`
   /// attributes repeat the same data. Public so tests can feed a
   /// captured page without network.
+  Future<List<BookData>> _parseOffMain(String html, String baseUrl) {
+    if (html.length < _isolateParseThreshold) {
+      return Future.value(parseResults(html, baseUrl));
+    }
+    return Isolate.run(() => WelibProvider().parseResults(html, baseUrl));
+  }
+
   List<BookData> parseResults(String html, String baseUrl) {
     final document = html_parser.parse(html);
     final books = <BookData>[];
@@ -1408,6 +1486,9 @@ enum SearchSourceStatus {
   /// The source threw. The other sources still contribute their results.
   failed,
 
+  /// Every mirror had a fresh local timeout, so this search skipped it.
+  locallyUnreachable,
+
   /// Kept for stored/older payloads; parallel searches query every source.
   skipped,
 }
@@ -1427,7 +1508,9 @@ class SearchSourceRun {
     required this.status,
   });
 
-  bool get wasAttempted => status != SearchSourceStatus.skipped;
+  bool get wasAttempted =>
+      status != SearchSourceStatus.skipped &&
+      status != SearchSourceStatus.locallyUnreachable;
 }
 
 /// Combined outcome of a parallel search.
@@ -1574,16 +1657,26 @@ class SearchManager {
   /// never takes the rest down; an empty source is a valid result, not a
   /// reason to skip the others. [SearchQuery.source] is used only by the
   /// results page when it paginates a single catalog.
-  Future<SearchManagerResult> search(SearchQuery query) async {
+  Future<SearchManagerResult> search(
+    SearchQuery query, {
+    bool forceLocalTimeouts = false,
+  }) async {
     final active = await _activeProviders(query);
     if (active.isEmpty) {
       return const SearchManagerResult(books: [], failedProviders: []);
     }
+    final skipped = forceLocalTimeouts
+        ? <SearchProviderId>{}
+        : await _locallyUnreachable(active);
     final logger = _logStart(query, active);
-    final outcomes = await Future.wait(
-      active.map((provider) => _searchOne(provider, query, logger)),
-    );
-    final result = _combine(active, outcomes);
+    final outcomes = List<_Outcome?>.filled(active.length, null);
+    await Future.wait([
+      for (var i = 0; i < active.length; i++)
+        if (!skipped.contains(active[i].id))
+          _searchOne(active[i], query, logger)
+              .then((outcome) => outcomes[i] = outcome),
+    ]);
+    final result = _combine(active, outcomes, skipped);
     _logFinished(result);
     return result;
   }
@@ -1592,7 +1685,10 @@ class SearchManager {
   /// can show the first catalog's books without waiting for a slow source.
   /// Pending catalogs appear as [SearchSourceStatus.pending] and are
   /// replaced by their real status in later snapshots.
-  Stream<SearchManagerResult> watch(SearchQuery query) {
+  Stream<SearchManagerResult> watch(
+    SearchQuery query, {
+    bool forceLocalTimeouts = false,
+  }) {
     final controller = StreamController<SearchManagerResult>();
     () async {
       try {
@@ -1603,11 +1699,26 @@ class SearchManager {
           await controller.close();
           return;
         }
+        final skipped = forceLocalTimeouts
+            ? <SearchProviderId>{}
+            : await _locallyUnreachable(active);
+        final queried =
+            active.where((p) => !skipped.contains(p.id)).toList(growable: false);
         final logger = _logStart(query, active);
         final outcomes = List<_Outcome?>.filled(active.length, null);
+
+        if (queried.isEmpty) {
+          final result = _combine(active, outcomes, skipped);
+          _logFinished(result);
+          controller.add(result);
+          await controller.close();
+          return;
+        }
+
         final progress = StreamController<int>();
         var completed = 0;
         for (var i = 0; i < active.length; i++) {
+          if (skipped.contains(active[i].id)) continue;
           _searchOne(active[i], query, logger).then((outcome) {
             outcomes[i] = outcome;
             completed++;
@@ -1615,13 +1726,14 @@ class SearchManager {
           });
         }
         await for (final _ in progress.stream) {
-          final result = _combine(active, outcomes);
-          final finished = completed == active.length;
+          final result = _combine(active, outcomes, skipped);
+          final finished = completed == queried.length;
           if (finished) {
             _logFinished(result);
             if (!controller.isClosed) {
               if (result.books.isEmpty &&
-                  result.failedProviders.length == active.length) {
+                  result.failedProviders.length == queried.length &&
+                  skipped.isEmpty) {
                 controller.addError(Exception(
                     'All search sources are unreachable: '
                     '${result.failedProviders.join(', ')}'));
@@ -1642,6 +1754,19 @@ class SearchManager {
       }
     }();
     return controller.stream;
+  }
+
+  Future<Set<SearchProviderId>> _locallyUnreachable(
+      List<SearchProvider> active) async {
+    final skipped = <SearchProviderId>{};
+    for (final provider in active) {
+      try {
+        if (await provider.locallyUnreachable()) skipped.add(provider.id);
+      } catch (_) {
+        // A failed health check must never hide a source.
+      }
+    }
+    return skipped;
   }
 
   Future<List<SearchProvider>> _activeProviders(SearchQuery query) async {
@@ -1679,7 +1804,10 @@ class SearchManager {
   }
 
   SearchManagerResult _combine(
-      List<SearchProvider> active, List<_Outcome?> outcomes) {
+    List<SearchProvider> active,
+    List<_Outcome?> outcomes, [
+    Set<SearchProviderId> skipped = const {},
+  ]) {
     final books = <BookData>[];
     final booksBySource = <SearchProviderId, List<BookData>>{};
     final failed = <String>[];
@@ -1689,6 +1817,15 @@ class SearchManager {
     for (var i = 0; i < active.length; i++) {
       final provider = active[i];
       final outcome = outcomes[i];
+      if (skipped.contains(provider.id)) {
+        runs.add(SearchSourceRun(
+          id: provider.id,
+          displayName: provider.displayName,
+          resultCount: 0,
+          status: SearchSourceStatus.locallyUnreachable,
+        ));
+        continue;
+      }
       if (outcome == null) {
         runs.add(SearchSourceRun(
           id: provider.id,

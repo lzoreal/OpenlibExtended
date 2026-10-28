@@ -38,67 +38,70 @@ class ActiveDownloadsWidget extends ConsumerWidget {
 
         final theme = Theme.of(context);
         final scheme = theme.colorScheme;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.download_rounded,
-                      size: 20,
-                      color: scheme.primary,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      AppLocalizations.of(context).downloadsTitle,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: scheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
+        // Progress ticks arrive at 10 Hz; keep that repaint off the page layer.
+        return RepaintBoundary(
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.download_rounded,
+                        size: 20,
+                        color: scheme.primary,
                       ),
-                      child: Text(
-                        '${downloads.length}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(width: 10),
+                      Text(
+                        AppLocalizations.of(context).downloadsTitle,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${downloads.length}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Divider(height: 1),
-              SizedBox(
-                height: downloads.length > 2 ? 220 : null,
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  physics: downloads.length > 2
-                      ? const AlwaysScrollableScrollPhysics()
-                      : const NeverScrollableScrollPhysics(),
-                  itemCount: downloads.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                  itemBuilder: (context, index) {
-                    final task = downloads.values.elementAt(index);
-                    return _DownloadItem(
-                      task: task,
-                      bytesToFileSize: _bytesToFileSize,
-                    );
-                  },
+                const Divider(height: 1),
+                SizedBox(
+                  height: downloads.length > 2 ? 220 : null,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    physics: downloads.length > 2
+                        ? const AlwaysScrollableScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
+                    itemCount: downloads.length,
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                    itemBuilder: (context, index) {
+                      final task = downloads.values.elementAt(index);
+                      return _DownloadItem(
+                        task: task,
+                        bytesToFileSize: _bytesToFileSize,
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

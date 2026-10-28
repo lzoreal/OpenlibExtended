@@ -1658,6 +1658,12 @@ abstract class AppLocalizations {
   /// **'Local mirrors have not been tested; search may be slower. Testing sorts them by your own latency.'**
   String get mirrorLatencyHint;
 
+  /// Local latency suffix for protected mirrors: reachable as a host, but a challenge may still block a search
+  ///
+  /// In en, this message translates to:
+  /// **'needs verification'**
+  String get mirrorLatencyNeedsVerification;
+
   /// Search page hint action that opens the mirrors page to run a local latency test
   ///
   /// In en, this message translates to:
@@ -2997,6 +3003,24 @@ abstract class AppLocalizations {
   /// **'Untried'**
   String get sourceStatusUntried;
 
+  /// A source skipped because every enabled mirror has a fresh local speed-test timeout
+  ///
+  /// In en, this message translates to:
+  /// **'Locally unreachable'**
+  String get sourceStatusLocallyUnreachable;
+
+  /// Results-page hint naming sources skipped by fresh local timeouts
+  ///
+  /// In en, this message translates to:
+  /// **'{sources} skipped: unreachable from this device.'**
+  String sourcesSkippedLocally(String sources);
+
+  /// Button that re-runs the search ignoring the local-timeout source skip
+  ///
+  /// In en, this message translates to:
+  /// **'Try anyway'**
+  String get retryAnyway;
+
   /// A source that could not be reached during the search
   ///
   /// In en, this message translates to:
@@ -3788,6 +3812,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manual verification needed - the search continues as soon as it passes'**
   String get challengeNeedsVerification;
+
+  /// Shown after automatic challenge solving failed; the next search skips the automatic solve and uses a manual verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual verification needed - the next search reuses the verified page'**
+  String get challengeNeedsVerificationRetry;
 
   /// Button that opens the manual verification page for a blocked source.
   ///

@@ -70,6 +70,9 @@ String slumPage(List<({String url, String status, String? vendor})> mirrors) {
 }
 
 void main() {
+  setUp(WebviewChallengeSolver.clearAutoSolveFailures);
+  tearDown(WebviewChallengeSolver.clearAutoSolveFailures);
+
   /// URLs the (test-registered) visible solver hook was asked for.
   final gatewayCalls = <String>[];
 

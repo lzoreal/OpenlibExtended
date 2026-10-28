@@ -291,6 +291,38 @@ void main() {
     });
   });
 
+  group('local reachability gate', () {
+    test('only skips when every attemptable mirror has a fresh timeout',
+        () async {
+      final views = (await manager.instances(MirrorService.zlibrary,
+              force: true))
+          .where((view) => view.enabled && view.site.isAttemptable)
+          .toList();
+      expect(views.length, greaterThan(1));
+
+      await manager.saveLocalLatencies(
+        {for (final view in views) view.host: null},
+      );
+      expect(await manager.isLocallyUnreachable(MirrorService.zlibrary),
+          isTrue);
+
+      await manager.saveLocalLatencies({views.first.host: 85});
+      expect(await manager.isLocallyUnreachable(MirrorService.zlibrary),
+          isFalse,
+          reason: 'one reachable mirror keeps the source in play');
+
+      final staleAt =
+          DateTime.now().subtract(const Duration(hours: 25));
+      await manager.saveLocalLatencies(
+        {views.first.host: null},
+        testedAt: staleAt,
+      );
+      expect(await manager.isLocallyUnreachable(MirrorService.zlibrary),
+          isFalse,
+          reason: 'an expired reading is not a reason to skip');
+    });
+  });
+
   group('last good mirror', () {
     test('persists per service and can be cleared', () async {
       expect(await manager.lastGoodMirror(MirrorService.zlibrary), isNull);

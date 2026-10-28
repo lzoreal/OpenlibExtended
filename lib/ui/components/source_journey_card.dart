@@ -47,6 +47,7 @@ class SourceJourneyCard extends StatelessWidget {
             count: switch (run.status) {
               SearchSourceStatus.pending => '…',
               SearchSourceStatus.failed => l10n.sourceStatusFailed,
+              SearchSourceStatus.locallyUnreachable => '—',
               _ => '${run.resultCount}',
             },
             dot: switch (run.status) {
@@ -54,6 +55,7 @@ class SourceJourneyCard extends StatelessWidget {
               SearchSourceStatus.failed => _PillDot.failed,
               SearchSourceStatus.empty => _PillDot.off,
               SearchSourceStatus.skipped => _PillDot.off,
+              SearchSourceStatus.locallyUnreachable => _PillDot.off,
               SearchSourceStatus.hit => _PillDot.active,
             },
             selected: selectedSource == run.id,

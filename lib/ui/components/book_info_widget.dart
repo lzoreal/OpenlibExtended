@@ -23,13 +23,21 @@ import 'package:openlib/ui/swiss_grid.dart';
 /// for them lands on the error the user sees as "link expired". Those
 /// open their own source page instead. Null (a disabled button) only when
 /// neither target is available.
+final _md5Pattern = RegExp(r'^[0-9a-f]{32}$', caseSensitive: false);
+final _isbnLabelPattern = RegExp(
+  r'ISBN(?:-1[03])?\s*:?\s*([0-9][0-9Xx -]{8,16}[0-9Xx])',
+  caseSensitive: false,
+);
+final _isbn13Pattern = RegExp(r'\b97[89][0-9]{10}\b');
+final _nonIsbnCharsPattern = RegExp(r'[^0-9Xx]');
+
 @visibleForTesting
 String? openInSiteUrl({
   required String link,
   required String md5,
   String? annaArchiveBaseUrl,
 }) {
-  final hasMd5 = RegExp(r'^[0-9a-f]{32}$', caseSensitive: false).hasMatch(md5);
+  final hasMd5 = _md5Pattern.hasMatch(md5);
   if (hasMd5 && annaArchiveBaseUrl != null && annaArchiveBaseUrl.isNotEmpty) {
     return '$annaArchiveBaseUrl/md5/$md5';
   }
@@ -37,15 +45,11 @@ String? openInSiteUrl({
 }
 
 String? _isbnFromInfo(String info) {
-  final labelled = RegExp(
-    r'ISBN(?:-1[03])?\s*:?\s*([0-9][0-9Xx -]{8,16}[0-9Xx])',
-    caseSensitive: false,
-  ).firstMatch(info)?.group(1);
-  final candidate =
-      labelled ?? RegExp(r'\b97[89][0-9]{10}\b').firstMatch(info)?.group(0);
+  final labelled = _isbnLabelPattern.firstMatch(info)?.group(1);
+  final candidate = labelled ?? _isbn13Pattern.firstMatch(info)?.group(0);
   if (candidate == null) return null;
   final normalized =
-      candidate.replaceAll(RegExp(r'[^0-9Xx]'), '').toUpperCase();
+      candidate.replaceAll(_nonIsbnCharsPattern, '').toUpperCase();
   if (normalized.length == 10 || normalized.length == 13) return normalized;
   return null;
 }
@@ -91,6 +95,7 @@ class BookInfoWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     final l10n = AppLocalizations.of(context);
     final aaBaseUrl = ref.watch(annaArchiveBaseUrlProvider).valueOrNull;
     final link = data.link;
@@ -174,6 +179,7 @@ class BookInfoWidget extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(SwissRadius.field),
                       child: CachedNetworkImage(
                         imageUrl: thumbnail,
+                        memCacheWidth: (128 * dpr).round(),
                         fit: BoxFit.cover,
                         httpHeaders: thumbnail.contains('libgen')
                             ? <String, String>{'Referer': link}

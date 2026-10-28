@@ -893,6 +893,9 @@ class AppLocalizationsFr extends AppLocalizations {
       'Les miroirs locaux n’ont pas encore été testés ; la recherche peut être plus lente. Le test les trie selon votre propre latence.';
 
   @override
+  String get mirrorLatencyNeedsVerification => 'vérification requise';
+
+  @override
   String get mirrorLatencyGoTest => 'Tester';
 
   @override
@@ -1652,6 +1655,18 @@ class AppLocalizationsFr extends AppLocalizations {
   String get sourceStatusUntried => 'Non essayée';
 
   @override
+  String get sourceStatusLocallyUnreachable =>
+      'Injoignable depuis cet appareil';
+
+  @override
+  String sourcesSkippedLocally(String sources) {
+    return '$sources ignoré(s) : injoignable(s) depuis cet appareil.';
+  }
+
+  @override
+  String get retryAnyway => 'Essayer quand même';
+
+  @override
   String get sourceStatusFailed => 'Échec';
 
   @override
@@ -2122,6 +2137,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get challengeNeedsVerification =>
       'Vérification manuelle requise : la recherche reprend une fois validée';
+
+  @override
+  String get challengeNeedsVerificationRetry =>
+      'Vérification manuelle requise – la prochaine recherche réutilisera la page validée.';
 
   @override
   String get challengeVerifyNow => 'Vérifier';

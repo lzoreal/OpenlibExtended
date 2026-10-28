@@ -3,6 +3,7 @@ import 'dart:async';
 
 // Flutter imports:
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
 // Package imports:
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +55,8 @@ class _ResultPageState extends ConsumerState<ResultPage> {
   final Set<String> _viewEnded = {};
   bool _fetchingNextPage = false;
   bool _retrying = false;
+  bool _forceLocalTimeouts = false;
+  ProviderSubscription<AsyncValue<SearchManagerResult>>? _firstPageSubscription;
   final Set<String> _formatFilters = {};
   final Set<String> _languageFilters = {};
 
@@ -62,14 +65,22 @@ class _ResultPageState extends ConsumerState<ResultPage> {
   List<BookData> get _books =>
       _viewBooks[_viewKey(_selectedSource)] ?? const <BookData>[];
 
-  app_state.SearchPageKey get _firstPageKey =>
-      app_state.SearchPageKey(widget.searchQuery, 1);
+  app_state.SearchPageKey get _firstPageKey => app_state.SearchPageKey(
+        widget.searchQuery,
+        1,
+        forceLocalTimeouts: _forceLocalTimeouts,
+      );
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    ref.listenManual(
+    _listenFirstPage();
+  }
+
+  void _listenFirstPage() {
+    _firstPageSubscription?.close();
+    _firstPageSubscription = ref.listenManual(
       app_state.initialSearchProvider(_firstPageKey),
       (previous, next) {
         final result = next.valueOrNull;
@@ -81,6 +92,10 @@ class _ResultPageState extends ConsumerState<ResultPage> {
   }
 
   void _applyFirstResult(SearchManagerResult result) {
+    if (_firstResult != null) {
+      _mergeFirstResult(result);
+      return;
+    }
     setState(() {
       _firstResult = result;
       _viewBooks.clear();
@@ -118,8 +133,62 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     });
   }
 
+  /// Later snapshots add books from sources that finished after the first
+  /// paint. Merge instead of clearing, so pagination and the user's scroll
+  /// position survive the stream.
+  void _mergeFirstResult(SearchManagerResult result) {
+    setState(() {
+      _firstResult = result;
+
+      void merge(
+        SearchProviderId? source,
+        List<BookData> books, {
+        bool replacePageOne = false,
+      }) {
+        final key = _viewKey(source);
+        final existing = _viewBooks[key];
+        final seen = _viewSeen[key];
+        if (existing == null || seen == null) {
+          _viewBooks[key] = List<BookData>.of(books);
+          _viewSeen[key] = books.map((book) => book.md5).toSet();
+          _viewPages[key] = 1;
+          if (books.isEmpty) _viewEnded.add(key);
+          return;
+        }
+
+        final page = _viewPages[key] ?? 1;
+        if (replacePageOne && page <= 1) {
+          _viewBooks[key] = List<BookData>.of(books);
+          _viewSeen[key] = books.map((book) => book.md5).toSet();
+          if (books.isEmpty) {
+            _viewEnded.add(key);
+          } else {
+            _viewEnded.remove(key);
+          }
+          return;
+        }
+
+        for (final book in books) {
+          if (seen.add(book.md5)) existing.add(book);
+        }
+        if (existing.isNotEmpty) _viewEnded.remove(key);
+      }
+
+      merge(null, result.books);
+      for (final run in result.sources) {
+        final sourceBooks = result.booksBySource[run.id] ??
+            (run.id == result.resultSourceId
+                ? result.books
+                : const <BookData>[]);
+        merge(run.id, sourceBooks, replacePageOne: true);
+      }
+      _fetchingNextPage = false;
+    });
+  }
+
   @override
   void dispose() {
+    _firstPageSubscription?.close();
     _scrollController.dispose();
     super.dispose();
   }
@@ -142,8 +211,12 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     setState(() => _fetchingNextPage = true);
     try {
       final result = await ref.read(app_state
-          .searchProvider(app_state.SearchPageKey(widget.searchQuery, nextPage,
-              source: view))
+          .searchProvider(app_state.SearchPageKey(
+            widget.searchQuery,
+            nextPage,
+            source: view,
+            forceLocalTimeouts: _forceLocalTimeouts,
+          ))
           .future);
       if (!mounted) return;
       final pageBooks = view == null
@@ -182,8 +255,17 @@ class _ResultPageState extends ConsumerState<ResultPage> {
   }
 
   void _retryPageOne() {
+    setState(() => _forceLocalTimeouts = false);
     _resetLocalPager();
     ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
+    _listenFirstPage();
+  }
+
+  void _retryIgnoringLocalTimeouts() {
+    setState(() => _forceLocalTimeouts = true);
+    _resetLocalPager();
+    ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
+    _listenFirstPage();
   }
 
   Future<void> _pickSort() async {
@@ -192,45 +274,15 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      builder: (context) {
-        final theme = Theme.of(context);
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-                child: Text(
-                  l10n.filterSortLabel,
-                  style: theme.textTheme.titleMedium,
-                ),
-              ),
-              for (final value in app_state.sortValues.keys)
-                ListTile(
-                  title: Text(_sortLabel(l10n, value)),
-                  trailing: value == current
-                      ? Icon(Icons.check, color: theme.colorScheme.primary)
-                      : null,
-                  selected: value == current,
-                  onTap: () => Navigator.pop(context, value),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+      builder: (_) => _SortSheet(
+        current: current,
+        labelFor: (value) => _sortLabel(l10n, value),
+      ),
     );
     if (selected == null || selected == current) return;
     ref.read(app_state.selectedSortState.notifier).state = selected;
     await MyLibraryDb.instance.savePreference('filterSort', selected);
     _retryPageOne();
-  }
-
-  String _filterLabel(String base, Set<String> selection) {
-    if (selection.isEmpty) return base;
-    if (selection.length == 1) return selection.first;
-    return '$base · ${selection.length}';
   }
 
   Future<void> _pickFormats(List<String> options) async {
@@ -298,7 +350,10 @@ class _ResultPageState extends ConsumerState<ResultPage> {
 
   void _clearFiltersAndRetry() {
     if (_retrying) return;
-    setState(() => _retrying = true);
+    setState(() {
+      _retrying = true;
+      _forceLocalTimeouts = false;
+    });
     _resetLocalPager();
     ref.read(app_state.selectedTypeState.notifier).state = 'All';
     ref.read(app_state.selectedSortState.notifier).state = 'Most Relevant';
@@ -308,6 +363,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     ref.read(app_state.searchAuthorProvider.notifier).state = '';
     ref.read(app_state.searchPublisherProvider.notifier).state = '';
     ref.invalidate(app_state.initialSearchProvider(_firstPageKey));
+    _listenFirstPage();
     unawaited(_persistFilterDefaults());
     if (mounted) setState(() => _retrying = false);
   }
@@ -426,6 +482,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                 onSelectSource: _selectSource,
                 onModify: () => Navigator.of(context).maybePop(),
                 onClearFilters: _clearFiltersAndRetry,
+                onRetrySkipped: _retryIgnoringLocalTimeouts,
                 retrying: _retrying,
               );
             }
@@ -458,8 +515,6 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     required String sortLabel,
   }) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final allCount = _viewBooks[_viewKey(null)]?.length ?? result.books.length;
 
     SearchSourceRun? selectedRun;
@@ -476,36 +531,6 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       for (final run in result.sources)
         if (run.status == SearchSourceStatus.pending)
           sourceShortLabel(l10n, run.id),
-    ];
-
-    final formats = <String>{
-      for (final book in books)
-        if (getFileType(book.info) != null)
-          getFileType(book.info)!.toUpperCase(),
-    }.toList()
-      ..sort((a, b) {
-        const order = ['EPUB', 'PDF'];
-        final aIndex = order.indexOf(a);
-        final bIndex = order.indexOf(b);
-        if (aIndex == -1 && bIndex == -1) return a.compareTo(b);
-        if (aIndex == -1) return 1;
-        if (bIndex == -1) return -1;
-        return aIndex.compareTo(bIndex);
-      });
-
-    final languages = <String>{
-      for (final book in books)
-        if (getLanguage(book.info) != null) getLanguage(book.info)!,
-    }.toList()
-      ..sort();
-
-    final visibleBooks = <BookData>[
-      for (final book in books)
-        if (_formatFilters.isEmpty ||
-            _formatFilters.contains(getFileType(book.info)?.toUpperCase()))
-          if (_languageFilters.isEmpty ||
-              _languageFilters.contains(getLanguage(book.info)))
-            book,
     ];
 
     String? otherSources;
@@ -525,33 +550,167 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       }
     }
 
-    Widget capsule({
-      required Key key,
-      required String label,
-      required bool active,
-      required VoidCallback? onTap,
-    }) {
-      return FilterChip(
-        key: key,
-        selected: active,
-        showCheckmark: false,
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.expand_more_rounded,
-              size: 16,
-              color: active
-                  ? scheme.onPrimaryContainer
-                  : scheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-        onSelected: onTap == null ? null : (_) => onTap(),
-      );
-    }
+    final sortValue = ref.watch(app_state.selectedSortState);
+
+    return _ResultsView(
+      result: result,
+      visibleBooks: _visibleBooks(books),
+      sortChipLabel:
+          sortValue == 'Most Relevant' ? l10n.filterRelevance : sortLabel,
+      allCount: allCount,
+      rightLabel: rightLabel,
+      pendingLabels: pending,
+      formats: _availableFormats(books),
+      languages: _availableLanguages(books),
+      otherSources: otherSources,
+      selectedSource: _selectedSource,
+      formatFilters: _formatFilters,
+      languageFilters: _languageFilters,
+      fetchingNextPage: _fetchingNextPage,
+      reachedEnd: _viewEnded.contains(_viewKey(_selectedSource)),
+      scrollController: _scrollController,
+      onSelectSource: _selectSource,
+      onOpenSourceSheet: () => _openSourceSheet(result),
+      onPickSort: _pickSort,
+      onPickFormats: _pickFormats,
+      onPickLanguages: _pickLanguages,
+      onClearFilters: _clearFilters,
+      onRetrySkipped: _retryIgnoringLocalTimeouts,
+      onOpenBook: _openBook,
+    );
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _formatFilters.clear();
+      _languageFilters.clear();
+    });
+  }
+
+  List<String> _availableFormats(List<BookData> books) {
+    return <String>{
+      for (final book in books)
+        if (getFileType(book.info) != null)
+          getFileType(book.info)!.toUpperCase(),
+    }.toList()
+      ..sort((a, b) {
+        const order = ['EPUB', 'PDF'];
+        final aIndex = order.indexOf(a);
+        final bIndex = order.indexOf(b);
+        if (aIndex == -1 && bIndex == -1) return a.compareTo(b);
+        if (aIndex == -1) return 1;
+        if (bIndex == -1) return -1;
+        return aIndex.compareTo(bIndex);
+      });
+  }
+
+  List<String> _availableLanguages(List<BookData> books) {
+    return <String>{
+      for (final book in books)
+        if (getLanguage(book.info) != null) getLanguage(book.info)!,
+    }.toList()
+      ..sort();
+  }
+
+  List<BookData> _visibleBooks(List<BookData> books) {
+    return <BookData>[
+      for (final book in books)
+        if (_formatFilters.isEmpty ||
+            _formatFilters.contains(getFileType(book.info)?.toUpperCase()))
+          if (_languageFilters.isEmpty ||
+              _languageFilters.contains(getLanguage(book.info)))
+            book,
+    ];
+  }
+
+  String _sortLabel(AppLocalizations l10n, String value) {
+    return switch (value) {
+      'Newest' => l10n.sortNewest,
+      'Oldest' => l10n.sortOldest,
+      'Largest' => l10n.sortLargest,
+      'Smallest' => l10n.sortSmallest,
+      _ => l10n.sortMostRelevant,
+    };
+  }
+}
+
+String _filterLabel(String base, Set<String> selection) {
+  if (selection.isEmpty) return base;
+  if (selection.length == 1) return selection.first;
+  return '$base · ${selection.length}';
+}
+
+SearchProviderId? _sourceIdForBook(
+  SearchManagerResult result,
+  BookData book,
+  SearchProviderId? selectedSource,
+) {
+  for (final run in result.sources) {
+    if (run.displayName == book.source) return run.id;
+  }
+  return selectedSource;
+}
+
+/// The scrollable results surface: header, filter capsules, the list and
+/// the pagination footer. State ownership stays on [ResultPage] so filters
+/// survive a retry's loading flash; this widget only renders and forwards
+/// intents.
+class _ResultsView extends StatelessWidget {
+  const _ResultsView({
+    required this.result,
+    required this.visibleBooks,
+    required this.sortChipLabel,
+    required this.allCount,
+    required this.rightLabel,
+    required this.pendingLabels,
+    required this.formats,
+    required this.languages,
+    required this.otherSources,
+    required this.selectedSource,
+    required this.formatFilters,
+    required this.languageFilters,
+    required this.fetchingNextPage,
+    required this.reachedEnd,
+    required this.scrollController,
+    required this.onSelectSource,
+    required this.onOpenSourceSheet,
+    required this.onPickSort,
+    required this.onPickFormats,
+    required this.onPickLanguages,
+    required this.onClearFilters,
+    required this.onRetrySkipped,
+    required this.onOpenBook,
+  });
+
+  final SearchManagerResult result;
+  final List<BookData> visibleBooks;
+  final String sortChipLabel;
+  final int allCount;
+  final String rightLabel;
+  final List<String> pendingLabels;
+  final List<String> formats;
+  final List<String> languages;
+  final String? otherSources;
+  final SearchProviderId? selectedSource;
+  final Set<String> formatFilters;
+  final Set<String> languageFilters;
+  final bool fetchingNextPage;
+  final bool reachedEnd;
+  final ScrollController scrollController;
+  final ValueChanged<SearchProviderId?> onSelectSource;
+  final VoidCallback onOpenSourceSheet;
+  final VoidCallback onPickSort;
+  final ValueChanged<List<String>> onPickFormats;
+  final ValueChanged<List<String>> onPickLanguages;
+  final VoidCallback onClearFilters;
+  final VoidCallback onRetrySkipped;
+  final ValueChanged<BookData> onOpenBook;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     final filterChips = <Widget>[
       FilterChip(
@@ -562,38 +721,35 @@ class _ResultPageState extends ConsumerState<ResultPage> {
           size: 16,
           color: scheme.onPrimaryContainer,
         ),
-        label: Text(
-          ref.watch(app_state.selectedSortState) == 'Most Relevant'
-              ? l10n.filterRelevance
-              : sortLabel,
-        ),
-        onSelected: (_) => _pickSort(),
+        label: Text(sortChipLabel),
+        onSelected: (_) => onPickSort(),
       ),
       // One capsule per dimension: the picker behind it is multi-select,
       // so results pages no longer grow a chip per format and language.
-      capsule(
+      _FilterCapsule(
         key: const ValueKey('format-filter-capsule'),
-        label: _filterLabel(l10n.filterFileTypeLabel, _formatFilters),
-        active: _formatFilters.isNotEmpty,
-        onTap: formats.isEmpty ? null : () => _pickFormats(formats),
+        label: _filterLabel(l10n.filterFileTypeLabel, formatFilters),
+        active: formatFilters.isNotEmpty,
+        onTap: formats.isEmpty ? null : () => onPickFormats(formats),
       ),
-      capsule(
+      _FilterCapsule(
         key: const ValueKey('language-filter-capsule'),
         label: _filterLabel(
           l10n.languageSetting,
-          _languageFilters
+          languageFilters
               .map((code) => localizedLanguageName(l10n, code))
               .toSet(),
         ),
-        active: _languageFilters.isNotEmpty,
-        onTap: languages.isEmpty ? null : () => _pickLanguages(languages),
+        active: languageFilters.isNotEmpty,
+        onTap: languages.isEmpty ? null : () => onPickLanguages(languages),
       ),
     ];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: CustomScrollView(
-        controller: _scrollController,
+        controller: scrollController,
+        scrollCacheExtent: const ScrollCacheExtent.pixels(600),
         slivers: [
           SliverToBoxAdapter(
             child: Column(
@@ -606,67 +762,23 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                 const SizedBox(height: 8),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onLongPress: () => _openSourceSheet(result),
+                  onLongPress: onOpenSourceSheet,
                   child: SourceJourneyCard(
                     sources: result.sources,
-                    selectedSource: _selectedSource,
-                    onSelect: _selectSource,
+                    selectedSource: selectedSource,
+                    onSelect: onSelectSource,
                     totalCount: allCount,
                   ),
                 ),
-                if (pending.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  ValueListenableBuilder<List<String>>(
-                    valueListenable: WebviewChallengeSolver.pendingChallenges,
-                    builder: (context, challengeUrls, _) {
-                      if (challengeUrls.isEmpty) {
-                        return InlineHint(
-                          icon: Icons.refresh_rounded,
-                          message: pending.length == 1
-                              ? l10n.sourceStillSearching(pending.first)
-                              : l10n.sourceStillSearching(pending.join(' · ')),
-                        );
-                      }
-                      final challengeUrl = challengeUrls.first;
-                      // A source is stuck on a challenge: offer the
-                      // verification page now instead of letting the
-                      // invisible solve run out its timeout first.
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: InlineHint(
-                              icon: Icons.shield_outlined,
-                              tone: InlineHintTone.warning,
-                              message: l10n.challengeNeedsVerification,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: () => unawaited(
-                              WebviewChallengeSolver.requestVisibleSolve(
-                                  challengeUrl),
-                            ),
-                            style: TextButton.styleFrom(
-                              minimumSize: Size.zero,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              l10n.challengeVerifyNow,
-                              style: SwissText.micro.copyWith(
-                                color: scheme.primary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                _ChallengeHint(pendingLabels: pendingLabels),
+                _SkippedSourcesHint(
+                  sources: [
+                    for (final run in result.sources)
+                      if (run.status == SearchSourceStatus.locallyUnreachable)
+                        run,
+                  ],
+                  onRetry: onRetrySkipped,
+                ),
                 const SizedBox(height: 16),
                 Wrap(
                   spacing: 8,
@@ -679,58 +791,47 @@ class _ResultPageState extends ConsumerState<ResultPage> {
           ),
           if (visibleBooks.isEmpty)
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Column(
-                  children: [
-                    Text(
-                      l10n.noResultsFound,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 6),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _formatFilters.clear();
-                          _languageFilters.clear();
-                        });
-                      },
-                      child: Text(l10n.clearFiltersRetry),
-                    ),
-                  ],
-                ),
-              ),
+              child: _NoMatchesHint(onClearFilters: onClearFilters),
             )
           else
-            SliverToBoxAdapter(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  borderRadius: BorderRadius.circular(SwissRadius.card),
-                  border: Border.all(color: scheme.outlineVariant),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.shadow.withValues(alpha: 0.05),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    for (var index = 0;
-                        index < visibleBooks.length;
-                        index++) ...[
-                      _resultRow(result, visibleBooks[index], l10n),
+            DecoratedSliver(
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(SwissRadius.card),
+                border: Border.all(color: scheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.shadow.withValues(alpha: 0.05),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              sliver: SliverList.builder(
+                itemCount: visibleBooks.length,
+                itemBuilder: (context, index) {
+                  final book = visibleBooks[index];
+                  return Column(
+                    key: ValueKey(book.md5.isNotEmpty ? book.md5 : book.link),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ResultRow(
+                        book: book,
+                        sourceId: _sourceIdForBook(
+                          result,
+                          book,
+                          selectedSource,
+                        ),
+                        onTap: () => onOpenBook(book),
+                      ),
                       if (index < visibleBooks.length - 1)
                         Divider(
                           height: 1,
                           color: scheme.outlineVariant.withValues(alpha: 0.55),
                         ),
                     ],
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           if (otherSources != null)
@@ -739,14 +840,14 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                 padding: const EdgeInsets.only(top: 8),
                 child: InlineHint(
                   icon: Icons.public,
-                  message: otherSources,
+                  message: otherSources!,
                 ),
               ),
             ),
           SliverToBoxAdapter(
             child: _PaginationFooter(
-              fetching: _fetchingNextPage,
-              reachedEnd: _viewEnded.contains(_viewKey(_selectedSource)),
+              fetching: fetchingNextPage,
+              reachedEnd: reachedEnd,
               label: l10n.loadMoreResults,
             ),
           ),
@@ -754,13 +855,143 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       ),
     );
   }
+}
 
-  Widget _resultRow(
-    SearchManagerResult result,
-    BookData book,
-    AppLocalizations l10n,
-  ) {
-    final sourceId = _sourceIdFor(result, book);
+/// Filter dimension capsule: a label plus an expand affordance.
+class _FilterCapsule extends StatelessWidget {
+  const _FilterCapsule({
+    super.key,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FilterChip(
+      selected: active,
+      showCheckmark: false,
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          const SizedBox(width: 2),
+          Icon(
+            Icons.expand_more_rounded,
+            size: 16,
+            color: active ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+          ),
+        ],
+      ),
+      onSelected: onTap == null ? null : (_) => onTap!(),
+    );
+  }
+}
+
+/// "Still searching" / "needs verification" banner above the list.
+class _ChallengeHint extends StatelessWidget {
+  const _ChallengeHint({required this.pendingLabels});
+
+  final List<String> pendingLabels;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        WebviewChallengeSolver.pendingChallenges,
+        WebviewChallengeSolver.failedChallenges,
+      ]),
+      builder: (context, _) {
+        final pendingUrls = WebviewChallengeSolver.pendingChallenges.value;
+        final failedUrls = WebviewChallengeSolver.failedChallenges.value;
+        if (pendingUrls.isEmpty &&
+            failedUrls.isEmpty &&
+            pendingLabels.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final challengeUrl = failedUrls.isNotEmpty
+            ? failedUrls.first
+            : (pendingUrls.isNotEmpty ? pendingUrls.first : null);
+        if (challengeUrl == null) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: InlineHint(
+              icon: Icons.refresh_rounded,
+              message: pendingLabels.length == 1
+                  ? l10n.sourceStillSearching(pendingLabels.first)
+                  : l10n.sourceStillSearching(pendingLabels.join(' · ')),
+            ),
+          );
+        }
+
+        final needsRetry = failedUrls.isNotEmpty;
+        // A source is stuck on a challenge: offer the verification page now
+        // instead of letting the invisible solve run out its timeout first.
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: InlineHint(
+                  icon: Icons.shield_outlined,
+                  tone: InlineHintTone.warning,
+                  message: needsRetry
+                      ? l10n.challengeNeedsVerificationRetry
+                      : l10n.challengeNeedsVerification,
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () => unawaited(
+                  WebviewChallengeSolver.requestVisibleSolve(challengeUrl),
+                ),
+                style: TextButton.styleFrom(
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  l10n.challengeVerifyNow,
+                  style: SwissText.micro.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ResultRow extends StatelessWidget {
+  const _ResultRow({
+    required this.book,
+    required this.sourceId,
+    required this.onTap,
+  });
+
+  final BookData book;
+  final SearchProviderId? sourceId;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final id = sourceId;
     return SearchResultCard(
       title: book.title,
       author: book.author ?? '',
@@ -768,27 +999,73 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       info: book.info,
       link: book.link,
       md5: book.md5,
-      sourceLabel:
-          sourceId == null ? book.source : sourceShortLabel(l10n, sourceId),
-      onClick: () => _openBook(book),
+      sourceLabel: id == null ? book.source : sourceShortLabel(l10n, id),
+      onClick: onTap,
     );
   }
+}
 
-  SearchProviderId? _sourceIdFor(SearchManagerResult result, BookData book) {
-    for (final run in result.sources) {
-      if (run.displayName == book.source) return run.id;
-    }
-    return _selectedSource;
+class _NoMatchesHint extends StatelessWidget {
+  const _NoMatchesHint({required this.onClearFilters});
+
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        children: [
+          Text(l10n.noResultsFound, style: theme.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: onClearFilters,
+            child: Text(l10n.clearFiltersRetry),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  String _sortLabel(AppLocalizations l10n, String value) {
-    return switch (value) {
-      'Newest' => l10n.sortNewest,
-      'Oldest' => l10n.sortOldest,
-      'Largest' => l10n.sortLargest,
-      'Smallest' => l10n.sortSmallest,
-      _ => l10n.sortMostRelevant,
-    };
+/// Sort picker shown from the first filter capsule.
+class _SortSheet extends StatelessWidget {
+  const _SortSheet({required this.current, required this.labelFor});
+
+  final String current;
+  final String Function(String) labelFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+            child: Text(
+              l10n.filterSortLabel,
+              style: theme.textTheme.titleMedium,
+            ),
+          ),
+          for (final value in app_state.sortValues.keys)
+            ListTile(
+              title: Text(labelFor(value)),
+              trailing: value == current
+                  ? Icon(Icons.check, color: theme.colorScheme.primary)
+                  : null,
+              selected: value == current,
+              onTap: () => Navigator.pop(context, value),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 }
 
@@ -1173,6 +1450,7 @@ class _EmptyResults extends StatelessWidget {
     required this.onSelectSource,
     required this.onModify,
     required this.onClearFilters,
+    required this.onRetrySkipped,
     required this.retrying,
   });
 
@@ -1182,6 +1460,7 @@ class _EmptyResults extends StatelessWidget {
   final ValueChanged<SearchProviderId?> onSelectSource;
   final VoidCallback onModify;
   final VoidCallback onClearFilters;
+  final VoidCallback onRetrySkipped;
   final bool retrying;
 
   @override
@@ -1192,7 +1471,8 @@ class _EmptyResults extends StatelessWidget {
     final responded = result.sources
         .where((run) =>
             run.status != SearchSourceStatus.pending &&
-            run.status != SearchSourceStatus.skipped)
+            run.status != SearchSourceStatus.skipped &&
+            run.status != SearchSourceStatus.locallyUnreachable)
         .length;
     final failed = result.sources
         .where((run) => run.status == SearchSourceStatus.failed)
@@ -1216,6 +1496,13 @@ class _EmptyResults extends StatelessWidget {
             totalCount: 0,
           ),
         ],
+        _SkippedSourcesHint(
+          sources: [
+            for (final run in result.sources)
+              if (run.status == SearchSourceStatus.locallyUnreachable) run,
+          ],
+          onRetry: onRetrySkipped,
+        ),
         const SizedBox(height: 30),
         Center(
           child: ConstrainedBox(
@@ -1360,6 +1647,44 @@ class _SourceStatusCard extends StatelessWidget {
   }
 }
 
+class _SkippedSourcesHint extends StatelessWidget {
+  const _SkippedSourcesHint({required this.sources, required this.onRetry});
+
+  final List<SearchSourceRun> sources;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sources.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final names = sources.map((run) => run.displayName).join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: InlineHint(
+              icon: Icons.cloud_off_rounded,
+              message: l10n.sourcesSkippedLocally(names),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(l10n.retryAnyway),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SourceStatusRow extends StatelessWidget {
   const _SourceStatusRow({required this.run});
 
@@ -1381,6 +1706,10 @@ class _SourceStatusRow extends StatelessWidget {
         ),
       SearchSourceStatus.skipped => (
           l10n.sourceStatusUntried,
+          scheme.outline,
+        ),
+      SearchSourceStatus.locallyUnreachable => (
+          l10n.sourceStatusLocallyUnreachable,
           scheme.outline,
         ),
       _ => (l10n.sourceResponded(run.resultCount), scheme.secondary),
@@ -1563,6 +1892,8 @@ class _SourcePickerSheet extends StatelessWidget {
       SearchSourceStatus.empty =>
         l10n.sourceResultCount(run.resultCount),
       SearchSourceStatus.failed => l10n.sourceStatusFailed,
+      SearchSourceStatus.locallyUnreachable =>
+        l10n.sourceStatusLocallyUnreachable,
       SearchSourceStatus.skipped => l10n.sourceStatusUntried,
     };
   }
@@ -1765,8 +2096,9 @@ class _MultiSelectFilterSheetState extends State<_MultiSelectFilterSheet> {
                   child: Text(widget.title, style: theme.textTheme.titleMedium),
                 ),
                 TextButton(
-                  onPressed:
-                      _selected.isEmpty ? null : () => setState(_selected.clear),
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () => setState(_selected.clear),
                   child: Text(l10n.clearAll),
                 ),
               ],

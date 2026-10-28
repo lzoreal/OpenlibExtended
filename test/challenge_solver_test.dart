@@ -13,6 +13,9 @@ import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 
 void main() {
+  setUp(WebviewChallengeSolver.clearAutoSolveFailures);
+  tearDown(WebviewChallengeSolver.clearAutoSolveFailures);
+
   group('ChallengeHtmlCache', () {
     setUp(() {
       ChallengeHtmlCache.clear();
@@ -57,6 +60,45 @@ void main() {
       ChallengeHtmlCache.clear();
 
       expect(ChallengeHtmlCache.has('https://a'), isFalse);
+    });
+  });
+
+  group('automatic solve failure cache', () {
+    setUp(WebviewChallengeSolver.clearAutoSolveFailures);
+    tearDown(WebviewChallengeSolver.clearAutoSolveFailures);
+
+    test('remembers a failure per host and exposes it for the banner', () {
+      const url = 'https://annas-archive.pk/search?q=docker';
+      expect(WebviewChallengeSolver.autoSolveRecentlyFailed(url), isFalse);
+
+      WebviewChallengeSolver.debugRememberAutoSolveFailure(url);
+
+      expect(WebviewChallengeSolver.autoSolveRecentlyFailed(url), isTrue);
+      expect(
+        WebviewChallengeSolver.autoSolveRecentlyFailed(
+            'https://annas-archive.pk/search?q=other'),
+        isTrue,
+        reason: 'the whole host is marked, not just one query',
+      );
+      expect(WebviewChallengeSolver.failedChallenges.value, contains(url));
+      expect(
+        WebviewChallengeSolver.autoSolveRecentlyFailed(
+            'https://z-lib.gd/search?q=x'),
+        isFalse,
+      );
+    });
+
+    test('a successful manual solve clears the failure and the banner', () async {
+      const url = 'https://annas-archive.pk/search?q=manual';
+      WebviewChallengeSolver.debugRememberAutoSolveFailure(url);
+      WebviewChallengeSolver.visibleSolverFallback =
+          (_) async => '<html>solved</html>';
+      addTearDown(() => WebviewChallengeSolver.visibleSolverFallback = null);
+
+      await WebviewChallengeSolver.requestVisibleSolve(url);
+
+      expect(WebviewChallengeSolver.autoSolveRecentlyFailed(url), isFalse);
+      expect(WebviewChallengeSolver.failedChallenges.value, isEmpty);
     });
   });
 

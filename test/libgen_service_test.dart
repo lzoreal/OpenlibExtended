@@ -14,25 +14,8 @@ import 'package:openlib/services/slum_catalogue.dart';
 // The libgen tests inject an InstanceManager whose catalogue is a local
 // server, so the enabled-mirror list they exercise comes from a real
 // open-slum.org-shaped response instead of the network or the database.
-class _FakePathProvider extends PathProviderPlatform {
-  Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_libgen_test/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
 
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
+import 'helpers/fake_path_provider.dart';
 
 const _md5Temple = '7373b39d1addaf236328975f9bbef7c4';
 const _md5Flutter = '0229cc161352df1fb45a8f8246350910';
@@ -83,7 +66,7 @@ void main() {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
-      PathProviderPlatform.instance = _FakePathProvider();
+      PathProviderPlatform.instance = FakePathProvider('libgen');
     }
   });
 

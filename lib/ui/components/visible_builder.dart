@@ -8,9 +8,17 @@ import 'package:flutter/scheduler.dart';
 /// that watches the lazy-cover provider, so a long result list does not
 /// fire one lookup per row.
 class VisibilityBuilder extends StatefulWidget {
-  const VisibilityBuilder({super.key, required this.builder});
+  const VisibilityBuilder({
+    super.key,
+    required this.builder,
+    this.prefetchExtent = 0,
+  });
 
   final Widget Function(BuildContext context, bool visible) builder;
+
+  /// Treat rows this many logical pixels outside the viewport as visible,
+  /// so their cover lookup starts before they scroll onto the screen.
+  final double prefetchExtent;
 
   @override
   State<VisibilityBuilder> createState() => _VisibilityBuilderState();
@@ -59,7 +67,9 @@ class _VisibilityBuilderState extends State<VisibilityBuilder> {
     }
 
     final top = box.localToGlobal(Offset.zero, ancestor: viewport).dy;
-    final visible = top + box.size.height > 0 && top < viewport.size.height;
+    final margin = widget.prefetchExtent;
+    final visible = top + box.size.height > -margin &&
+        top < viewport.size.height + margin;
     if (visible != _visible) {
       setState(() => _visible = visible);
     }

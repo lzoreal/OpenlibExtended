@@ -24,28 +24,16 @@ import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/settings_page.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 
-class _FakePathProvider extends PathProviderPlatform {
-  static const base = '/tmp/openlib_settings_test';
+import 'helpers/fake_path_provider.dart';
 
-  @override
-  Future<String?> getApplicationSupportPath() async => base;
-
-  @override
-  Future<String?> getApplicationDocumentsPath() async => base;
-
-  @override
-  Future<String?> getTemporaryPath() async => base;
-
-  @override
-  Future<String?> getLibraryPath() async => base;
-}
+final _paths = FakePathProvider('settings');
 
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    PathProviderPlatform.instance = _FakePathProvider();
-    Directory(_FakePathProvider.base).createSync(recursive: true);
+    PathProviderPlatform.instance = _paths;
+    Directory(_paths.base).createSync(recursive: true);
   });
 
   Future<void> pumpPage(WidgetTester tester, {Locale? locale}) async {

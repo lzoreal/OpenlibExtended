@@ -19,6 +19,10 @@ import 'package:openlib/services/database.dart';
 import 'package:openlib/services/download_manager.dart';
 import 'package:openlib/services/files.dart' show generateBookFileName;
 
+import 'helpers/fake_path_provider.dart';
+
+final _paths = FakePathProvider('dl');
+
 /// Minimal local file server with real Range support, like the real mirrors.
 /// [chunkDelay] forces multi-chunk delivery so downloads can be paused
 /// mid-transfer.
@@ -120,36 +124,11 @@ class _RangeServer {
   }
 }
 
-class _FakePathProvider extends PathProviderPlatform {
-  // Unique per-suite base dir: flutter test runs test files concurrently, so
-  // each suite needs its own sqlite DB / storage paths.
-  static final String base =
-      '/tmp/openlib_dl_test_${DateTime.now().millisecondsSinceEpoch}_$pid';
-
-  Future<String> _dir(String name) async {
-    final dir = Directory('$base/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
-
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    PathProviderPlatform.instance = _FakePathProvider();
+    PathProviderPlatform.instance = _paths;
   });
 
   group('DownloadManager end-to-end (local server)', () {
@@ -161,7 +140,7 @@ void main() {
       manager = DownloadManager();
       await manager.initialize();
 
-      saveDir = (await _FakePathProvider().getTemporaryPath())!;
+      saveDir = (await _paths.getTemporaryPath())!;
       // bookStorageDirectory preference is read by the manager
       await MyLibraryDb.instance
           .savePreference('bookStorageDirectory', saveDir);
@@ -312,7 +291,7 @@ void main() {
       // a removed drive or a deleted folder) no longer exists when the
       // download starts. The manager must recreate it and finish normally
       // rather than dying silently mid-transfer with progress frozen.
-      final dir = Directory('${_FakePathProvider.base}/gone_md5hash_004');
+      final dir = Directory('${_paths.base}/gone_md5hash_004');
       await dir.create(recursive: true);
       await MyLibraryDb.instance
           .savePreference('bookStorageDirectory', dir.path);

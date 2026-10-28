@@ -1,3 +1,6 @@
+// Dart imports:
+import 'dart:async';
+
 // Flutter imports:
 import 'package:flutter/material.dart';
 
@@ -148,6 +151,115 @@ void main() {
     expect(find.text('LibGen 1-0'), findsWidgets);
   });
 
+  testWidgets('skipped source offers try-anyway and forces a retry',
+      (tester) async {
+    SearchManagerResult skippedPage(int page) {
+      final base = multiSourcePage(page);
+      return SearchManagerResult(
+        books: base.books.where((book) => book.source != 'Z-Library').toList(),
+        failedProviders: const [],
+        resultSource: base.resultSource,
+        resultSourceId: base.resultSourceId,
+        sources: [
+          for (final run in base.sources)
+            if (run.id == SearchProviderId.zlibrary)
+              const SearchSourceRun(
+                id: SearchProviderId.zlibrary,
+                displayName: 'Z-Library',
+                resultCount: 0,
+                status: SearchSourceStatus.locallyUnreachable,
+              )
+            else
+              run,
+        ],
+        booksBySource: {
+          for (final entry in base.booksBySource.entries)
+            if (entry.key != SearchProviderId.zlibrary) entry.key: entry.value,
+        },
+      );
+    }
+
+    final keys = await pumpResults(
+      tester,
+      search: (key) async => skippedPage(key.page),
+    );
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+
+    expect(find.textContaining('Z-Library skipped'), findsOneWidget);
+    expect(find.text(l10n.retryAnyway), findsOneWidget);
+
+    await tester.tap(find.text(l10n.retryAnyway));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(keys.any((key) => key.forceLocalTimeouts), isTrue);
+  });
+
+  testWidgets('later source snapshots merge without clearing earlier books',
+      (tester) async {
+    SearchManagerResult partial({required bool withZlib}) {
+      final libgen = _sourceBooks('LibGen', 'Library Genesis', 1, 2);
+      final zlib =
+          withZlib ? _sourceBooks('Z-Library', 'Z-Library', 1, 3) : <BookData>[];
+      return SearchManagerResult(
+        books: [...libgen, ...zlib],
+        failedProviders: const [],
+        resultSource: 'Library Genesis',
+        resultSourceId: SearchProviderId.libgen,
+        sources: [
+          const SearchSourceRun(
+            id: SearchProviderId.libgen,
+            displayName: 'Library Genesis',
+            resultCount: 2,
+            status: SearchSourceStatus.hit,
+          ),
+          SearchSourceRun(
+            id: SearchProviderId.zlibrary,
+            displayName: 'Z-Library',
+            resultCount: zlib.length,
+            status: withZlib
+                ? SearchSourceStatus.hit
+                : SearchSourceStatus.pending,
+          ),
+        ],
+        booksBySource: {
+          SearchProviderId.libgen: libgen,
+          if (withZlib) SearchProviderId.zlibrary: zlib,
+        },
+      );
+    }
+
+    final controller = StreamController<SearchManagerResult>();
+    addTearDown(controller.close);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        initialSearchProvider.overrideWith((ref, key) => controller.stream),
+      ],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const ResultPage(searchQuery: 'docker'),
+      ),
+    ));
+    await tester.pump();
+
+    controller.add(partial(withZlib: false));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('LibGen 1-0'), findsWidgets);
+    expect(find.text('Z-Library 1-0'), findsNothing);
+
+    controller.add(partial(withZlib: true));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('LibGen 1-0'), findsWidgets,
+        reason: 'the first snapshot must survive the merge');
+    expect(find.text('Z-Library 1-0'), findsWidgets,
+        reason: 'the late source is appended in place');
+  });
+
   testWidgets('the merged view paginates without pinning a source',
       (tester) async {
     final keys = await pumpResults(
@@ -165,7 +277,8 @@ void main() {
     final pageTwo = keys.where((key) => key.page == 2).toList();
     expect(pageTwo, isNotEmpty);
     expect(pageTwo.first.source, isNull);
-    expect(find.text('Z-Library 2-0'), findsWidgets);
+    // The list is lazy now; the first appended row is the one in view.
+    expect(find.text('LibGen 2-0'), findsWidgets);
   });
 
   testWidgets('a switched source paginates within that source', (tester) async {
@@ -382,6 +495,23 @@ void main() {
       find.descendant(of: capsule, matching: find.text(l10n.languageNameZh)),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a failed auto-solve offers manual verification with retry copy',
+      (tester) async {
+    const url = 'https://annas-archive.pk/search?q=docker';
+    WebviewChallengeSolver.failedChallenges.value = [url];
+    addTearDown(WebviewChallengeSolver.clearAutoSolveFailures);
+
+    await pumpResults(
+      tester,
+      search: (key) async => multiSourcePage(key.page),
+    );
+    final l10n = AppLocalizations.of(
+        tester.element(find.byType(ResultPage).first));
+
+    expect(find.text(l10n.challengeNeedsVerificationRetry), findsOneWidget);
+    expect(find.text(l10n.challengeVerifyNow), findsOneWidget);
   });
 
   testWidgets('a pending challenge offers the verification page',

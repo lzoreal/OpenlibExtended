@@ -33,6 +33,7 @@ InstanceView _view(
   bool enabled = true,
   SlumStatus status = SlumStatus.up,
   int? latency = 320,
+  Protection protection = Protection.none,
 }) =>
     InstanceView(
       site: SlumSite(
@@ -40,7 +41,7 @@ InstanceView _view(
         url: 'https://$host',
         host: host,
         status: status,
-        protection: Protection.none,
+        protection: protection,
         latencyMs: latency,
       ),
       enabled: enabled,
@@ -133,6 +134,25 @@ void main() {
       find.text('Local test: 1/1 reachable, fastest 85 ms'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('marks protected mirrors as needing verification',
+      (tester) async {
+    final store = MemoryPreferenceStore();
+    final manager = _manager(store);
+    await manager.saveLocalLatencies({'z-lib.gd': 85});
+
+    await _pumpPage(
+      tester,
+      manager: manager,
+      views: [
+        _view('z-lib.gd', protection: Protection.cloudflare),
+      ],
+      measure: (urls) async => <String, int?>{},
+    );
+
+    expect(_localText(tester, 'z-lib.gd'),
+        'Local 85 ms · needs verification · just now');
   });
 
   testWidgets('shows a timeout as a tested local result', (tester) async {

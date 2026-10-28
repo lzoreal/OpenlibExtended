@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/state/state.dart'
-    show checkIdExists, resultCoverProvider;
+    show downloadedBookIdsProvider, resultCoverProvider;
 import 'package:openlib/ui/components/book_card_widget.dart'
     show getFileType, getLanguage;
 import 'package:openlib/ui/components/language_names.dart';
@@ -16,11 +16,12 @@ import 'package:openlib/ui/components/visible_builder.dart';
 import 'package:openlib/ui/swiss_grid.dart';
 
 /// Parses the size token out of the provider's comma-separated info line.
+final _fileSizePattern =
+    RegExp(r'\b\d+(?:\.\d+)?\s*(?:KB|MB|GB)\b', caseSensitive: false);
+
 String? getFileSize(String? info) {
   if (info == null || info.isEmpty) return null;
-  return RegExp(r'\b\d+(?:\.\d+)?\s*(?:KB|MB|GB)\b', caseSensitive: false)
-      .firstMatch(info)
-      ?.group(0);
+  return _fileSizePattern.firstMatch(info)?.group(0);
 }
 
 Map<String, String>? _coverHeaders(String? coverUrl) {
@@ -61,9 +62,10 @@ class SearchResultCard extends ConsumerWidget {
     final fileType = getFileType(info);
     final language = getLanguage(info);
     final fileSize = getFileSize(info);
-    final isDownloaded = md5 != null
-        ? ref.watch(checkIdExists(md5!))
-        : const AsyncValue<bool>.data(false);
+    final downloadedIds = md5 == null
+        ? const <String>{}
+        : ref.watch(downloadedBookIdsProvider).valueOrNull ?? const <String>{};
+    final isDownloaded = md5 != null && downloadedIds.contains(md5);
 
     final hasThumbnail = thumbnail != null && thumbnail!.isNotEmpty;
 
@@ -80,6 +82,7 @@ class SearchResultCard extends ConsumerWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(SwissRadius.sm),
                 child: VisibilityBuilder(
+                  prefetchExtent: 240,
                   builder: (context, visible) {
                     if (!visible) {
                       return _CoverFallback(scheme: scheme, title: title);
@@ -99,7 +102,7 @@ class SearchResultCard extends ConsumerWidget {
                             title: title,
                             scheme: scheme,
                           ),
-                        if (isDownloaded.valueOrNull == true)
+                        if (isDownloaded)
                           Positioned(
                             top: 4,
                             right: 4,
@@ -109,8 +112,8 @@ class SearchResultCard extends ConsumerWidget {
                               decoration: BoxDecoration(
                                 color: scheme.primary,
                                 shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: scheme.surface, width: 1),
+                                border:
+                                    Border.all(color: scheme.surface, width: 1),
                               ),
                               child: Icon(
                                 Icons.check_rounded,
@@ -259,8 +262,10 @@ class _CoverImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return CachedNetworkImage(
       imageUrl: url,
+      memCacheWidth: (56 * dpr).round(),
       fit: BoxFit.cover,
       httpHeaders: _coverHeaders(url),
       placeholder: (context, url) => _CoverFallback(

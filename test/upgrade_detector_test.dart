@@ -3,39 +3,15 @@ import 'dart:io';
 
 // Package imports:
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/upgrade_detector.dart';
 import 'package:openlib/services/search_manager.dart';
 
-class _FakePathProvider extends PathProviderPlatform {
-  _FakePathProvider()
-      : _base =
-            Directory.systemTemp.createTempSync('openlib_upgrade_test').path;
-
-  final String _base;
-
-  Future<String> _dir(String name) async {
-    final dir = Directory('$_base/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
+import 'helpers/fake_path_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +20,7 @@ void main() {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
-      PathProviderPlatform.instance = _FakePathProvider();
+      PathProviderPlatform.instance = FakePathProvider('upgrade');
     }
   });
 

@@ -832,6 +832,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mirrorLatencyHint => '本机镜像未测速，搜索可能变慢。测速后会按本机延迟自动排序。';
 
   @override
+  String get mirrorLatencyNeedsVerification => '需验证';
+
+  @override
   String get mirrorLatencyGoTest => '测速';
 
   @override
@@ -1547,6 +1550,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sourceStatusUntried => '未尝试';
 
   @override
+  String get sourceStatusLocallyUnreachable => '本机不可达';
+
+  @override
+  String sourcesSkippedLocally(String sources) {
+    return '已跳过 $sources：本机不可达。';
+  }
+
+  @override
+  String get retryAnyway => '仍要尝试';
+
+  @override
   String get sourceStatusFailed => '失败';
 
   @override
@@ -1989,6 +2003,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get challengeNeedsVerification => '需要手动验证，验证通过后会自动继续检索';
+
+  @override
+  String get challengeNeedsVerificationRetry => '需要手动验证，验证后重新搜索会直接使用验证结果。';
 
   @override
   String get challengeVerifyNow => '去验证';

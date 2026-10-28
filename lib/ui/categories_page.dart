@@ -430,6 +430,7 @@ class CategoryListingPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     final booksBasedOnGenre = ref.watch(getSubCategoryTypeList(url));
     final width = MediaQuery.sizeOf(context).width;
     final contentWidth = (width > 840 ? 840.0 : width) - 32;
@@ -494,6 +495,8 @@ class CategoryListingPage extends ConsumerWidget {
                                           SwissRadius.field),
                                       child: CachedNetworkImage(
                                         imageUrl: book.thumbnail!,
+                                        memCacheWidth:
+                                            (cardWidth * dpr).round(),
                                         fit: BoxFit.cover,
                                         placeholder: (context, url) =>
                                             ColoredBox(

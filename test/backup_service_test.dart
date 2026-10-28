@@ -2,9 +2,6 @@
 // a JSON backup, a fresh database restores from it, and the restored
 // rows match. Garbage and future-version files are rejected.
 
-// Dart imports:
-import 'dart:io';
-
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,25 +13,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:openlib/services/backup_service.dart';
 import 'package:openlib/services/database.dart';
 
-class _FakePathProvider extends PathProviderPlatform {
-  Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_backup_test/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
+import 'helpers/fake_path_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +21,7 @@ void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    PathProviderPlatform.instance = _FakePathProvider();
+    PathProviderPlatform.instance = FakePathProvider('backup');
   });
 
   Future<void> seedData() async {

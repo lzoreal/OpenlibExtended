@@ -17,25 +17,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/share_book.dart' show findBookFileForTesting;
 
-class _FakePathProvider extends PathProviderPlatform {
-  Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_share_test/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
+import 'helpers/fake_path_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -44,12 +26,12 @@ void main() {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
-      PathProviderPlatform.instance = _FakePathProvider();
+      PathProviderPlatform.instance = FakePathProvider('share');
     }
   });
 
   test('a downloaded book resolves to its file on disk', () async {
-    final storage = await _FakePathProvider().getTemporaryPath();
+    final storage = await FakePathProvider('share').getTemporaryPath();
     await MyLibraryDb.instance.savePreference('bookStorageDirectory', storage);
 
     final book = File('$storage/Some Great Book-ab12cd34.epub')
@@ -62,7 +44,7 @@ void main() {
   });
 
   test('a book that is not downloaded resolves to nothing', () async {
-    final storage = await _FakePathProvider().getTemporaryPath();
+    final storage = await FakePathProvider('share').getTemporaryPath();
     await MyLibraryDb.instance.savePreference('bookStorageDirectory', storage);
 
     expect(await findBookFileForTesting('Missing Book.epub', 'epub'), isNull);

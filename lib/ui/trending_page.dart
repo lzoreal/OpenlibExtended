@@ -103,6 +103,7 @@ class _TrendingBookCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
 
     return SizedBox(
       key: const ValueKey('trending-poster'),
@@ -131,6 +132,7 @@ class _TrendingBookCard extends StatelessWidget {
                   aspectRatio: 2 / 3,
                   child: CachedNetworkImage(
                     imageUrl: book.thumbnail ?? '',
+                    memCacheWidth: (128 * dpr).round(),
                     fit: BoxFit.cover,
                     placeholder: (context, url) => ColoredBox(
                       color: scheme.surfaceContainerHighest,

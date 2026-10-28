@@ -91,6 +91,47 @@ final completedDownloadsProvider =
   return entries;
 });
 
+bool _isActiveTask(DownloadTask task) =>
+    task.status != DownloadStatus.completed &&
+    task.status != DownloadStatus.cancelled &&
+    task.status != DownloadStatus.failed;
+
+@immutable
+class _ActiveSummary {
+  const _ActiveSummary({required this.activeCount, required this.failedCount});
+
+  final int activeCount;
+  final int failedCount;
+
+  static const empty = _ActiveSummary(activeCount: 0, failedCount: 0);
+
+  @override
+  bool operator ==(Object other) =>
+      other is _ActiveSummary &&
+      other.activeCount == activeCount &&
+      other.failedCount == failedCount;
+
+  @override
+  int get hashCode => Object.hash(activeCount, failedCount);
+}
+
+/// Only counts/statuses: progress ticks produce an equal summary, so the
+/// page shell and the completed list do not rebuild ten times per second.
+final _activeSummaryProvider = Provider<_ActiveSummary>((ref) {
+  final tasks =
+      ref.watch(activeDownloadsProvider).valueOrNull?.values ?? const [];
+  var active = 0;
+  var failed = 0;
+  for (final task in tasks) {
+    if (task.status == DownloadStatus.failed) {
+      failed++;
+    } else if (_isActiveTask(task)) {
+      active++;
+    }
+  }
+  return _ActiveSummary(activeCount: active, failedCount: failed);
+});
+
 Future<String?> _bookStorageDirectory() async {
   try {
     final directory =
@@ -435,148 +476,73 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
     // A hidden tab stays mounted, so it must not keep subscribing: every
     // download event would rebuild this whole page behind the user's back.
     final tabActive = TabVisibility.of(context);
-    final activeAsync = tabActive
-        ? ref.watch(activeDownloadsProvider)
-        : const AsyncData<Map<String, DownloadTask>>({});
+    final summary = tabActive
+        ? ref.watch(_activeSummaryProvider)
+        : _ActiveSummary.empty;
     final completedAsync = tabActive
         ? ref.watch(completedDownloadsProvider)
         : const AsyncData<List<CompletedDownload>>([]);
-    final active = (activeAsync.valueOrNull ?? const <String, DownloadTask>{})
-        .values
-        .where((task) =>
-            task.status != DownloadStatus.completed &&
-            task.status != DownloadStatus.cancelled)
-        .toList();
-    final activeOnly =
-        active.where((task) => task.status != DownloadStatus.failed).toList();
-    final failed =
-        active.where((task) => task.status == DownloadStatus.failed).toList();
     final completed = completedAsync.valueOrNull ?? const <CompletedDownload>[];
 
-    final pausedCount =
-        activeOnly.where((task) => task.status == DownloadStatus.paused).length;
-
-    DownloadTask? currentTask;
-    for (final task in activeOnly) {
-      if (task.status == DownloadStatus.downloading) {
-        currentTask = task;
-        break;
-      }
-    }
-    currentTask ??= activeOnly.isEmpty ? null : activeOnly.first;
-
-    final allCount = activeOnly.length + failed.length + completed.length;
-    final canPause = activeOnly.any((task) =>
-        task.status == DownloadStatus.downloading ||
-        task.status == DownloadStatus.downloadingMirrors ||
-        task.status == DownloadStatus.fetchingMirrors ||
-        task.status == DownloadStatus.queued);
-    final canResume = pausedCount > 0;
+    final allCount =
+        summary.activeCount + summary.failedCount + completed.length;
 
     Widget buildList(_DownloadFilter filter) {
       final includeActive = filter != _DownloadFilter.completed;
       final includeCompleted = filter != _DownloadFilter.active;
-      final hasContent = (includeActive && activeOnly.isNotEmpty) ||
-          (includeCompleted && (failed.isNotEmpty || completed.isNotEmpty));
+      final hasActive = includeActive && summary.activeCount > 0;
+      final hasFailed = includeCompleted && summary.failedCount > 0;
+      final hasCompleted = includeCompleted && completed.isNotEmpty;
+      final hasContent = hasActive || hasFailed || hasCompleted;
 
-      return ListView(
+      final showCompleted = hasCompleted;
+      return CustomScrollView(
         key: PageStorageKey<_DownloadFilter>(filter),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          if (currentTask != null && filter != _DownloadFilter.completed)
-            _ProgressHero(
-              task: currentTask,
-              speed: _speeds[currentTask.id],
-            ),
-          const SizedBox(height: 16),
-          if (!hasContent)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Center(
-                child: Text(
-                  l10n.downloadCenterNoTasks,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            )
-          else ...[
-            if (includeActive && activeOnly.isNotEmpty) ...[
-              SectionHeader(
-                title: l10n.downloadCenterInProgress,
-                hint: l10n.downloadCenterQueueMemory,
-                action: canPause || canResume
-                    ? TextButton.icon(
-                        onPressed: () => _toggleAll(activeOnly),
-                        icon: Icon(
-                          canResume && !canPause
-                              ? Icons.play_arrow_rounded
-                              : Icons.pause_rounded,
-                          size: 16,
-                        ),
-                        label: Text(
-                          canResume && !canPause
-                              ? l10n.downloadCenterAllResume
-                              : l10n.downloadCenterAllPause,
-                        ),
-                        style: TextButton.styleFrom(
-                          minimumSize: Size.zero,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (hasActive)
+                    _ActiveSection(
+                      speeds: _speeds,
+                      verifyingTaskId: _verifyingTaskId,
+                      onToggleAll: _toggleAll,
+                      onVerify: _verifyTask,
+                    ),
+                  if (!hasActive) const SizedBox(height: 16),
+                  if (!hasContent)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Text(
+                          l10n.downloadCenterNoTasks,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
                           ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          textStyle: SwissText.micro,
                         ),
-                      )
-                    : null,
+                      ),
+                    )
+                  else ...[
+                    if (hasFailed)
+                      _FailedSection(
+                        verifyingTaskId: _verifyingTaskId,
+                        onVerify: _verifyTask,
+                      ),
+                    if (showCompleted && (hasActive || hasFailed))
+                      const SizedBox(height: 16),
+                  ],
+                ],
               ),
-              for (final task in activeOnly)
-                _TaskCard(
-                  task: task,
-                  speed: _speeds[task.id],
-                  verifying: _verifyingTaskId == task.id,
-                  onPause: () =>
-                      ref.read(downloadManagerProvider).pauseDownload(task.id),
-                  onResume: () =>
-                      ref.read(downloadManagerProvider).resumeDownload(task.id),
-                  onCancel: () =>
-                      ref.read(downloadManagerProvider).cancelDownload(task.id),
-                  onRetry: () => ref
-                      .read(downloadManagerProvider)
-                      .retryDownloadKeepingPartial(task.id),
-                  onVerify: () => _verifyTask(task),
-                ),
-            ],
-            if (includeCompleted && failed.isNotEmpty) ...[
-              SectionHeader(
-                title: l10n.downloadCenterFailed,
-                hint: '${failed.length}',
-              ),
-              for (final task in failed)
-                _TaskCard(
-                  task: task,
-                  speed: null,
-                  verifying: _verifyingTaskId == task.id,
-                  onPause: null,
-                  onResume: null,
-                  onCancel: () =>
-                      ref.read(downloadManagerProvider).cancelDownload(task.id),
-                  onRetry: () => ref
-                      .read(downloadManagerProvider)
-                      .retryDownloadKeepingPartial(task.id),
-                  onVerify: () => _verifyTask(task),
-                ),
-            ],
-            if (includeCompleted && completed.isNotEmpty) ...[
-              // Only separate from a section above: with nothing before it
-              // this left a blank band right under the filter tabs.
-              if ((includeActive && activeOnly.isNotEmpty) ||
-                  (includeCompleted && failed.isNotEmpty))
-                const SizedBox(height: 16),
-              _CompletedList(
+            ),
+          ),
+          if (showCompleted)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: _CompletedSliver(
                 items: completed,
                 onOpen: _openCompleted,
                 onDetails: (item) {
@@ -601,12 +567,23 @@ class _DownloadCenterPageState extends ConsumerState<DownloadCenterPage>
                     : null,
                 onRemove: _removeRecord,
               ),
-              const SizedBox(height: 12),
-              InlineHint(message: l10n.downloadCenterRemoveNote),
-              const SizedBox(height: 12),
-              _StorageSummary(completed: completed),
-            ],
-          ],
+            ),
+          if (showCompleted)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    InlineHint(message: l10n.downloadCenterRemoveNote),
+                    const SizedBox(height: 12),
+                    _StorageSummary(completed: completed),
+                  ],
+                ),
+              ),
+            )
+          else
+            const SliverToBoxAdapter(child: SizedBox(height: 28)),
         ],
       );
     }
@@ -1115,6 +1092,140 @@ class _TaskCard extends StatelessWidget {
   }
 }
 
+class _ActiveSection extends ConsumerWidget {
+  const _ActiveSection({
+    required this.speeds,
+    required this.verifyingTaskId,
+    required this.onToggleAll,
+    required this.onVerify,
+  });
+
+  final Map<String, double> speeds;
+  final String? verifyingTaskId;
+  final Future<void> Function(List<DownloadTask> tasks) onToggleAll;
+  final Future<void> Function(DownloadTask task) onVerify;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tasks = (ref.watch(activeDownloadsProvider).valueOrNull?.values ??
+            const <DownloadTask>[])
+        .where(_isActiveTask)
+        .toList(growable: false);
+    if (tasks.isEmpty) return const SizedBox.shrink();
+
+    final selected = tasks.firstWhere(
+      (task) => task.status == DownloadStatus.downloading,
+      orElse: () => tasks.first,
+    );
+    final pausedCount =
+        tasks.where((task) => task.status == DownloadStatus.paused).length;
+    final canPause = tasks.any((task) =>
+        task.status == DownloadStatus.downloading ||
+        task.status == DownloadStatus.downloadingMirrors ||
+        task.status == DownloadStatus.fetchingMirrors ||
+        task.status == DownloadStatus.queued);
+    final canResume = pausedCount > 0;
+    final l10n = AppLocalizations.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ProgressHero(task: selected, speed: speeds[selected.id]),
+        const SizedBox(height: 16),
+        SectionHeader(
+          title: l10n.downloadCenterInProgress,
+          hint: l10n.downloadCenterQueueMemory,
+          action: canPause || canResume
+              ? TextButton.icon(
+                  onPressed: () => onToggleAll(tasks),
+                  icon: Icon(
+                    canResume && !canPause
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_rounded,
+                    size: 16,
+                  ),
+                  label: Text(
+                    canResume && !canPause
+                        ? l10n.downloadCenterAllResume
+                        : l10n.downloadCenterAllPause,
+                  ),
+                  style: TextButton.styleFrom(
+                    minimumSize: Size.zero,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: SwissText.micro,
+                  ),
+                )
+              : null,
+        ),
+        for (final task in tasks)
+          _TaskCard(
+            task: task,
+            speed: speeds[task.id],
+            verifying: verifyingTaskId == task.id,
+            onPause: () =>
+                ref.read(downloadManagerProvider).pauseDownload(task.id),
+            onResume: () =>
+                ref.read(downloadManagerProvider).resumeDownload(task.id),
+            onCancel: () =>
+                ref.read(downloadManagerProvider).cancelDownload(task.id),
+            onRetry: () => ref
+                .read(downloadManagerProvider)
+                .retryDownloadKeepingPartial(task.id),
+            onVerify: () => onVerify(task),
+          ),
+      ],
+    );
+  }
+}
+
+class _FailedSection extends ConsumerWidget {
+  const _FailedSection({
+    required this.verifyingTaskId,
+    required this.onVerify,
+  });
+
+  final String? verifyingTaskId;
+  final Future<void> Function(DownloadTask task) onVerify;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final failed = (ref.watch(activeDownloadsProvider).valueOrNull?.values ??
+            const <DownloadTask>[])
+        .where((task) => task.status == DownloadStatus.failed)
+        .toList(growable: false);
+    if (failed.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          title: l10n.downloadCenterFailed,
+          hint: '${failed.length}',
+        ),
+        for (final task in failed)
+          _TaskCard(
+            task: task,
+            speed: null,
+            verifying: verifyingTaskId == task.id,
+            onPause: null,
+            onResume: null,
+            onCancel: () =>
+                ref.read(downloadManagerProvider).cancelDownload(task.id),
+            onRetry: () => ref
+                .read(downloadManagerProvider)
+                .retryDownloadKeepingPartial(task.id),
+            onVerify: () => onVerify(task),
+          ),
+      ],
+    );
+  }
+}
+
 class _DownloadCover extends StatelessWidget {
   const _DownloadCover({
     required this.title,
@@ -1127,6 +1238,7 @@ class _DownloadCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     final hasThumbnail = thumbnail != null && thumbnail!.isNotEmpty;
     return ClipRRect(
       borderRadius: BorderRadius.circular(SwissRadius.sm),
@@ -1137,6 +1249,7 @@ class _DownloadCover extends StatelessWidget {
         child: hasThumbnail
             ? CachedNetworkImage(
                 imageUrl: thumbnail!,
+                memCacheWidth: (64 * dpr).round(),
                 fit: BoxFit.cover,
                 placeholder: (context, url) => _CoverFallback(
                   title: title,
@@ -1315,8 +1428,8 @@ class _ErrorBox extends StatelessWidget {
   }
 }
 
-class _CompletedList extends StatelessWidget {
-  const _CompletedList({
+class _CompletedSliver extends StatelessWidget {
+  const _CompletedSliver({
     required this.items,
     required this.onOpen,
     required this.onDetails,
@@ -1334,23 +1447,37 @@ class _CompletedList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SurfaceCard(
-      child: Column(
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            _CompletedRow(
-              item: items[i],
-              onOpen: () => onOpen(items[i].book),
-              onDetails: () => onDetails(items[i]),
-              onShare: () => onShare(items[i]),
-              onShowInFolder: onShowInFolder == null
-                  ? null
-                  : () => onShowInFolder!(items[i]),
-              onRemove: () => onRemove(items[i]),
-            ),
-            if (i < items.length - 1) const Divider(indent: 16, endIndent: 16),
-          ],
-        ],
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedSliver(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      sliver: SliverList.builder(
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _CompletedRow(
+                item: item,
+                onOpen: () => onOpen(item.book),
+                onDetails: () => onDetails(item),
+                onShare: () => onShare(item),
+                onShowInFolder: onShowInFolder == null
+                    ? null
+                    : () => onShowInFolder!(item),
+                onRemove: () => onRemove(item),
+              ),
+              if (index < items.length - 1)
+                const Divider(indent: 16, endIndent: 16),
+            ],
+          );
+        },
       ),
     );
   }

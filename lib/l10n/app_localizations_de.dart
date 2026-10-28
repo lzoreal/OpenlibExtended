@@ -891,6 +891,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Lokale Spiegel wurden noch nicht getestet; die Suche kann langsamer sein. Nach dem Test werden sie nach deiner eigenen Latenz sortiert.';
 
   @override
+  String get mirrorLatencyNeedsVerification => 'Prüfung nötig';
+
+  @override
   String get mirrorLatencyGoTest => 'Testen';
 
   @override
@@ -1649,6 +1652,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sourceStatusUntried => 'Nicht versucht';
 
   @override
+  String get sourceStatusLocallyUnreachable => 'Lokal nicht erreichbar';
+
+  @override
+  String sourcesSkippedLocally(String sources) {
+    return '$sources übersprungen: von diesem Gerät nicht erreichbar.';
+  }
+
+  @override
+  String get retryAnyway => 'Trotzdem versuchen';
+
+  @override
   String get sourceStatusFailed => 'Fehlgeschlagen';
 
   @override
@@ -2118,6 +2132,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get challengeNeedsVerification =>
       'Manuelle Prüfung nötig - die Suche läuft danach automatisch weiter';
+
+  @override
+  String get challengeNeedsVerificationRetry =>
+      'Manuelle Bestätigung nötig – die nächste Suche nutzt die bestätigte Seite.';
 
   @override
   String get challengeVerifyNow => 'Jetzt prüfen';

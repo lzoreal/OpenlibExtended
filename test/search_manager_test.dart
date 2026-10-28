@@ -19,36 +19,28 @@ import 'package:openlib/services/database.dart';
 import 'package:openlib/services/logger.dart';
 import 'package:openlib/services/search_manager.dart';
 
-class _FakePathProvider extends PathProviderPlatform {
-  Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_searchmgr_test/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
+import 'helpers/fake_path_provider.dart';
 
 /// A provider the test fully controls.
 class _FakeProvider implements SearchProvider {
-  _FakeProvider(this.idName, this.results, {this.error, this.delay});
+  _FakeProvider(
+    this.idName,
+    this.results, {
+    this.error,
+    this.delay,
+    this.unreachable = false,
+  });
 
   final String idName;
   final List<BookData> results;
   final Object? error;
   final Duration? delay;
+  final bool unreachable;
 
   int calls = 0;
+
+  @override
+  Future<bool> locallyUnreachable() async => unreachable;
 
   @override
   SearchProviderId get id =>
@@ -74,7 +66,7 @@ void main() {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
-      PathProviderPlatform.instance = _FakePathProvider();
+      PathProviderPlatform.instance = FakePathProvider('searchmgr');
     }
   });
 
@@ -730,6 +722,73 @@ void main() {
   // to leave no trace in the exported logs. The libgen provider now logs
   // its lifecycle and its Dio records every request/response, so a
   // scraping session can be debugged from the export alone.
+  group('local timeout skip', () {
+    test('skips an all-timeout source and lets try-anyway force it', () async {
+      final skipped = _FakeProvider(
+        'libgen',
+        [BookData(title: 'Skipped', link: 'https://l/1', md5: 'skip')],
+        unreachable: true,
+      );
+      final alive = _FakeProvider(
+        'zlibrary',
+        [BookData(title: 'Alive', link: 'https://z/1', md5: 'alive')],
+      );
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [skipped, alive],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.zlibrary, true);
+
+      final result = await manager.search(const SearchQuery(text: 'q'));
+      final libgenRun = result.sources
+          .firstWhere((run) => run.id == SearchProviderId.libgen);
+
+      expect(libgenRun.status, SearchSourceStatus.locallyUnreachable);
+      expect(skipped.calls, 0);
+      expect(result.books.map((book) => book.title), ['Alive']);
+
+      final forced = await manager.search(
+        const SearchQuery(text: 'q'),
+        forceLocalTimeouts: true,
+      );
+      expect(skipped.calls, 1);
+      expect(
+        forced.sources
+            .firstWhere((run) => run.id == SearchProviderId.libgen)
+            .status,
+        SearchSourceStatus.hit,
+      );
+    });
+
+    test('watch includes the skipped source without querying it', () async {
+      final skipped = _FakeProvider(
+        'libgen',
+        [BookData(title: 'Skipped', link: 'https://l/1', md5: 'skip')],
+        unreachable: true,
+      );
+      final alive = _FakeProvider(
+        'zlibrary',
+        [BookData(title: 'Alive', link: 'https://z/1', md5: 'alive')],
+      );
+      final manager = SearchManager(
+        database: MyLibraryDb.instance,
+        providers: [skipped, alive],
+      );
+      await manager.setProviderEnabled(SearchProviderId.libgen, true);
+      await manager.setProviderEnabled(SearchProviderId.zlibrary, true);
+
+      final snapshots =
+          await manager.watch(const SearchQuery(text: 'q')).toList();
+      final run = snapshots.last.sources
+          .firstWhere((run) => run.id == SearchProviderId.libgen);
+
+      expect(run.status, SearchSourceStatus.locallyUnreachable);
+      expect(skipped.calls, 0);
+      expect(snapshots.last.books.map((book) => book.title), ['Alive']);
+    });
+  });
+
   group('search logging (issue #98)', () {
     test('a libgen search leaves network and lifecycle entries in the log',
         () async {

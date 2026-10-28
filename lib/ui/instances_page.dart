@@ -557,6 +557,9 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     final now = DateTime.now();
     final stale = !reading.isFreshAt(now);
     final parts = [l10n.mirrorLatencyLocal(formatMirrorLatency(milliseconds))];
+    if (view.site.protection != Protection.none) {
+      parts.add(l10n.mirrorLatencyNeedsVerification);
+    }
     if (stale) {
       parts.add(l10n.mirrorLatencyExpired);
     } else {

@@ -880,6 +880,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Local mirrors have not been tested; search may be slower. Testing sorts them by your own latency.';
 
   @override
+  String get mirrorLatencyNeedsVerification => 'needs verification';
+
+  @override
   String get mirrorLatencyGoTest => 'Test';
 
   @override
@@ -1628,6 +1631,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceStatusUntried => 'Untried';
 
   @override
+  String get sourceStatusLocallyUnreachable => 'Locally unreachable';
+
+  @override
+  String sourcesSkippedLocally(String sources) {
+    return '$sources skipped: unreachable from this device.';
+  }
+
+  @override
+  String get retryAnyway => 'Try anyway';
+
+  @override
   String get sourceStatusFailed => 'Failed';
 
   @override
@@ -2095,6 +2109,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get challengeNeedsVerification =>
       'Manual verification needed - the search continues as soon as it passes';
+
+  @override
+  String get challengeNeedsVerificationRetry =>
+      'Manual verification needed - the next search reuses the verified page';
 
   @override
   String get challengeVerifyNow => 'Verify now';

@@ -1,6 +1,5 @@
 // Dart imports:
 import 'dart:convert';
-import 'dart:io';
 
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
@@ -15,25 +14,7 @@ import 'package:openlib/services/backup_service.dart';
 import 'package:openlib/services/book_info_cache.dart';
 import 'package:openlib/services/database.dart';
 
-class _FakePathProvider extends PathProviderPlatform {
-  Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_cache_test/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
+import 'helpers/fake_path_provider.dart';
 
 BookInfoData _sample() => BookInfoData(
       title: 'Cached Title',
@@ -55,7 +36,7 @@ void main() {
   setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    PathProviderPlatform.instance = _FakePathProvider();
+    PathProviderPlatform.instance = FakePathProvider('cache');
     final database = await MyLibraryDb.instance.database;
     await database.delete('preferences');
   });

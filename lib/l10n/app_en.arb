@@ -1134,6 +1134,10 @@
   "@mirrorLatencyHint": {
     "description": "Search page hint shown when local mirror latency readings are missing or older than 24 hours"
   },
+  "mirrorLatencyNeedsVerification": "needs verification",
+  "@mirrorLatencyNeedsVerification": {
+    "description": "Local latency suffix for protected mirrors: reachable as a host, but a challenge may still block a search"
+  },
   "mirrorLatencyGoTest": "Test",
   "@mirrorLatencyGoTest": {
     "description": "Search page hint action that opens the mirrors page to run a local latency test"
@@ -2129,6 +2133,23 @@
   "@sourceStatusUntried": {
     "description": "A source after the winning source that the automatic chain never queried"
   },
+  "sourceStatusLocallyUnreachable": "Locally unreachable",
+  "@sourceStatusLocallyUnreachable": {
+    "description": "A source skipped because every enabled mirror has a fresh local speed-test timeout"
+  },
+  "sourcesSkippedLocally": "{sources} skipped: unreachable from this device.",
+  "@sourcesSkippedLocally": {
+    "description": "Results-page hint naming sources skipped by fresh local timeouts",
+    "placeholders": {
+      "sources": {
+        "type": "String"
+      }
+    }
+  },
+  "retryAnyway": "Try anyway",
+  "@retryAnyway": {
+    "description": "Button that re-runs the search ignoring the local-timeout source skip"
+  },
   "sourceStatusFailed": "Failed",
   "@sourceStatusFailed": {
     "description": "A source that could not be reached during the search"
@@ -2794,6 +2815,10 @@
   "challengeNeedsVerification": "Manual verification needed - the search continues as soon as it passes",
   "@challengeNeedsVerification": {
     "description": "Shown while a source waits on a manual challenge; the button opens the verification page."
+  },
+  "challengeNeedsVerificationRetry": "Manual verification needed - the next search reuses the verified page",
+  "@challengeNeedsVerificationRetry": {
+    "description": "Shown after automatic challenge solving failed; the next search skips the automatic solve and uses a manual verification."
   },
   "challengeVerifyNow": "Verify now",
   "@challengeVerifyNow": {

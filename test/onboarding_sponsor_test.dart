@@ -15,21 +15,9 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/ui/onboarding/onboarding_page.dart';
 
-class _FakePathProvider extends PathProviderPlatform {
-  static final base = '${Directory.systemTemp.path}/openlib_onboarding_test';
+import 'helpers/fake_path_provider.dart';
 
-  @override
-  Future<String?> getApplicationSupportPath() async => base;
-
-  @override
-  Future<String?> getApplicationDocumentsPath() async => base;
-
-  @override
-  Future<String?> getTemporaryPath() async => base;
-
-  @override
-  Future<String?> getLibraryPath() async => base;
-}
+final _paths = FakePathProvider('onboarding');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -38,8 +26,8 @@ void main() {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
-      PathProviderPlatform.instance = _FakePathProvider();
-      await Directory(_FakePathProvider.base).create(recursive: true);
+      PathProviderPlatform.instance = _paths;
+      await Directory(_paths.base).create(recursive: true);
     }
   });
 

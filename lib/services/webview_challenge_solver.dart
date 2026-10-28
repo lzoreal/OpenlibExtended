@@ -79,6 +79,65 @@ class WebviewChallengeSolver {
   static const Duration _headlessRetryAfter = Duration(minutes: 30);
   static final Map<String, DateTime> _headlessFailures = {};
 
+  /// Automatic solving (headless plus visible fallback) already failed for
+  /// this host recently. Later searches must not spend another full timeout
+  /// or auto-open the verification page; the user can retry manually.
+  static const Duration _autoSolveRetryAfter = Duration(minutes: 30);
+  static final Map<String, DateTime> _autoSolveFailures = {};
+
+  /// Blocked URLs whose automatic solve failed, for the results page's
+  /// manual verification banner.
+  static final ValueNotifier<List<String>> failedChallenges =
+      ValueNotifier(const []);
+
+  static String _failureHost(String url) => Uri.tryParse(url)?.host ?? url;
+
+  static bool _autoSolveRecentlyFailed(String url) {
+    final host = _failureHost(url);
+    final at = _autoSolveFailures[host];
+    if (at == null) return false;
+    if (DateTime.now().difference(at) > _autoSolveRetryAfter) {
+      _autoSolveFailures.remove(host);
+      return false;
+    }
+    return true;
+  }
+
+  static void _rememberAutoSolveFailure(String url) {
+    _autoSolveFailures[_failureHost(url)] = DateTime.now();
+    _addFailed(url);
+  }
+
+  static void _clearAutoSolveFailure(String url) {
+    final host = _failureHost(url);
+    _autoSolveFailures.remove(host);
+    failedChallenges.value = [
+      for (final candidate in failedChallenges.value)
+        if (_failureHost(candidate) != host) candidate,
+    ];
+  }
+
+  static void _addFailed(String url) {
+    if (url.isEmpty) return;
+    final current = failedChallenges.value;
+    if (current.contains(url)) return;
+    failedChallenges.value = [...current, url].take(4).toList();
+  }
+
+  @visibleForTesting
+  static void clearAutoSolveFailures() {
+    _autoSolveFailures.clear();
+    failedChallenges.value = const [];
+  }
+
+  @visibleForTesting
+  static bool autoSolveRecentlyFailed(String url) =>
+      _autoSolveRecentlyFailed(url);
+
+  @visibleForTesting
+  static void debugRememberAutoSolveFailure(String url) =>
+      _rememberAutoSolveFailure(url);
+
   /// Solved browser sessions kept alive per host, so a later search on the
   /// same site reuses the clearance instead of verifying again. The list
   /// is trimmed to the newest [_maxSessions].
@@ -141,7 +200,10 @@ class WebviewChallengeSolver {
     _visibleSolveInFlight.add(url);
     try {
       final html = await fallback(url);
-      if (html != null) ChallengeHtmlCache.store(url, html);
+      if (html != null) {
+        ChallengeHtmlCache.store(url, html);
+        _clearAutoSolveFailure(url);
+      }
     } finally {
       _visibleSolveInFlight.remove(url);
       _removePending(url);
@@ -260,6 +322,10 @@ class WebviewChallengeSolver {
     Duration? timeout,
   }) async {
     if (!isSupported) return null;
+    if (_autoSolveRecentlyFailed(url)) {
+      _addFailed(url);
+      return null;
+    }
 
     final effectiveTimeout = timeout ??
         (_isMobile ? const Duration(seconds: 60) : const Duration(minutes: 3));
@@ -290,6 +356,9 @@ class WebviewChallengeSolver {
 
     if (html != null) {
       ChallengeHtmlCache.store(url, html);
+      _clearAutoSolveFailure(url);
+    } else {
+      _rememberAutoSolveFailure(url);
     }
     return html;
   }

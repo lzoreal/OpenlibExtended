@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/state/state.dart' show resultCoverProvider;
+import 'package:openlib/state/state.dart'
+    show downloadedBookIdsProvider, resultCoverProvider;
 import 'package:openlib/ui/components/search_result_card.dart';
 import 'package:openlib/ui/components/visible_builder.dart';
 
@@ -50,6 +51,65 @@ void main() {
     expect(visible, isNot(isEmpty));
     expect(visible, isNot(contains(0)),
         reason: 'row 0 has scrolled out of the viewport');
+  });
+
+  testWidgets('prefetchExtent marks just-offscreen rows as visible',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 300);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final visible = <int>{};
+    await tester.pumpWidget(_app(
+      ListView.builder(
+        itemCount: 10,
+        itemBuilder: (context, index) => SizedBox(
+          height: 100,
+          child: VisibilityBuilder(
+            prefetchExtent: 150,
+            builder: (context, isVisible) {
+              if (isVisible) visible.add(index);
+              return Text('prefetch $index ${isVisible ? 'on' : 'off'}');
+            },
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(visible, containsAll([0, 1, 2, 3]),
+        reason: 'the next row starts loading before it enters the viewport');
+    expect(visible, isNot(contains(5)));
+  });
+
+  testWidgets('downloaded badge comes from the shared id set',
+      (tester) async {
+    Future<void> pumpCard(Set<String> ids) {
+      return tester.pumpWidget(ProviderScope(
+        key: ValueKey(ids.toString()),
+        overrides: [
+          downloadedBookIdsProvider.overrideWith((ref) async => ids),
+        ],
+        child: _app(SearchResultCard(
+          title: 'Downloaded',
+          author: 'Author',
+          thumbnail: null,
+          info: 'English, EPUB, 1 MB',
+          link: 'https://example.com/book',
+          md5: 'book-1',
+          onClick: () {},
+        )),
+      ));
+    }
+
+    await pumpCard({'book-1'});
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+
+    await pumpCard({'other'});
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_rounded), findsNothing);
   });
 
   testWidgets('search result covers are only looked up for visible rows',

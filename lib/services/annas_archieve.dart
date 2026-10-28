@@ -1,6 +1,7 @@
 // Dart imports:
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 
 // Package imports:
 import 'package:dio/dio.dart';
@@ -537,6 +538,22 @@ class AnnasArchieve {
     return bookList;
   }
 
+  static const int _isolateParseThreshold = 20 * 1024;
+
+  /// Parses a search page off the UI isolate when it is large enough to
+  /// drop frames; small pages stay synchronous to avoid isolate startup.
+  Future<List<BookData>> _parseSearchOffMain(
+    String html,
+    String fileType,
+    String baseUrl,
+  ) {
+    if (html.length < _isolateParseThreshold) {
+      return Future.value(_parser(html, fileType, baseUrl));
+    }
+    return Isolate.run(
+        () => AnnasArchieve()._parser(html, fileType, baseUrl));
+  }
+
   /// Test-only wrappers around the private parsers so tests can verify real
   /// HTML parsing without going through the network layer.
   @visibleForTesting
@@ -756,7 +773,7 @@ class AnnasArchieve {
         if (cached != null) {
           _logger.info('Using cached challenge HTML for search',
               tag: 'AnnasArchive', metadata: {'url': encodedURL});
-          return _parser(cached, fileType, currentBaseUrl);
+          return await _parseSearchOffMain(cached, fileType, currentBaseUrl);
         }
 
         // A cleared browser session for this host means the search page
@@ -764,7 +781,8 @@ class AnnasArchieve {
         final sessionHtml =
             await WebviewChallengeSolver.fetchWithSession(encodedURL);
         if (sessionHtml != null) {
-          final parsed = _parser(sessionHtml, fileType, currentBaseUrl);
+          final parsed =
+              await _parseSearchOffMain(sessionHtml, fileType, currentBaseUrl);
           if (parsed.isNotEmpty) return parsed;
         }
 
@@ -812,7 +830,8 @@ class AnnasArchieve {
           throw Exception(
               'Mirror $currentBaseUrl did not serve an Anna\'s Archive page');
         }
-        return _parser(response.data, fileType, currentBaseUrl);
+        return await _parseSearchOffMain(
+            response.data.toString(), fileType, currentBaseUrl);
       });
 
       _logger.info('Search completed',
@@ -834,7 +853,7 @@ class AnnasArchieve {
           _logger.info('Challenge solved, parsing results from webview HTML',
               tag: 'AnnasArchive');
           final currentBaseUrl = Uri.parse(networkErr.blockedUrl!).origin;
-          return _parser(html, fileType, currentBaseUrl);
+          return await _parseSearchOffMain(html, fileType, currentBaseUrl);
         } else {
           _logger.warning('Webview solver returned no usable HTML',
               tag: 'AnnasArchive');

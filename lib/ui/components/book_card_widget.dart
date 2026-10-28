@@ -23,7 +23,8 @@ String? getFileType(String? info) => bookFormatLabel(detectBookFormat(info));
 /// mapped to the same uppercase codes [languageCodeToDisplay] uses.
 final Map<String, String> _languageNameToDisplay = {
   for (final entry in languageValues.entries)
-    if (entry.value.isNotEmpty) entry.key.toLowerCase(): entry.value.toUpperCase(),
+    if (entry.value.isNotEmpty)
+      entry.key.toLowerCase(): entry.value.toUpperCase(),
 };
 
 String? _canonicalLanguage(String token) {
@@ -35,19 +36,21 @@ String? _canonicalLanguage(String token) {
 // Extract language code from book info string
 // Info format typically: "[en], pdf, 5.2MB", "English, pdf, 5.2MB" or
 // "English · EPUB · 2 MB" - catalogs disagree on both code and separator.
+final _languageBracketPattern = RegExp(r'\[([a-z]{2})\]', caseSensitive: false);
+final _languageSeparatorPattern = RegExp(r'[,·]');
+
 String? getLanguage(String? info) {
   if (info == null || info.isEmpty) return null;
 
   // Try to match [xx] pattern for language code
-  final bracketMatch =
-      RegExp(r'\[([a-z]{2})\]', caseSensitive: false).firstMatch(info);
+  final bracketMatch = _languageBracketPattern.firstMatch(info);
   if (bracketMatch != null) {
     final byBracket = _canonicalLanguage(bracketMatch.group(1) ?? '');
     if (byBracket != null) return byBracket;
   }
 
   // Otherwise the language leads the info string.
-  final firstPart = info.split(RegExp(r'[,·]')).first;
+  final firstPart = info.split(_languageSeparatorPattern).first;
   return _canonicalLanguage(firstPart);
 }
 
@@ -94,6 +97,7 @@ class BookInfoCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     final l10n = AppLocalizations.of(context);
     final fileType = getFileType(info);
     final language = getLanguage(info);
@@ -129,6 +133,7 @@ class BookInfoCard extends ConsumerWidget {
                     child: CachedNetworkImage(
                       height: 120,
                       width: 84,
+                      memCacheWidth: (84 * dpr).round(),
                       fit: BoxFit.cover,
                       imageUrl: coverUrl ?? "",
                       // libgen mirrors serve /covers/ only with a

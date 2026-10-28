@@ -1,4 +1,5 @@
 // Dart imports:
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -551,17 +552,27 @@ class SearchPageKey {
   /// with, then pins deeper pages to the source that produced page 1.
   final SearchProviderId? source;
 
-  const SearchPageKey(this.query, this.page, {this.source});
+  /// The results page's "try anyway" escape from a local-timeout skip.
+  final bool forceLocalTimeouts;
+
+  const SearchPageKey(
+    this.query,
+    this.page, {
+    this.source,
+    this.forceLocalTimeouts = false,
+  });
 
   @override
   bool operator ==(Object other) =>
       other is SearchPageKey &&
       other.query == query &&
       other.page == page &&
-      other.source == source;
+      other.source == source &&
+      other.forceLocalTimeouts == forceLocalTimeouts;
 
   @override
-  int get hashCode => Object.hash(query, page, source);
+  int get hashCode =>
+      Object.hash(query, page, source, forceLocalTimeouts);
 }
 
 // Provider for one page of search results across all enabled providers
@@ -589,7 +600,7 @@ final searchProvider = FutureProvider.family
     filtersEnabled: ref.watch(enableFiltersState),
     page: key.page,
     source: source,
-  ));
+  ), forceLocalTimeouts: key.forceLocalTimeouts);
   final expectedCount = source == null ? enabled.length : 1;
   if (result.books.isEmpty &&
       result.failedProviders.length == expectedCount &&
@@ -624,7 +635,7 @@ final initialSearchProvider = StreamProvider.family
     filtersEnabled: ref.watch(enableFiltersState),
     page: key.page,
     source: enabledSource,
-  ));
+  ), forceLocalTimeouts: key.forceLocalTimeouts);
 });
 
 // Which sources the user turned on in settings.
@@ -689,6 +700,13 @@ final myLibraryProvider = FutureProvider((ref) async {
   return dataBase.getAll();
 });
 
+/// Ids already in the library, resolved in one query so result cards can
+/// check membership in memory instead of running a database query per row.
+final downloadedBookIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final books = await ref.watch(myLibraryProvider.future);
+  return books.map((book) => book.id).toSet();
+});
+
 final checkIdExists =
     FutureProvider.family.autoDispose<bool, String>((ref, id) async {
   return await dataBase.checkIdExists(id);
@@ -700,6 +718,12 @@ final checkIdExists =
 /// cache tied to what is on screen.
 final resultCoverProvider =
     FutureProvider.family.autoDispose<String?, String>((ref, url) async {
+  // Keep the resolved cover address briefly so scrolling a row away and
+  // back reuses it instead of hitting ads.php again. The image bytes stay
+  // in CachedNetworkImage's own cache.
+  final keepAlive = ref.keepAlive();
+  final timer = Timer(const Duration(minutes: 10), keepAlive.close);
+  ref.onDispose(timer.cancel);
   if (!url.contains('ads.php?md5=')) return null;
   return LibgenService().fetchCover(url);
 });

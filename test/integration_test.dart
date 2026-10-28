@@ -22,26 +22,7 @@ import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/services/network_error.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 
-// Fake path_provider so the services' sqlite database works in the test VM.
-class _FakePathProvider extends PathProviderPlatform {
-  Future<String> _dir(String name) async {
-    final dir = Directory('/tmp/openlib_test_support/$name');
-    await dir.create(recursive: true);
-    return dir.path;
-  }
-
-  @override
-  Future<String?> getApplicationSupportPath() => _dir('support');
-
-  @override
-  Future<String?> getApplicationDocumentsPath() => _dir('documents');
-
-  @override
-  Future<String?> getTemporaryPath() => _dir('temp');
-
-  @override
-  Future<String?> getLibraryPath() => _dir('library');
-}
+import 'helpers/fake_path_provider.dart';
 
 void main() {
   // NOTE: no TestWidgetsFlutterBinding here on purpose. That binding replaces
@@ -54,7 +35,7 @@ void main() {
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    PathProviderPlatform.instance = _FakePathProvider();
+    PathProviderPlatform.instance = FakePathProvider('integration');
   }
 
   group('Integration Tests - Real Network Calls', () {

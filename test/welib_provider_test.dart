@@ -24,6 +24,9 @@ String _fixture() =>
     File('test/fixtures/welib_book_page.html').readAsStringSync();
 
 void main() {
+  setUp(WebviewChallengeSolver.clearAutoSolveFailures);
+  tearDown(WebviewChallengeSolver.clearAutoSolveFailures);
+
   group('parseBookPage on a live-captured welib page', () {
     late BookInfoData? data;
 

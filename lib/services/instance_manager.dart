@@ -295,6 +295,35 @@ class InstanceManager {
     ];
   }
 
+  /// True when every mirror a provider may request has a fresh local
+  /// reading and all of them timed out. A single reachable or unmeasured
+  /// mirror keeps the source alive, because a root timeout is not proof
+  /// that the search endpoint is down.
+  Future<bool> isLocallyUnreachable(
+    MirrorService service, {
+    bool headlessOnly = false,
+  }) async {
+    final views = await instances(service);
+    final candidates = <InstanceView>[
+      for (final view in views)
+        if (view.enabled && view.site.isAttemptable)
+          if (!headlessOnly || view.site.protection.solvableHeadless) view,
+    ];
+    if (candidates.isEmpty) return false;
+
+    final readings = await localLatencies();
+    final now = DateTime.now();
+    for (final view in candidates) {
+      final reading = readings[view.host];
+      if (reading == null ||
+          !reading.isFreshAt(now) ||
+          reading.milliseconds != null) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /// The mirror URLs a provider may actually request, best first.
   ///
   /// Excludes:
