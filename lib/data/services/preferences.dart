@@ -27,6 +27,8 @@ class PreferencesService {
 
   final MyLibraryDb _database;
 
+  MyLibraryDb get database => _database;
+
   static const Map<SearchFilterKind, String> _keyByKind = {
     SearchFilterKind.type: 'filterType',
     SearchFilterKind.sort: 'filterSort',

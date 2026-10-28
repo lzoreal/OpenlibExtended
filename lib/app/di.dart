@@ -5,27 +5,24 @@ import 'package:get_it/get_it.dart';
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/preferences.dart';
 
 final GetIt getIt = GetIt.instance;
 
-/// Single assembly point. Pages resolve view models from here; nothing
-/// registers itself on first use.
+/// Called once from main(); a second call is a startup bug, not a reuse path.
 Future<void> initDi({
   required AppSettings settings,
-  MyLibraryDb? database,
+  required MyLibraryDb database,
+  required PreferencesService preferences,
 }) async {
-  final db = database ?? MyLibraryDb.instance;
-
-  if (!getIt.isRegistered<MyLibraryDb>()) {
-    getIt.registerSingleton<MyLibraryDb>(db);
+  if (getIt.isRegistered<AppSettings>()) {
+    throw StateError('initDi called twice');
   }
+
+  getIt.registerSingleton<MyLibraryDb>(database);
   getIt.registerSingleton<AppSettings>(settings);
-  getIt.registerLazySingleton<PreferencesService>(
-      () => PreferencesService(database: getIt<MyLibraryDb>()));
+  getIt.registerLazySingleton<PreferencesService>(() => preferences);
   getIt.registerLazySingleton<DownloadManager>(() => DownloadManager());
-  getIt.registerLazySingleton<InstanceManager>(() => InstanceManager());
 }
 
 Future<void> resetDi() => getIt.reset();

@@ -164,7 +164,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 1. Linux/Windows 先处理桌面 WebView 标题栏插件参数（`main()`）。
 2. 桌面端初始化 sqflite FFI（`main()`）。
 3. 打开 SQLite（首次建表 v7），初始化 `DownloadManager` 并清空旧通知（`main()`）。
-4. `AppSettings.load` 从 `preferences` / `browserOptions` 读取主题、字号、语言、手动下载按钮、后台验证、donation key、UA/cookie、5 个搜索筛选（`lib/app/app_settings.dart`）；`main()` 另读 onboarding 状态。
+4. `ThemeModeNotifier.getInitialTheme()` 读主题，`AppSettings.load` 读其余偏好（经 `PreferencesRepository`）：字号、语言、手动下载按钮、后台验证、donation key、UA/cookie、5 个搜索筛选（`lib/app/app_settings.dart`）；`main()` 另读 onboarding 状态。
 5. 挂载 get_it 容器（`initDi`，`lib/app/di.dart`），把 `AppSettings` 与各服务注册为单例。
 6. 检测版本升级（`UpgradeDetector`，写 `lastRunVersion`，`main()`）。
 7. Android 额外迁移旧内部存储文件（`main()`）。
@@ -444,6 +444,7 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 2. `main()` 把 `AppSettings.load(...)` 的结果传给 `initDi()`（`lib/app/di.dart`）；迁移期 Riverpod 仍通过 `ProviderScope.overrides` 收到同一份启动值，页面再从 provider 取。
 3. 在 `lib/ui/settings_page.dart` 加 `_SettingsTile` / `_SettingsSwitchTile`，切换时写库。
 4. 若需要即时生效，同步更新对应服务的静态开关（参考 `backgroundVerification`）。
+5. 迁移期仍需在 `lib/state/state.dart` 定义 `StateProvider`，并在 `main.dart` 的 `ProviderScope` overrides 中接线；W6 后改由 SettingsViewModel 回写 `AppSettings`。
 
 ### 新增/修改数据库字段
 

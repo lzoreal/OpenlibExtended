@@ -33,9 +33,10 @@ class AppSettings extends ChangeNotifier {
 
   static Future<AppSettings> load({
     required ThemeMode initialThemeMode,
-    MyLibraryDb? database,
+    required PreferencesService preferences,
   }) async {
-    final db = database ?? MyLibraryDb.instance;
+    final db = preferences.database;
+    final filters = await preferences.loadSearchFilters();
 
     double fontSizeScale = 1.0;
     final fontSize = await _read(db, 'fontSizeScale');
@@ -63,7 +64,7 @@ class AppSettings extends ChangeNotifier {
       donationKey: donationKey is String ? donationKey : '',
       userAgent: await _readBrowserOption(db, 'userAgent'),
       cookie: await _readBrowserOption(db, 'cookie'),
-      filters: await PreferencesService(database: db).loadSearchFilters(),
+      filters: filters,
     );
   }
 

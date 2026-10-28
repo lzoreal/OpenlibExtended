@@ -30,8 +30,11 @@ void main() {
     await seeded.delete('preferences',
         where: 'name = ?', whereArgs: ['showManualDownloadButton']);
 
-    final settings =
-        await AppSettings.load(initialThemeMode: ThemeMode.system);
+    final preferences = PreferencesService(database: MyLibraryDb.instance);
+    final settings = await AppSettings.load(
+      initialThemeMode: ThemeMode.system,
+      preferences: preferences,
+    );
 
     expect(settings.themeMode, ThemeMode.system);
     expect(settings.fontSizeScale, 1.0);
@@ -54,8 +57,10 @@ void main() {
     await db.savePreference('locale', 'de');
     await db.savePreference('filterType', 'Comic Books');
 
-    final settings =
-        await AppSettings.load(initialThemeMode: ThemeMode.dark, database: db);
+    final settings = await AppSettings.load(
+      initialThemeMode: ThemeMode.dark,
+      preferences: PreferencesService(database: db),
+    );
 
     expect(settings.themeMode, ThemeMode.dark);
     expect(settings.fontSizeScale, 1.5);
@@ -67,8 +72,10 @@ void main() {
   });
 
   test('setters update state and notify listeners', () async {
-    final settings =
-        await AppSettings.load(initialThemeMode: ThemeMode.system);
+    final settings = await AppSettings.load(
+      initialThemeMode: ThemeMode.system,
+      preferences: PreferencesService(database: MyLibraryDb.instance),
+    );
     var notified = 0;
     settings.addListener(() => notified++);
 

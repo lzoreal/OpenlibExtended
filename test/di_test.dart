@@ -11,7 +11,6 @@ import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/download_manager.dart';
-import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/preferences.dart';
 
 import 'helpers/fake_path_provider.dart';
@@ -29,15 +28,22 @@ void main() {
     await resetDi();
   });
 
-  Future<AppSettings> settings() =>
-      AppSettings.load(initialThemeMode: ThemeMode.system);
+  Future<AppSettings> settings() => AppSettings.load(
+        initialThemeMode: ThemeMode.system,
+        preferences: PreferencesService(database: MyLibraryDb.instance),
+      );
 
   test('registers services as resolvable singletons', () async {
+    final preferences = PreferencesService(database: MyLibraryDb.instance);
     final s = await settings();
-    await initDi(settings: s);
+    await initDi(
+      settings: s,
+      database: MyLibraryDb.instance,
+      preferences: preferences,
+    );
 
     expect(getIt<MyLibraryDb>(), same(MyLibraryDb.instance));
-    expect(getIt<InstanceManager>(), same(getIt<InstanceManager>()));
+    expect(getIt<PreferencesService>(), same(preferences));
     expect(getIt<PreferencesService>(), same(getIt<PreferencesService>()));
     expect(getIt<DownloadManager>(), same(getIt<DownloadManager>()));
     expect(getIt<AppSettings>(), same(s));
@@ -45,9 +51,43 @@ void main() {
   });
 
   test('resetDi forgets registrations', () async {
-    await initDi(settings: await settings());
+    final preferences = PreferencesService(database: MyLibraryDb.instance);
+    await initDi(
+      settings: await settings(),
+      database: MyLibraryDb.instance,
+      preferences: preferences,
+    );
     await resetDi();
 
     expect(() => getIt<AppSettings>(), throwsA(anything));
+  });
+
+  test('a second initDi throws instead of silently keeping stale state',
+      () async {
+    final preferences = PreferencesService(database: MyLibraryDb.instance);
+    await initDi(
+      settings: await settings(),
+      database: MyLibraryDb.instance,
+      preferences: preferences,
+    );
+
+    expect(
+      () => initDi(
+        settings: AppSettings(
+          themeMode: ThemeMode.light,
+          fontSizeScale: 1,
+          locale: null,
+          showManualDownloadButton: true,
+          backgroundVerification: true,
+          donationKey: '',
+          userAgent: '',
+          cookie: '',
+          filters: const SearchFilters(),
+        ),
+        database: MyLibraryDb.instance,
+        preferences: preferences,
+      ),
+      throwsA(isA<StateError>()),
+    );
   });
 }

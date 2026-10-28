@@ -18,6 +18,7 @@ import 'package:openlib/app/di.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/database.dart' show MyLibraryDb;
 import 'package:openlib/data/services/platform_utils.dart';
+import 'package:openlib/data/services/preferences.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/data/services/update_checker.dart';
@@ -79,10 +80,16 @@ void main(List<String> args) async {
 
   ThemeMode startThemeMode = await ThemeModeNotifier.getInitialTheme();
 
+  final preferences = PreferencesService(database: dataBase);
   final settings = await AppSettings.load(
     initialThemeMode: startThemeMode,
+    preferences: preferences,
   );
-  await initDi(settings: settings);
+  await initDi(
+    settings: settings,
+    database: dataBase,
+    preferences: preferences,
+  );
 
   // Stored as 0 = off; anything else (or missing) = headless on.
   WebviewChallengeSolver.headlessEnabled = settings.backgroundVerification;
