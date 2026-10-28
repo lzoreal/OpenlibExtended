@@ -29,6 +29,7 @@ import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/download_manager.dart';
 import 'package:openlib/data/services/stream_throttle.dart';
+import 'package:openlib/state/repository_providers.dart';
 // Assuming OpenLibrary, Goodreads, PenguinRandomHouse, BookDigits, and SubCategoriesTypeList are defined
 // or are simple placeholder services/models that work as intended.
 
@@ -701,7 +702,7 @@ Future<BookInfoData> _fetchBookInfo(Ref ref, String url) async {
 
 // Completed download records
 final myLibraryProvider = FutureProvider((ref) async {
-  return dataBase.getAll();
+  return ref.watch(libraryRepositoryProvider).allBooks();
 });
 
 /// Ids already in the library, resolved in one query so result cards can
@@ -713,7 +714,7 @@ final downloadedBookIdsProvider = FutureProvider<Set<String>>((ref) async {
 
 final checkIdExists =
     FutureProvider.family.autoDispose<bool, String>((ref, id) async {
-  return await dataBase.checkIdExists(id);
+  return ref.watch(libraryRepositoryProvider).contains(id);
 });
 
 /// Lazily resolves a cover URL for a result that has none (LibGen
@@ -734,7 +735,7 @@ final resultCoverProvider =
 
 final getBookByIdProvider =
     FutureProvider.family.autoDispose<MyBook?, String>((ref, id) async {
-  return await dataBase.getId(id);
+  return ref.watch(libraryRepositoryProvider).bookById(id);
 });
 
 final deleteFileFromMyLib =
