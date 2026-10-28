@@ -6,6 +6,7 @@
 
 // Dart imports:
 import 'dart:async';
+import 'dart:io' show Platform;
 
 // Flutter imports:
 import 'package:flutter/material.dart';
@@ -205,6 +206,15 @@ void main() {
 
     await vm.load();
     final plan = await vm.startDownload();
+
+    if (Platform.isLinux) {
+      // Linux ships no headless WebView, so the button hands the page to the
+      // visible browser instead of queueing a task.
+      expect(plan, isA<DownloadNeedsMirrors>());
+      expect((plan as DownloadNeedsMirrors).url, _annaMirror);
+      expect(downloads.addedWithMirrorUrl, isEmpty);
+      return;
+    }
 
     expect(plan, isA<DownloadStarted>());
     expect(downloads.addedWithMirrorUrl.single.mirrorUrl, _annaMirror);

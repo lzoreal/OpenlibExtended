@@ -2,6 +2,9 @@
 // a JSON backup, a fresh database restores from it, and the restored
 // rows match. Garbage and future-version files are rejected.
 
+// Dart imports:
+import 'dart:io';
+
 // Flutter imports:
 import 'package:flutter_test/flutter_test.dart';
 
@@ -111,8 +114,12 @@ void main() {
   test('file helpers round-trip through disk', () async {
     await seedData();
     final service = BackupService();
+    // A clean runner does not have /tmp/openlib_backup_test, and another suite
+    // creating /tmp is not a guarantee; own the directory here.
+    final dir = await Directory.systemTemp.createTemp('openlib_backup_test');
+    addTearDown(() => dir.delete(recursive: true));
     final path =
-        '/tmp/openlib_backup_test/backup_${DateTime.now().millisecondsSinceEpoch}.json';
+        '${dir.path}/backup_${DateTime.now().millisecondsSinceEpoch}.json';
 
     final file = await service.writeBackupFile(path);
     expect(file.existsSync(), isTrue);
