@@ -316,6 +316,27 @@ class AppLocalizationsEs extends AppLocalizations {
       'Los espejos rotan; puede requerir inicio de sesión';
 
   @override
+  String get paletteSectionTitle => 'Paleta de color';
+
+  @override
+  String get paletteEmerald => 'Esmeralda';
+
+  @override
+  String get paletteIndigo => 'Índigo';
+
+  @override
+  String get paletteBurgundy => 'Burdeos';
+
+  @override
+  String get paletteAmber => 'Ámbar';
+
+  @override
+  String get paletteViolet => 'Violeta';
+
+  @override
+  String get paletteGraphite => 'Grafito';
+
+  @override
   String get themeTitle => 'Tema';
 
   @override

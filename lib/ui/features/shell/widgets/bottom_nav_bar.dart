@@ -108,8 +108,12 @@ class _DockItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final foreground =
+    // The icon sits on the tonal pill, the label on the bar's surface.
+    // Sharing one colour made the label low-contrast on palettes whose
+    // container is dark in light mode.
+    final iconColor =
         selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    final labelColor = selected ? scheme.primary : scheme.onSurfaceVariant;
 
     return Semantics(
       button: true,
@@ -142,13 +146,13 @@ class _DockItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(SwissRadius.field),
                       ),
                       child: TweenAnimationBuilder<Color?>(
-                        tween: ColorTween(end: foreground),
+                        tween: ColorTween(end: iconColor),
                         duration: kSelectionAnimationDuration,
                         curve: kSelectionAnimationCurve,
                         builder: (context, color, child) => Icon(
                           selected ? selectedIcon : icon,
                           size: 20,
-                          color: color ?? foreground,
+                          color: color ?? iconColor,
                         ),
                       ),
                     ),
@@ -183,7 +187,7 @@ class _DockItem extends StatelessWidget {
                   duration: kSelectionAnimationDuration,
                   curve: kSelectionAnimationCurve,
                   style: SwissText.badge.copyWith(
-                    color: foreground,
+                    color: labelColor,
                     fontWeight: FontWeight.w700,
                   ),
                   child: Text(

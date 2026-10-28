@@ -317,6 +317,27 @@ class AppLocalizationsFr extends AppLocalizations {
       'Les miroirs tournent ; connexion parfois requise';
 
   @override
+  String get paletteSectionTitle => 'Palette de couleurs';
+
+  @override
+  String get paletteEmerald => 'Émeraude';
+
+  @override
+  String get paletteIndigo => 'Indigo';
+
+  @override
+  String get paletteBurgundy => 'Bordeaux';
+
+  @override
+  String get paletteAmber => 'Ambre';
+
+  @override
+  String get paletteViolet => 'Violet';
+
+  @override
+  String get paletteGraphite => 'Graphite';
+
+  @override
   String get themeTitle => 'Thème';
 
   @override

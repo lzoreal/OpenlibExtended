@@ -53,7 +53,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get followSystem => 'Follow the System';
+  String get followSystem => 'System';
 
   @override
   String get lightTheme => 'Light theme';
@@ -137,7 +137,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTitle => 'Settings';
 
   @override
-  String get searchProvidersSection => 'Search Providers';
+  String get searchProvidersSection => 'Sources';
 
   @override
   String get searchOrderHint =>
@@ -309,6 +309,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerZlibMirrors => 'Mirrors rotate; may need a login';
+
+  @override
+  String get paletteSectionTitle => 'Color palette';
+
+  @override
+  String get paletteEmerald => 'Emerald';
+
+  @override
+  String get paletteIndigo => 'Indigo';
+
+  @override
+  String get paletteBurgundy => 'Burgundy';
+
+  @override
+  String get paletteAmber => 'Amber';
+
+  @override
+  String get paletteViolet => 'Violet';
+
+  @override
+  String get paletteGraphite => 'Graphite';
 
   @override
   String get themeTitle => 'Theme';

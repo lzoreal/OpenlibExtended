@@ -6,12 +6,14 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/database.dart';
+import 'package:openlib/ui/core/themes.dart' show AppPalette;
 
 /// Startup values shared by the shell and every page. Pages hold a
 /// ViewModel that listens to this instead of receiving override lists.
 class AppSettings extends ChangeNotifier {
   AppSettings({
     required this.themeMode,
+    this.themePalette = AppPalette.emerald,
     required this.fontSizeScale,
     required this.locale,
     required this.showManualDownloadButton,
@@ -26,6 +28,7 @@ class AppSettings extends ChangeNotifier {
   });
 
   ThemeMode themeMode;
+  AppPalette themePalette;
   double fontSizeScale;
   Locale? locale;
   bool showManualDownloadButton;
@@ -63,6 +66,7 @@ class AppSettings extends ChangeNotifier {
 
     return AppSettings(
       themeMode: initialThemeMode,
+      themePalette: AppPalette.fromPreference(await _read(db, 'themePalette')),
       fontSizeScale: fontSizeScale,
       locale: locale,
       showManualDownloadButton:
@@ -94,6 +98,12 @@ class AppSettings extends ChangeNotifier {
   void setThemeMode(ThemeMode mode) {
     if (themeMode == mode) return;
     themeMode = mode;
+    notifyListeners();
+  }
+
+  void setThemePalette(AppPalette palette) {
+    if (themePalette == palette) return;
+    themePalette = palette;
     notifyListeners();
   }
 

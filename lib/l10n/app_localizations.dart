@@ -191,7 +191,7 @@ abstract class AppLocalizations {
   /// Theme mode choice that follows the OS
   ///
   /// In en, this message translates to:
-  /// **'Follow the System'**
+  /// **'System'**
   String get followSystem;
 
   /// Theme mode choice
@@ -347,7 +347,7 @@ abstract class AppLocalizations {
   /// Settings section header
   ///
   /// In en, this message translates to:
-  /// **'Search Providers'**
+  /// **'Sources'**
   String get searchProvidersSection;
 
   /// Settings hint explaining the drag-to-reorder search source list
@@ -649,6 +649,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mirrors rotate; may need a login'**
   String get providerZlibMirrors;
+
+  /// Appearance tab: color palette group title
+  ///
+  /// In en, this message translates to:
+  /// **'Color palette'**
+  String get paletteSectionTitle;
+
+  /// Color palette name
+  ///
+  /// In en, this message translates to:
+  /// **'Emerald'**
+  String get paletteEmerald;
+
+  /// Color palette name
+  ///
+  /// In en, this message translates to:
+  /// **'Indigo'**
+  String get paletteIndigo;
+
+  /// Color palette name
+  ///
+  /// In en, this message translates to:
+  /// **'Burgundy'**
+  String get paletteBurgundy;
+
+  /// Color palette name
+  ///
+  /// In en, this message translates to:
+  /// **'Amber'**
+  String get paletteAmber;
+
+  /// Color palette name
+  ///
+  /// In en, this message translates to:
+  /// **'Violet'**
+  String get paletteViolet;
+
+  /// Color palette name
+  ///
+  /// In en, this message translates to:
+  /// **'Graphite'**
+  String get paletteGraphite;
 
   /// Settings card title
   ///

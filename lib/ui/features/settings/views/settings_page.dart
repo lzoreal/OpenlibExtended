@@ -41,7 +41,7 @@ import 'package:openlib/ui/features/settings/view_models/settings_view_model.dar
 import 'package:openlib/ui/features/settings/views/about_page.dart';
 import 'package:openlib/ui/features/instances/views/instances_page.dart';
 import 'package:openlib/ui/features/onboarding/views/onboarding_page.dart';
-import 'package:openlib/ui/core/themes.dart' show openlibColorScheme;
+import 'package:openlib/ui/core/themes.dart' show AppPalette, openlibColorScheme;
 
 // ---------------------------------------------------------------------------
 // Shared building blocks: every settings row renders through these, so all
@@ -338,6 +338,15 @@ class _SettingsPageState extends State<SettingsPage>
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: _ThemeSelectorWidget(viewModel: _viewModel),
+            ),
+          ],
+        ),
+        _SettingsGroup(
+          title: l10n.paletteSectionTitle,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _PaletteSelectorWidget(viewModel: _viewModel),
             ),
           ],
         ),
@@ -1554,6 +1563,7 @@ class _ThemeSelectorWidget extends StatelessWidget {
         Expanded(
           child: _ThemeOption(
             mode: ThemeMode.light,
+            palette: viewModel.themePalette,
             label: l10n.themeLightShort,
             selected: mode == ThemeMode.light,
             onTap: () => select(ThemeMode.light),
@@ -1563,6 +1573,7 @@ class _ThemeSelectorWidget extends StatelessWidget {
         Expanded(
           child: _ThemeOption(
             mode: ThemeMode.dark,
+            palette: viewModel.themePalette,
             label: l10n.themeDarkShort,
             selected: mode == ThemeMode.dark,
             onTap: () => select(ThemeMode.dark),
@@ -1572,6 +1583,7 @@ class _ThemeSelectorWidget extends StatelessWidget {
         Expanded(
           child: _ThemeOption(
             mode: ThemeMode.system,
+            palette: viewModel.themePalette,
             label: l10n.followSystem,
             selected: mode == ThemeMode.system,
             onTap: () => select(ThemeMode.system),
@@ -1585,12 +1597,14 @@ class _ThemeSelectorWidget extends StatelessWidget {
 class _ThemeOption extends StatelessWidget {
   const _ThemeOption({
     required this.mode,
+    required this.palette,
     required this.label,
     required this.selected,
     required this.onTap,
   });
 
   final ThemeMode mode;
+  final AppPalette palette;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -1631,11 +1645,11 @@ class _ThemeOption extends StatelessWidget {
                           children: [
                             Expanded(
                               child: _ThemeSwatch(
-                                  scheme: openlibColorScheme(Brightness.light)),
+                                  scheme: openlibColorScheme(Brightness.light, palette)),
                             ),
                             Expanded(
                               child: _ThemeSwatch(
-                                  scheme: openlibColorScheme(Brightness.dark)),
+                                  scheme: openlibColorScheme(Brightness.dark, palette)),
                             ),
                           ],
                         )
@@ -1644,6 +1658,7 @@ class _ThemeOption extends StatelessWidget {
                             mode == ThemeMode.dark
                                 ? Brightness.dark
                                 : Brightness.light,
+                            palette,
                           ),
                         ),
                 ),
@@ -1657,6 +1672,140 @@ class _ThemeOption extends StatelessWidget {
                 style: SwissText.micro.copyWith(
                   fontWeight: FontWeight.w700,
                   color: selected ? scheme.primary : scheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Localized name of a palette; the stored value stays English.
+String paletteLabel(AppLocalizations l10n, AppPalette palette) {
+  return switch (palette) {
+    AppPalette.emerald => l10n.paletteEmerald,
+    AppPalette.indigo => l10n.paletteIndigo,
+    AppPalette.burgundy => l10n.paletteBurgundy,
+    AppPalette.amber => l10n.paletteAmber,
+    AppPalette.violet => l10n.paletteViolet,
+    AppPalette.graphite => l10n.paletteGraphite,
+  };
+}
+
+class _PaletteSelectorWidget extends StatelessWidget {
+  const _PaletteSelectorWidget({required this.viewModel});
+
+  final SettingsViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final current = viewModel.themePalette;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 8.0;
+        final columns = constraints.maxWidth < 360 ? 2 : 3;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final palette in AppPalette.values)
+              SizedBox(
+                width: width,
+                child: _PaletteOption(
+                  palette: palette,
+                  label: paletteLabel(l10n, palette),
+                  selected: palette == current,
+                  onTap: () async {
+                    viewModel.setThemePalette(palette);
+                    try {
+                      await MyLibraryDb.instance.savePreference(
+                          'themePalette', palette.preferenceValue);
+                    } catch (_) {
+                      // The live switch already happened; a failed write
+                      // only loses the choice on the next launch.
+                    }
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PaletteOption extends StatelessWidget {
+  const _PaletteOption({
+    required this.palette,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppPalette palette;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(SwissRadius.field),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color:
+                selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(SwissRadius.field),
+            border: Border.all(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(SwissRadius.sm),
+                child: SizedBox(
+                  height: 40,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _ThemeSwatch(
+                          scheme:
+                              openlibColorScheme(Brightness.light, palette),
+                        ),
+                      ),
+                      Expanded(
+                        child: _ThemeSwatch(
+                          scheme: openlibColorScheme(Brightness.dark, palette),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurface,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
             ],

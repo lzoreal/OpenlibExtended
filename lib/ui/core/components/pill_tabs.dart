@@ -49,7 +49,9 @@ class PillTabs extends StatelessWidget {
                   tabAlignment:
                       scrollable ? TabAlignment.start : TabAlignment.fill,
                   dividerHeight: 0,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  // Long English labels ("Search Providers") clipped at 4
+                // tabs on a phone; 4dp is still comfortable to tap.
+                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   indicatorSize: TabBarIndicatorSize.tab,
                   indicator: BoxDecoration(
                     color: scheme.surface,

@@ -29,6 +29,7 @@ import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/ui/core/themes.dart' show AppPalette;
 import 'package:openlib/ui/features/settings/view_models/settings_view_model.dart';
 import 'package:openlib/ui/features/settings/views/settings_page.dart';
 
@@ -199,7 +200,7 @@ void main() {
   testWidgets('renders every tab and its settings', (tester) async {
     await pumpPage(tester);
 
-    expect(find.text('Search Providers'), findsOneWidget);
+    expect(find.text('Sources'), findsOneWidget);
     expect(find.text('WeLib'), findsOneWidget,
         reason:
             'the search-source cards must render, not the blank loading box');
@@ -354,6 +355,26 @@ void main() {
       findsNWidgets(4),
       reason: 'every source card must be draggable onto another slot',
     );
+  });
+
+  testWidgets('palette tiles update AppSettings and persist', (tester) async {
+    await pumpPage(tester);
+    await openTab(tester, 1);
+
+    await tester.ensureVisible(find.text('Indigo'));
+    await tester.pump();
+    await tester.tap(find.text('Indigo'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump();
+
+    expect(settings.themePalette, AppPalette.indigo,
+        reason: 'selecting a palette must update AppSettings');
+    final saved = await tester
+        .runAsync(() => MyLibraryDb.instance.getPreference('themePalette'));
+    expect(saved, 'indigo',
+        reason: 'the palette must reach the preferences table');
   });
 
   testWidgets('theme tiles update AppSettings', (tester) async {

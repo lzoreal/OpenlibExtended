@@ -23,6 +23,7 @@ class ShellViewModel extends ChangeNotifier {
   })  : _settings = settings,
         _downloads = downloads {
     _themeMode = settings.themeMode;
+    _themePalette = settings.themePalette;
     _fontSizeScale = settings.fontSizeScale;
     _locale = settings.locale;
     _activeDownloadCount = _countActive(downloads.active);
@@ -40,6 +41,7 @@ class ShellViewModel extends ChangeNotifier {
 
   StreamSubscription<Map<String, DownloadTask>>? _subscription;
   ThemeMode _themeMode = ThemeMode.system;
+  AppPalette _themePalette = AppPalette.emerald;
   double _fontSizeScale = 1.0;
   Locale? _locale;
   int _tabIndex = 0;
@@ -47,6 +49,8 @@ class ShellViewModel extends ChangeNotifier {
   bool _disposed = false;
 
   ThemeMode get themeMode => _themeMode;
+
+  AppPalette get themePalette => _themePalette;
 
   double get fontSizeScale => _fontSizeScale;
 
@@ -72,15 +76,20 @@ class ShellViewModel extends ChangeNotifier {
 
   void _onSettingsChanged() {
     final themeMode = _settings.themeMode;
+    final themePalette = _settings.themePalette;
     final fontSizeScale = _settings.fontSizeScale;
     final locale = _settings.locale;
     if (themeMode == _themeMode &&
+        themePalette == _themePalette &&
         fontSizeScale == _fontSizeScale &&
         locale == _locale) {
       return;
     }
-    if (themeMode != _themeMode) updateSystemUi(themeMode);
+    if (themeMode != _themeMode || themePalette != _themePalette) {
+      updateSystemUi(themeMode, themePalette);
+    }
     _themeMode = themeMode;
+    _themePalette = themePalette;
     _fontSizeScale = fontSizeScale;
     _locale = locale;
     _notify();

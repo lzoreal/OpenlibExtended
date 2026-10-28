@@ -173,7 +173,7 @@ Service 层（单例：MyLibraryDb / DownloadManager / InstanceManager / AppLogg
 
 ### 4.3 MD3 设计系统
 
-- **主题源**：`lib/ui/core/themes.dart` 以暖纸背景 + 翡翠绿 `#0F6B5C` 为种子生成 light/dark 两套语义色；不再使用旧的紫色 `#6750A4`、红色 `#FB0101` 或纯白/纯黑硬编码。
+- **主题源**：`lib/ui/core/themes.dart` 提供 6 套配色（翡翠默认 / 靛蓝 / 酒红 / 琥珀 / 紫罗兰 / 石墨），每套都有 light/dark；翡翠保持手工调色（暖纸 `#F4EFE6`/`#151310` + `#0F6B5C`），其余用种子 + 同色系纸底推导。配色存在偏好键 `themePalette`，与主题模式（light/dark/system）相互独立。不再使用旧的紫色 `#6750A4`、红色 `#FB0101` 或纯白/纯黑硬编码。
 - **语义色**：正文/标题用 `onSurface`，次要信息用 `onSurfaceVariant`，卡片用 `surface`/`surfaceContainerLow`，输入框用 `surfaceContainerHigh`，强调色用 `primary` / `primaryContainer`；禁止在新代码里写 `Colors.red`、`Colors.white` 等（深色遮罩上的白字除外）。
 - **排版**：保留 Nunito，但映射到 MD3 角色：页面标题 `headlineMedium`，卡片标题 `titleSmall`，正文 `bodyMedium`，辅助信息 `bodySmall`，按钮/标签 `labelLarge`。
 - **形状**：卡片 20dp 圆角 + 极浅描边，输入/选项 16dp，对话框 28dp，按钮与选项卡胶囊形；页面横向内边距统一 16dp。

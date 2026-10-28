@@ -18,15 +18,62 @@ import 'package:openlib/ui/core/swiss_grid.dart';
 /// more editorial feel than the previous violet baseline.
 const Color _seedColor = Color(0xFF0F6B5C);
 
+/// Selectable color palettes. Light/dark mode is chosen separately, so every
+/// palette ships both schemes.
+enum AppPalette {
+  emerald('emerald'),
+  indigo('indigo'),
+  burgundy('burgundy'),
+  amber('amber'),
+  violet('violet'),
+  graphite('graphite');
+
+  const AppPalette(this.preferenceValue);
+
+  /// Stored in the preferences table; never localize this.
+  final String preferenceValue;
+
+  static AppPalette fromPreference(Object? value) => values.firstWhere(
+        (palette) => palette.preferenceValue == value,
+        orElse: () => AppPalette.emerald,
+      );
+}
+
+class _PaletteSpec {
+  const _PaletteSpec(this.seed, this.lightPaper, this.darkPaper);
+
+  final Color seed;
+  final Color lightPaper;
+  final Color darkPaper;
+}
+
+/// One entry per palette: the seed drives the MD3 roles, the papers keep
+/// the editorial background. Emerald stays hand-tuned (see [_emeraldScheme]).
+const Map<AppPalette, _PaletteSpec> _paletteSpecs = {
+  AppPalette.emerald:
+      _PaletteSpec(Color(0xFF0F6B5C), Color(0xFFF4EFE6), Color(0xFF151310)),
+  AppPalette.indigo:
+      _PaletteSpec(Color(0xFF2F4B7C), Color(0xFFF1F2F6), Color(0xFF12151B)),
+  AppPalette.burgundy:
+      _PaletteSpec(Color(0xFF8C2F39), Color(0xFFF8F0ED), Color(0xFF1A1211)),
+  AppPalette.amber:
+      _PaletteSpec(Color(0xFF9A5B13), Color(0xFFF8F1E3), Color(0xFF1A150E)),
+  AppPalette.violet:
+      _PaletteSpec(Color(0xFF5B4B8A), Color(0xFFF4F1F8), Color(0xFF15121B)),
+  AppPalette.graphite:
+      _PaletteSpec(Color(0xFF4A4A4A), Color(0xFFF5F3F0), Color(0xFF131313)),
+};
+
 const double _cardRadius = SwissRadius.card;
 const double _fieldRadius = SwissRadius.field;
 const double _dialogRadius = SwissRadius.sheet;
 
-Color _paperBackground(Brightness brightness) => brightness == Brightness.light
-    ? const Color(0xFFF4EFE6)
-    : const Color(0xFF151310);
+Color _paperBackground(AppPalette palette, Brightness brightness) {
+  final spec = _paletteSpecs[palette]!;
+  return brightness == Brightness.light ? spec.lightPaper : spec.darkPaper;
+}
 
-ColorScheme _warmScheme(Brightness brightness) {
+ColorScheme _emeraldScheme(Brightness brightness) {
   final base = ColorScheme.fromSeed(
     seedColor: _seedColor,
     brightness: brightness,
@@ -68,9 +115,9 @@ ColorScheme _warmScheme(Brightness brightness) {
     surfaceContainerHigh:
         isLight ? const Color(0xFFECE2D3) : const Color(0xFF332D26),
     surfaceContainerHighest:
-        isLight ? const Color(0xFFE3D6C2) : const Color(0xFF3E372E),
+        isLight ? const Color(0xFFEDE3D3) : const Color(0xFF3E372E),
     onSurfaceVariant:
-        isLight ? const Color(0xFF726558) : const Color(0xFFA99D8F),
+        isLight ? const Color(0xFF665A4D) : const Color(0xFFB6AA9B),
     outline: isLight ? const Color(0xFFA99A89) : const Color(0xFF7C7266),
     outlineVariant: isLight ? const Color(0xFFE2D8CA) : const Color(0xFF3B352D),
     inverseSurface: isLight ? const Color(0xFF342F29) : const Color(0xFFF3EBE1),
@@ -80,13 +127,94 @@ ColorScheme _warmScheme(Brightness brightness) {
   );
 }
 
+/// Seed-driven scheme with the palette's own paper ramp; emerald keeps its
+/// hand-tuned roles so the default look does not change.
+/// WCAG contrast ratio between two opaque colors.
+double _contrastRatio(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  final hi = la > lb ? la : lb;
+  final lo = la > lb ? lb : la;
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/// Nudges [foreground] towards black (light backgrounds) or white (dark
+/// ones) until it reads at [ratio] against [background]. Only colors that
+/// already fail move, so the curated palettes keep their hue.
+Color _ensureContrast(Color foreground, Color background,
+    {double ratio = 4.5}) {
+  if (_contrastRatio(foreground, background) >= ratio) return foreground;
+  final darken = background.computeLuminance() > 0.5;
+  var hsl = HSLColor.fromColor(foreground);
+  var result = foreground;
+  for (var i = 0; i < 50; i++) {
+    hsl = hsl.withLightness(
+      (hsl.lightness + (darken ? -0.02 : 0.02)).clamp(0.0, 1.0),
+    );
+    result = hsl.toColor();
+    if (_contrastRatio(result, background) >= ratio) return result;
+  }
+  return result;
+}
+
+ColorScheme _paletteScheme(AppPalette palette, Brightness brightness) {
+  if (palette == AppPalette.emerald) return _emeraldScheme(brightness);
+  final spec = _paletteSpecs[palette]!;
+  final base = ColorScheme.fromSeed(
+    seedColor: spec.seed,
+    brightness: brightness,
+    dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+  );
+  final light = brightness == Brightness.light;
+  final paper = light ? spec.lightPaper : spec.darkPaper;
+  Color mix(Color from, Color to, double amount) =>
+      Color.lerp(from, to, amount)!;
+  return base.copyWith(
+    surface: light ? mix(paper, Colors.white, 0.62) : mix(paper, Colors.white, 0.07),
+    surfaceContainerLowest: light ? mix(paper, Colors.white, 0.92) : mix(paper, Colors.black, 0.30),
+    surfaceContainerLow: light ? mix(paper, Colors.white, 0.32) : mix(paper, Colors.white, 0.11),
+    surfaceContainer: light ? paper : mix(paper, Colors.white, 0.14),
+    surfaceContainerHigh: light ? mix(paper, Colors.black, 0.06) : mix(paper, Colors.white, 0.18),
+    surfaceContainerHighest: light ? mix(paper, Colors.black, 0.10) : mix(paper, Colors.white, 0.23),
+    onSurface: light ? mix(paper, Colors.black, 0.86) : mix(paper, Colors.white, 0.92),
+    onSurfaceVariant: light ? mix(paper, Colors.black, 0.62) : mix(paper, Colors.white, 0.72),
+    outline: light ? mix(paper, Colors.black, 0.42) : mix(paper, Colors.white, 0.45),
+    outlineVariant: light ? mix(paper, Colors.black, 0.22) : mix(paper, Colors.white, 0.26),
+    inverseSurface: light ? mix(paper, Colors.black, 0.86) : mix(paper, Colors.white, 0.92),
+    onInverseSurface: light ? mix(paper, Colors.white, 0.9) : mix(paper, Colors.black, 0.85),
+  ).copyWith(
+    // `fromSeed(fidelity)` keeps the seed's own tone, so a darker seed made
+    // the tonal container dark in light mode. The design language (emerald)
+    // is a pale container with dark text in light mode and the reverse in
+    // dark mode; normalize that here.
+    primaryContainer:
+        light ? mix(base.primary, paper, 0.85) : mix(base.primary, paper, 0.80),
+    onPrimaryContainer: _ensureContrast(
+        light
+            ? mix(base.primary, Colors.black, 0.45)
+            : mix(base.primary, Colors.white, 0.60),
+        light ? mix(base.primary, paper, 0.85) : mix(base.primary, paper, 0.80)),
+    // Accent text (eyebrows, links, section labels) sits directly on the
+    // paper; a seed that is too light there would be hard to read.
+    primary: _ensureContrast(
+        base.primary, light ? mix(paper, Colors.white, 0.62) : mix(paper, Colors.white, 0.07)),
+    secondary: _ensureContrast(base.secondary, paper),
+    tertiary: _ensureContrast(base.tertiary, paper),
+    error: _ensureContrast(base.error, paper),
+  );
+}
+
 /// The palette exposed for previews (theme picker swatches) so previews
 /// always match the real theme instead of duplicating hex values.
-ColorScheme openlibColorScheme(Brightness brightness) =>
-    _warmScheme(brightness);
+ColorScheme openlibColorScheme(Brightness brightness,
+        [AppPalette palette = AppPalette.emerald]) =>
+    _paletteScheme(palette, brightness);
 
-ThemeData _buildTheme(Brightness brightness) {
-  final scheme = _warmScheme(brightness);
+ThemeData _buildTheme(
+    ColorScheme scheme,
+    Brightness brightness,
+    Color background,
+  ) {
   final base = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -141,7 +269,7 @@ ThemeData _buildTheme(Brightness brightness) {
 
   return base.copyWith(
     textTheme: textTheme,
-    scaffoldBackgroundColor: _paperBackground(brightness),
+    scaffoldBackgroundColor: background,
     canvasColor: scheme.surface,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
@@ -154,7 +282,7 @@ ThemeData _buildTheme(Brightness brightness) {
       },
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: _paperBackground(brightness),
+      backgroundColor: background,
       foregroundColor: scheme.onSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -389,8 +517,25 @@ ThemeData _buildTheme(Brightness brightness) {
   );
 }
 
-final ThemeData lightTheme = _buildTheme(Brightness.light);
-final ThemeData darkTheme = _buildTheme(Brightness.dark);
+final Map<String, ThemeData> _themeCache = {};
+
+/// Theme for [palette] in [brightness]. Built once per pair: rebuilding a
+/// Material theme for every settings change would reset scroll positions.
+ThemeData buildAppTheme(AppPalette palette, Brightness brightness) {
+  final key = '${palette.preferenceValue}:${brightness.name}';
+  final cached = _themeCache[key];
+  if (cached != null) return cached;
+  final theme = _buildTheme(
+    _paletteScheme(palette, brightness),
+    brightness,
+    _paperBackground(palette, brightness),
+  );
+  _themeCache[key] = theme;
+  return theme;
+}
+
+final ThemeData lightTheme = buildAppTheme(AppPalette.emerald, Brightness.light);
+final ThemeData darkTheme = buildAppTheme(AppPalette.emerald, Brightness.dark);
 
 /// Reads the persisted theme mode, falling back to the legacy dark flag.
 Future<ThemeMode> getInitialTheme() async {
@@ -415,20 +560,34 @@ Future<ThemeMode> getInitialTheme() async {
   return ThemeMode.system;
 }
 
-/// Keeps the Android system bar in step with the MD3 surface palette.
-void updateSystemUi(ThemeMode mode) {
-  if (Platform.isAndroid) {
-    var isDark = mode == ThemeMode.dark;
-    if (mode == ThemeMode.system) {
-      isDark = ui.PlatformDispatcher.instance.platformBrightness ==
-          Brightness.dark;
-    }
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      systemNavigationBarColor:
-          isDark ? const Color(0xFF141218) : const Color(0xFFFEF7FF),
-      systemNavigationBarIconBrightness:
-          isDark ? Brightness.light : Brightness.dark,
-      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-    ));
+/// Reads the persisted palette; emerald when nothing (or garbage) is stored.
+Future<AppPalette> getInitialPalette() async {
+  try {
+    final value = await MyLibraryDb.instance
+        .getPreference('themePalette')
+        .catchError((e) => null);
+    return AppPalette.fromPreference(value);
+  } catch (_) {
+    return AppPalette.emerald;
   }
+}
+
+/// Keeps the Android system bar in step with the active palette.
+void updateSystemUi(ThemeMode mode, AppPalette palette) {
+  if (!Platform.isAndroid) return;
+  var isDark = mode == ThemeMode.dark;
+  if (mode == ThemeMode.system) {
+    isDark = ui.PlatformDispatcher.instance.platformBrightness ==
+        Brightness.dark;
+  }
+  final scheme = openlibColorScheme(
+    isDark ? Brightness.dark : Brightness.light,
+    palette,
+  );
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+    systemNavigationBarColor: scheme.surface,
+    systemNavigationBarIconBrightness:
+        isDark ? Brightness.light : Brightness.dark,
+    statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+  ));
 }

@@ -9,6 +9,7 @@ import 'package:openlib/data/repositories/library_repository.dart';
 import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/search_manager.dart';
+import 'package:openlib/ui/core/themes.dart' show AppPalette;
 
 /// Owns the settings page's state. Themes, font scale, locale and the
 /// download/browser preferences live in [AppSettings] so the rest of the app
@@ -48,6 +49,8 @@ class SettingsViewModel extends ChangeNotifier {
 
   ThemeMode get themeMode => _settings.themeMode;
 
+  AppPalette get themePalette => _settings.themePalette;
+
   double get fontSizeScale => _settings.fontSizeScale;
 
   Locale? get locale => _settings.locale;
@@ -75,6 +78,8 @@ class SettingsViewModel extends ChangeNotifier {
   bool get sourcesLoaded => _sourcesLoaded;
 
   void setThemeMode(ThemeMode mode) => _settings.setThemeMode(mode);
+
+  void setThemePalette(AppPalette palette) => _settings.setThemePalette(palette);
 
   void setFontSizeScale(double scale) => _settings.setFontSizeScale(scale);
 

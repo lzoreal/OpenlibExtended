@@ -315,6 +315,27 @@ class AppLocalizationsDe extends AppLocalizations {
       'Spiegel wechseln; Anmeldung kann nötig sein';
 
   @override
+  String get paletteSectionTitle => 'Farbschema';
+
+  @override
+  String get paletteEmerald => 'Smaragd';
+
+  @override
+  String get paletteIndigo => 'Indigo';
+
+  @override
+  String get paletteBurgundy => 'Burgunderrot';
+
+  @override
+  String get paletteAmber => 'Bernstein';
+
+  @override
+  String get paletteViolet => 'Violett';
+
+  @override
+  String get paletteGraphite => 'Graphit';
+
+  @override
   String get themeTitle => 'Design';
 
   @override

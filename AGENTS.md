@@ -108,7 +108,7 @@ dart run flutter_launcher_icons                        # 改 assets/icons/appIco
     - 根页面禁用横向拖动（`NeverScrollableScrollPhysics`），切换页只走底栏点击的 `switchToTab`：冷页或跨两页以上直接 `jumpToPage`（首次 build 不要放进滑动动画里），相邻且已构建的页才滑动。横向手势全部属于内层子标签。
     - 一级页统一 `PageHeader`（小标签 + 标题 + 可选操作，**不带副标题**），列表节标题统一 `SectionHeader`，设置/What's New/主页面选项卡统一 `PillTabs`。
     - 设置分组固定为搜索来源 / 外观 / 高级 / 关于；存储位置在“高级 → 通用”，不要放回外观。
-    - 语言默认收起、点击展开；主题用带预览的选项卡，不用下拉框。
+    - 语言默认收起、点击展开；主题用带预览的选项卡，不用下拉框。配色固定 6 套（翡翠/靛蓝/酒红/琥珀/紫罗兰/石墨），亮/暗独立，选择在 外观 → 配色；默认翡翠的手调色值不要改。
     - 页面横向内边距 16dp、卡片圆角 20dp、输入框/选项 16dp、对话框 28dp；底部导航首页标签用 `homeTitle`（发现）。新页面复用 `BookInfoWidget`、`ActiveDownloadsWidget`、`CustomErrorWidget` 等共享组件。
     - 大字体：固定高度卡、导航、标签和表单必须在 200% 字体下不溢出；优先动态高度或可滚动，不要靠缩小字号。
     - 不要恢复已移除的 `google_nav_bar`、旧的红色/紫色主题或内置阅读器。

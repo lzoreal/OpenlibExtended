@@ -61,6 +61,7 @@ void main(List<String> args) async {
   await DownloadManager().initialize();
 
   ThemeMode startThemeMode = await getInitialTheme();
+  final startPalette = await getInitialPalette();
 
   final preferences = PreferencesRepository(database: dataBase);
   final settings = await AppSettings.load(
@@ -99,7 +100,7 @@ void main(List<String> args) async {
 
   if (Platform.isAndroid) {
     // Android-specific setup for system UI overlay colors
-    updateSystemUi(startThemeMode);
+    updateSystemUi(startThemeMode, startPalette);
     await moveFilesToAndroidInternalStorage();
   }
 
@@ -217,8 +218,8 @@ class _MyAppState extends State<MyApp> {
         },
         debugShowCheckedModeBanner: false,
         title: 'OpenlibExtended',
-        theme: lightTheme,
-        darkTheme: darkTheme,
+        theme: buildAppTheme(_viewModel.themePalette, Brightness.light),
+        darkTheme: buildAppTheme(_viewModel.themePalette, Brightness.dark),
         themeMode: _viewModel.themeMode,
         home: !widget.onboardingCompleted
             ? const OnboardingPage()

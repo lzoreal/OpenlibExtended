@@ -307,6 +307,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerZlibMirrors => '镜像轮换，可能需要登录';
 
   @override
+  String get paletteSectionTitle => '配色';
+
+  @override
+  String get paletteEmerald => '翡翠';
+
+  @override
+  String get paletteIndigo => '靛蓝';
+
+  @override
+  String get paletteBurgundy => '酒红';
+
+  @override
+  String get paletteAmber => '琥珀';
+
+  @override
+  String get paletteViolet => '紫罗兰';
+
+  @override
+  String get paletteGraphite => '石墨';
+
+  @override
   String get themeTitle => '主题';
 
   @override

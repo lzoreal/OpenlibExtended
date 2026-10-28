@@ -61,7 +61,7 @@
       }
     }
   },
-  "followSystem": "Follow the System",
+  "followSystem": "System",
   "@followSystem": {
     "description": "Theme mode choice that follows the OS"
   },
@@ -170,7 +170,7 @@
   "@settingsTitle": {
     "description": "Settings page header"
   },
-  "searchProvidersSection": "Search Providers",
+  "searchProvidersSection": "Sources",
   "@searchProvidersSection": {
     "description": "Settings section header"
   },
@@ -417,6 +417,22 @@
   "@providerZlibMirrors": {
     "description": "Z-Library provider subtitle"
   },
+  "paletteSectionTitle": "Color palette",
+  "@paletteSectionTitle": {
+    "description": "Appearance tab: color palette group title"
+  },
+  "paletteEmerald": "Emerald",
+  "@paletteEmerald": {"description": "Color palette name"},
+  "paletteIndigo": "Indigo",
+  "@paletteIndigo": {"description": "Color palette name"},
+  "paletteBurgundy": "Burgundy",
+  "@paletteBurgundy": {"description": "Color palette name"},
+  "paletteAmber": "Amber",
+  "@paletteAmber": {"description": "Color palette name"},
+  "paletteViolet": "Violet",
+  "@paletteViolet": {"description": "Color palette name"},
+  "paletteGraphite": "Graphite",
+  "@paletteGraphite": {"description": "Color palette name"},
   "themeTitle": "Theme",
   "@themeTitle": {
     "description": "Settings card title"
