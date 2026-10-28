@@ -7,7 +7,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:meta/meta.dart';
 
 // Project imports:
-import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/services/hedged_requests.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/logger.dart';

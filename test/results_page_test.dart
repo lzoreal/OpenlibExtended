@@ -10,9 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/models/book_data.dart';
+import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
-import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/components/search_result_card.dart';

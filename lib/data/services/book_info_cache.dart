@@ -2,7 +2,7 @@
 import 'dart:convert';
 
 // Project imports:
-import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/services/database.dart';
 
 /// Remembers parsed book-detail pages across launches.

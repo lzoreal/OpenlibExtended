@@ -10,9 +10,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
-import 'package:openlib/data/services/annas_archieve.dart' show BookData;
+import 'package:openlib/data/models/book_data.dart' show BookData;
+import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/preferences.dart';
-import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/state/state.dart' as app_state;
 import 'package:openlib/state/results_pager.dart';

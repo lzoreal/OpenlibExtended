@@ -7,9 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/google_suggest_api.dart';
 import 'package:openlib/data/services/recent_searches.dart';
-import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/results_page.dart';
 import 'package:openlib/ui/search_page.dart';

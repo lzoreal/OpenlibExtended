@@ -3,13 +3,9 @@ import 'package:dio/dio.dart';
 import 'package:html/parser.dart' show parse;
 
 // Project imports:
+import 'package:openlib/data/models/trending_book_data.dart';
 import 'package:openlib/data/services/logger.dart';
 
-class TrendingBookData {
-  final String? title;
-  final String? thumbnail;
-  TrendingBookData({this.title, this.thumbnail});
-}
 
 abstract class TrendingBooksImpl {
   String url = '';

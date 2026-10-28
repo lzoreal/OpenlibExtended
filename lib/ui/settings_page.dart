@@ -20,6 +20,7 @@ import 'package:openlib/data/services/platform_utils.dart';
 import 'package:openlib/data/services/update_checker.dart';
 
 // Project imports:
+import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/book_import.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/logger.dart';

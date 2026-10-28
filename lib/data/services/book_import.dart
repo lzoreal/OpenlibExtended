@@ -2,6 +2,7 @@
 import 'dart:io';
 
 // Project imports:
+import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/services/book_format.dart';
 import 'package:openlib/data/services/database.dart';
 

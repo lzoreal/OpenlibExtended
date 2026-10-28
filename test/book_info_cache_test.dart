@@ -9,7 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
-import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/services/backup_service.dart';
 import 'package:openlib/data/services/book_info_cache.dart';
 import 'package:openlib/data/services/database.dart';

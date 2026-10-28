@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 
 // Project imports:
-import 'package:openlib/data/services/annas_archieve.dart';
+import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
 import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';

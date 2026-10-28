@@ -7,6 +7,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
+import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/upgrade_detector.dart';
 import 'package:openlib/data/services/search_manager.dart';

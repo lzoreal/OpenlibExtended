@@ -6,6 +6,7 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
+import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/services/annas_archieve.dart';
 import 'package:openlib/data/services/download_target.dart';
 import 'package:openlib/data/services/search_manager.dart';

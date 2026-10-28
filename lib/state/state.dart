@@ -12,6 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 // NOTE: These imports are crucial and must exist in your project structure.
+import 'package:openlib/data/models/book_data.dart';
+import 'package:openlib/data/models/my_book.dart';
+import 'package:openlib/data/models/search_result.dart';
+import 'package:openlib/data/models/trending_book_data.dart';
 import 'package:openlib/data/services/annas_archieve.dart';
 import 'package:openlib/data/services/book_detail_routing.dart';
 import 'package:openlib/data/services/book_info_cache.dart';
