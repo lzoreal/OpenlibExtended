@@ -10,7 +10,11 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/search_filters.dart';
+import 'package:openlib/data/repositories/download_repository.dart';
+import 'package:openlib/data/repositories/library_repository.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
+import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/download_manager.dart';
 
@@ -45,10 +49,16 @@ void main() {
 
     expect(getIt<MyLibraryDb>(), same(MyLibraryDb.instance));
     expect(getIt<PreferencesRepository>(), same(preferences));
-    expect(getIt<PreferencesRepository>(), same(getIt<PreferencesRepository>()));
+    expect(
+        getIt<PreferencesRepository>(), same(getIt<PreferencesRepository>()));
     expect(getIt<DownloadManager>(), same(getIt<DownloadManager>()));
     expect(getIt<AppSettings>(), same(s));
     expect(getIt<AppSettings>(), same(getIt<AppSettings>()));
+
+    expect(getIt<LibraryRepository>(), same(getIt<LibraryRepository>()));
+    expect(getIt<SearchRepository>(), same(getIt<SearchRepository>()));
+    expect(getIt<DownloadRepository>(), same(getIt<DownloadRepository>()));
+    expect(getIt<MirrorRepository>(), same(getIt<MirrorRepository>()));
   });
 
   test('resetDi forgets registrations', () async {

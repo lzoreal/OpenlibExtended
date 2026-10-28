@@ -626,9 +626,8 @@ void main() {
   test('updates forwards the manager stream', () {
     final repository = DownloadRepository();
 
-    // Broadcast controllers hand out the same stream object twice, so this
-    // proves the repository forwards the manager's stream instead of wrapping
-    // or replacing it.
+    // Equality holds because _ControllerStream.== compares the owning
+    // controller, not because the same stream object is returned.
     expect(repository.updates, equals(DownloadManager().downloadsStream));
   });
 }

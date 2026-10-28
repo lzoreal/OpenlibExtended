@@ -291,6 +291,8 @@ final backgroundVerificationProvider = StateProvider<bool>((ref) => true);
 final instanceAutoModeProvider = StateProvider<bool>((ref) => true);
 
 // Download Manager States
+// No onDispose: DownloadManager is process-wide, and closing its broadcast
+// controller is irreversible.
 final downloadManagerProvider = Provider<DownloadRepository>((ref) {
   return ref.watch(downloadRepositoryProvider);
 });

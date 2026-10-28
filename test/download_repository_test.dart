@@ -1,7 +1,9 @@
 // Queue-content behaviour (tasks actually appearing in `active` and updates
-// reaching listeners) is covered by `download_center_page_test`; the cases
-// below only guard the repository's wiring to the singleton, so an empty queue
-// here is a smoke check and must not be read as coverage of `active`.
+// reaching listeners) is covered at the service level by
+// `test/download_manager_test.dart`. The cases below only guard the
+// repository's wiring to the singleton, so an empty queue here is a smoke
+// check and must not be read as coverage of `active`; asserting that
+// forwarding is deferred.
 //
 // Flutter imports:
 import 'package:flutter/material.dart';

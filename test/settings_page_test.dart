@@ -10,6 +10,7 @@ import 'dart:io';
 
 // Flutter imports:
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 // Package imports:
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,8 +19,12 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Project imports:
+import 'package:openlib/app/app_settings.dart';
+import 'package:openlib/app/di.dart';
+import 'package:openlib/data/models/search_filters.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
+import 'package:openlib/data/repositories/preferences_repository.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/settings_page.dart';
@@ -35,6 +40,47 @@ void main() {
     databaseFactory = databaseFactoryFfi;
     PathProviderPlatform.instance = _paths;
     Directory(_paths.base).createSync(recursive: true);
+    // The About tab asks for the package version; without the handler the
+    // future fails as soon as a real async window opens.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('dev.fluttercommunity.plus/package_info'),
+      (call) async => call.method == 'getAll'
+          ? <String, dynamic>{
+              'appName': 'OpenlibExtended',
+              'packageName': 'org.openlib',
+              'version': '1.7.2',
+              'buildNumber': '1',
+            }
+          : null,
+    );
+  });
+
+  setUp(() async {
+    // The search-source block resolves SearchRepository through getIt and
+    // swallows a missing registration into an empty box, so the page has to
+    // run with the real container or the cards silently disappear.
+    await initDi(
+      // Built directly so setup does not await sqlite inside the widget-test
+      // fake async zone; the page does not read AppSettings.
+      settings: AppSettings(
+        themeMode: ThemeMode.system,
+        fontSizeScale: 1,
+        locale: null,
+        showManualDownloadButton: true,
+        backgroundVerification: true,
+        donationKey: '',
+        userAgent: '',
+        cookie: '',
+        filters: const SearchFilters(),
+      ),
+      database: MyLibraryDb.instance,
+      preferences: PreferencesRepository(database: MyLibraryDb.instance),
+    );
+  });
+
+  tearDown(() async {
+    await resetDi();
   });
 
   Future<void> pumpPage(WidgetTester tester, {Locale? locale}) async {
@@ -44,23 +90,29 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          // The page resolves the download queue through DI; tests do not
-          // run initDi.
-          downloadManagerProvider.overrideWithValue(DownloadRepository()),
-        ],
-        child: MaterialApp(
-          locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          theme: ThemeData.light(),
-          darkTheme: ThemeData.dark(),
-          home: const Scaffold(body: SettingsPage()),
+    // The search-source providers read preferences from sqlite, whose
+    // futures never complete in the widget-test fake async zone, so the
+    // first frame and the real async window it needs live inside runAsync.
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            // A bare repository keeps this test off the shared manager's
+            // queue even though the container registers one.
+            downloadManagerProvider.overrideWithValue(DownloadRepository()),
+          ],
+          child: MaterialApp(
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: ThemeData.light(),
+            darkTheme: ThemeData.dark(),
+            home: const Scaffold(body: SettingsPage()),
+          ),
         ),
-      ),
-    );
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
     // Bounded pumping: the page starts async work (instance providers,
     // PackageInfo) that can keep animations running, so pumpAndSettle is
     // not reliable here.
@@ -86,6 +138,9 @@ void main() {
     await pumpPage(tester);
 
     expect(find.text('Search Providers'), findsOneWidget);
+    expect(find.text('WeLib'), findsOneWidget,
+        reason:
+            'the search-source cards must render, not the blank DI fallback');
     expect(find.text('SOURCE BEHAVIOR'), findsOneWidget);
     expect(
       find.ancestor(
@@ -248,6 +303,11 @@ void main() {
 
     await tester.tap(find.text('Dark'));
     await tester.pump(const Duration(milliseconds: 600));
+    // The tile persists through sqlite; let the write finish in a real
+    // async window so its lock-warning timer does not outlive the test.
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump();
 
     final element = tester.element(find.byType(SettingsPage));
     final container = ProviderScope.containerOf(element);
@@ -267,6 +327,11 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.tap(find.text('Deutsch'));
     await tester.pump(const Duration(milliseconds: 300));
+    // The tile persists the code through sqlite; let the write finish in a
+    // real async window so its lock-warning timer does not outlive the test.
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump();
 
     final element = tester.element(find.byType(SettingsPage));
     final container = ProviderScope.containerOf(element);
@@ -277,6 +342,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('System default'));
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump();
     expect(container.read(localeOverrideProvider), isNull,
         reason: 'the system tile clears the override');
   });
