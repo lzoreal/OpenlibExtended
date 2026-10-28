@@ -599,6 +599,11 @@ git commit -m "feat(data): add SearchRepository and route search providers throu
 
 ```dart
 // test/download_repository_test.dart
+// Queue-content behaviour (tasks actually appearing in `active` and updates
+// reaching listeners) is covered by `download_center_page_test`; the cases
+// below only guard the repository's wiring to the singleton, so an empty queue
+// here is a smoke check and must not be read as coverage of `active`.
+//
 // Flutter imports:
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -607,7 +612,7 @@ import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/services/download_manager.dart';
 
 void main() {
-  test('an untouched queue is empty and unknown ids are ignored', () {
+  test('an untouched queue is empty and unknown ids are ignored (smoke)', () {
     final repository = DownloadRepository();
 
     expect(repository.active, isEmpty);
@@ -621,7 +626,10 @@ void main() {
   test('updates forwards the manager stream', () {
     final repository = DownloadRepository();
 
-    expect(repository.updates, isA<Stream<Map<String, DownloadTask>>>());
+    // Broadcast controllers hand out the same stream object twice, so this
+    // proves the repository forwards the manager's stream instead of wrapping
+    // or replacing it.
+    expect(repository.updates, equals(DownloadManager().downloadsStream));
   });
 }
 ```
