@@ -11,10 +11,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/annas_archieve.dart' show BookData;
-import 'package:openlib/services/database.dart';
+import 'package:openlib/services/preferences.dart';
 import 'package:openlib/services/search_manager.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 import 'package:openlib/state/state.dart' as app_state;
+import 'package:openlib/state/results_pager.dart';
 import 'package:openlib/ui/book_info_page.dart';
 import 'package:openlib/ui/components/book_card_widget.dart'
     show getFileType, getLanguage;
@@ -47,23 +48,18 @@ class ResultPage extends ConsumerStatefulWidget {
 
 class _ResultPageState extends ConsumerState<ResultPage> {
   final _scrollController = ScrollController();
-  SearchManagerResult? _firstResult;
-  SearchProviderId? _selectedSource;
-  final Map<String, List<BookData>> _viewBooks = {};
-  final Map<String, Set<String>> _viewSeen = {};
-  final Map<String, int> _viewPages = {};
-  final Set<String> _viewEnded = {};
-  bool _fetchingNextPage = false;
+  late final ResultsPager _pager = ResultsPager(routeSource: widget.source);
   bool _retrying = false;
   bool _forceLocalTimeouts = false;
   ProviderSubscription<AsyncValue<SearchManagerResult>>? _firstPageSubscription;
   final Set<String> _formatFilters = {};
   final Set<String> _languageFilters = {};
 
-  String _viewKey(SearchProviderId? source) => source?.name ?? 'all';
+  SearchManagerResult? get _firstResult => _pager.firstResult;
+  SearchProviderId? get _selectedSource => _pager.selectedSource;
+  bool get _fetchingNextPage => _pager.fetchingNextPage;
 
-  List<BookData> get _books =>
-      _viewBooks[_viewKey(_selectedSource)] ?? const <BookData>[];
+  List<BookData> get _books => _pager.booksFor(_pager.selectedSource);
 
   app_state.SearchPageKey get _firstPageKey => app_state.SearchPageKey(
         widget.searchQuery,
@@ -93,97 +89,10 @@ class _ResultPageState extends ConsumerState<ResultPage> {
 
   void _applyFirstResult(SearchManagerResult result) {
     if (_firstResult != null) {
-      _mergeFirstResult(result);
+      setState(() => _pager.merge(result));
       return;
     }
-    setState(() {
-      _firstResult = result;
-      _viewBooks.clear();
-      _viewSeen.clear();
-      _viewPages.clear();
-      _viewEnded.clear();
-      final previous = _selectedSource;
-      final routeSource = widget.source != null &&
-              result.sources.any((run) => run.id == widget.source)
-          ? widget.source
-          : null;
-      _selectedSource =
-          previous != null && result.sources.any((run) => run.id == previous)
-              ? previous
-              : routeSource;
-
-      void put(SearchProviderId? source, List<BookData> books) {
-        final key = _viewKey(source);
-        final copy = List<BookData>.of(books);
-        _viewBooks[key] = copy;
-        _viewSeen[key] = copy.map((book) => book.md5).toSet();
-        _viewPages[key] = 1;
-        if (copy.isEmpty) _viewEnded.add(key);
-      }
-
-      put(null, result.books);
-      for (final run in result.sources) {
-        final sourceBooks = result.booksBySource[run.id] ??
-            (run.id == result.resultSourceId
-                ? result.books
-                : const <BookData>[]);
-        put(run.id, sourceBooks);
-      }
-      _fetchingNextPage = false;
-    });
-  }
-
-  /// Later snapshots add books from sources that finished after the first
-  /// paint. Merge instead of clearing, so pagination and the user's scroll
-  /// position survive the stream.
-  void _mergeFirstResult(SearchManagerResult result) {
-    setState(() {
-      _firstResult = result;
-
-      void merge(
-        SearchProviderId? source,
-        List<BookData> books, {
-        bool replacePageOne = false,
-      }) {
-        final key = _viewKey(source);
-        final existing = _viewBooks[key];
-        final seen = _viewSeen[key];
-        if (existing == null || seen == null) {
-          _viewBooks[key] = List<BookData>.of(books);
-          _viewSeen[key] = books.map((book) => book.md5).toSet();
-          _viewPages[key] = 1;
-          if (books.isEmpty) _viewEnded.add(key);
-          return;
-        }
-
-        final page = _viewPages[key] ?? 1;
-        if (replacePageOne && page <= 1) {
-          _viewBooks[key] = List<BookData>.of(books);
-          _viewSeen[key] = books.map((book) => book.md5).toSet();
-          if (books.isEmpty) {
-            _viewEnded.add(key);
-          } else {
-            _viewEnded.remove(key);
-          }
-          return;
-        }
-
-        for (final book in books) {
-          if (seen.add(book.md5)) existing.add(book);
-        }
-        if (existing.isNotEmpty) _viewEnded.remove(key);
-      }
-
-      merge(null, result.books);
-      for (final run in result.sources) {
-        final sourceBooks = result.booksBySource[run.id] ??
-            (run.id == result.resultSourceId
-                ? result.books
-                : const <BookData>[]);
-        merge(run.id, sourceBooks, replacePageOne: true);
-      }
-      _fetchingNextPage = false;
-    });
+    setState(() => _pager.applyInitial(result));
   }
 
   @override
@@ -196,19 +105,18 @@ class _ResultPageState extends ConsumerState<ResultPage> {
   void _onScroll() {
     if (_scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 240 &&
-        !_fetchingNextPage &&
-        !_viewEnded.contains(_viewKey(_selectedSource))) {
+        !_pager.fetchingNextPage &&
+        !_pager.currentViewEnded) {
       _loadNextPage();
     }
   }
 
   Future<void> _loadNextPage() async {
-    if (!mounted || _fetchingNextPage) return;
-    final view = _selectedSource;
-    final key = _viewKey(view);
-    if (_viewEnded.contains(key)) return;
-    final nextPage = (_viewPages[key] ?? 1) + 1;
-    setState(() => _fetchingNextPage = true);
+    if (!mounted || _pager.fetchingNextPage) return;
+    final view = _pager.selectedSource;
+    if (_pager.currentViewEnded) return;
+    final nextPage = _pager.pageOf(view) + 1;
+    setState(() => _pager.fetchingNextPage = true);
     try {
       final result = await ref.read(app_state
           .searchProvider(app_state.SearchPageKey(
@@ -219,38 +127,11 @@ class _ResultPageState extends ConsumerState<ResultPage> {
           ))
           .future);
       if (!mounted) return;
-      final pageBooks = view == null
-          ? result.books
-          : (result.booksBySource[view] ?? result.books);
-      setState(() {
-        final list = _viewBooks[key] ??= <BookData>[];
-        final seen = _viewSeen[key] ??= <String>{};
-        for (final book in pageBooks) {
-          if (seen.add(book.md5)) list.add(book);
-        }
-        _viewPages[key] = nextPage;
-        if (pageBooks.isEmpty) _viewEnded.add(key);
-
-        // An "all sources" page contains every source's page too; keep
-        // the single-source caches in step so switching does not throw
-        // away pages already downloaded.
-        if (view == null) {
-          for (final entry in result.booksBySource.entries) {
-            final sourceKey = entry.key.name;
-            final sourceList = _viewBooks[sourceKey] ??= <BookData>[];
-            final sourceSeen = _viewSeen[sourceKey] ??= <String>{};
-            for (final book in entry.value) {
-              if (sourceSeen.add(book.md5)) sourceList.add(book);
-            }
-            _viewPages[sourceKey] = nextPage;
-            if (entry.value.isEmpty) _viewEnded.add(sourceKey);
-          }
-        }
-        _fetchingNextPage = false;
-      });
+      setState(() =>
+          _pager.appendPage(page: nextPage, view: view, result: result));
     } catch (_) {
       if (!mounted) return;
-      setState(() => _fetchingNextPage = false);
+      setState(() => _pager.fetchingNextPage = false);
     }
   }
 
@@ -281,7 +162,8 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     );
     if (selected == null || selected == current) return;
     ref.read(app_state.selectedSortState.notifier).state = selected;
-    await MyLibraryDb.instance.savePreference('filterSort', selected);
+    await PreferencesService()
+        .saveSearchFilter(SearchFilterKind.sort, selected);
     _retryPageOne();
   }
 
@@ -337,15 +219,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
   }
 
   void _resetLocalPager() {
-    setState(() {
-      _viewBooks.clear();
-      _viewSeen.clear();
-      _viewPages.clear();
-      _viewEnded.clear();
-      _firstResult = null;
-      _fetchingNextPage = false;
-      _selectedSource = widget.source;
-    });
+    setState(_pager.reset);
   }
 
   void _clearFiltersAndRetry() {
@@ -370,13 +244,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
 
   Future<void> _persistFilterDefaults() async {
     try {
-      await Future.wait([
-        MyLibraryDb.instance.savePreference('filterType', 'All'),
-        MyLibraryDb.instance.savePreference('filterSort', 'Most Relevant'),
-        MyLibraryDb.instance.savePreference('filterFileType', 'All'),
-        MyLibraryDb.instance.savePreference('filterLanguage', 'All'),
-        MyLibraryDb.instance.savePreference('filterYear', 'All'),
-      ]);
+      await PreferencesService().resetSearchFilters();
     } catch (_) {
       // In-memory filters already reset; persistence is a convenience.
     }
@@ -409,10 +277,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
 
   void _selectSource(SearchProviderId? source) {
     if (_selectedSource == source) return;
-    setState(() {
-      _selectedSource = source;
-      _fetchingNextPage = false;
-    });
+    setState(() => _pager.selectSource(source));
   }
 
   void _openBook(BookData book) {
@@ -515,7 +380,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
     required String sortLabel,
   }) {
     final l10n = AppLocalizations.of(context);
-    final allCount = _viewBooks[_viewKey(null)]?.length ?? result.books.length;
+    final allCount = _pager.booksFor(null).length;
 
     SearchSourceRun? selectedRun;
     for (final run in result.sources) {
@@ -567,7 +432,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
       formatFilters: _formatFilters,
       languageFilters: _languageFilters,
       fetchingNextPage: _fetchingNextPage,
-      reachedEnd: _viewEnded.contains(_viewKey(_selectedSource)),
+      reachedEnd: _pager.currentViewEnded,
       scrollController: _scrollController,
       onSelectSource: _selectSource,
       onOpenSourceSheet: () => _openSourceSheet(result),
