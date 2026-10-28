@@ -13,11 +13,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/data/services/slum_catalogue.dart';
+import 'package:openlib/state/repository_providers.dart'
+    show mirrorRepositoryProvider;
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/instances_page.dart';
+
+class _FakeTester extends MirrorLatencyTester {
+  _FakeTester(this.onMeasure);
+
+  final Future<Map<String, int?>> Function(Iterable<String>) onMeasure;
+
+  @override
+  Future<Map<String, int?>> measure(Iterable<String> urls) => onMeasure(urls);
+}
 
 InstanceManager _manager(MemoryPreferenceStore store) =>
     InstanceManager.forTest(
@@ -59,22 +72,27 @@ Future<void> _pumpPage(
   WidgetTester tester, {
   required InstanceManager manager,
   required List<InstanceView> views,
-  required MirrorLatencyMeasure measure,
+  required Future<Map<String, int?>> Function(Iterable<String>) measure,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
+  final repository = MirrorRepository(
+    manager: manager,
+    tester: _FakeTester(measure),
+  );
+
   await tester.pumpWidget(ProviderScope(
     overrides: [
-      instanceManagerProvider.overrideWithValue(manager),
+      mirrorRepositoryProvider.overrideWithValue(repository),
       serviceInstancesProvider.overrideWith(
         (ref, service) async =>
             service == MirrorService.zlibrary ? views : const <InstanceView>[],
       ),
       mirrorLatencyProvider.overrideWith(
-        (ref) => MirrorLatencyNotifier(manager, measure),
+        (ref) => MirrorLatencyNotifier(repository),
       ),
     ],
     child: MaterialApp(

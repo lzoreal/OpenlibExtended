@@ -29,6 +29,7 @@ import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/download_manager.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/stream_throttle.dart';
 import 'package:openlib/state/repository_providers.dart';
 // Assuming OpenLibrary, Goodreads, PenguinRandomHouse, BookDigits, and SubCategoriesTypeList are defined
@@ -289,10 +290,6 @@ final backgroundVerificationProvider = StateProvider<bool>((ref) => true);
 // Settings > Mirrors and orders the list by hand.
 final instanceAutoModeProvider = StateProvider<bool>((ref) => true);
 
-// Instance Management States
-final instanceManagerProvider =
-    Provider<InstanceManager>((ref) => InstanceManager());
-
 // Download Manager States
 final downloadManagerProvider = Provider<DownloadRepository>((ref) {
   return ref.watch(downloadRepositoryProvider);
@@ -314,7 +311,7 @@ final activeDownloadsProvider =
 /// shown in Settings > Mirrors.
 final serviceInstancesProvider =
     FutureProvider.family<List<InstanceView>, MirrorService>((ref, service) {
-  return ref.watch(instanceManagerProvider).instances(service);
+  return ref.watch(mirrorRepositoryProvider).instances(service);
 });
 
 @immutable
@@ -375,26 +372,21 @@ class MirrorLatencyResult {
   final int? fastestMs;
 }
 
-typedef MirrorLatencyMeasure = Future<Map<String, int?>> Function(
-    Iterable<String> urls);
-
 /// Runs one manual latency test over the enabled, non-down mirrors and
 /// persists the readings. The page owns the trigger; this class owns the
 /// filtering, in-flight state and storage merge.
 class MirrorLatencyNotifier extends StateNotifier<MirrorLatencyState> {
   MirrorLatencyNotifier(
-    this._manager,
-    this._measure, {
+    this._repository, {
     DateTime Function()? clock,
   })  : _clock = clock ?? DateTime.now,
         super(const MirrorLatencyState());
 
-  final InstanceManager _manager;
-  final MirrorLatencyMeasure _measure;
+  final MirrorRepository _repository;
   final DateTime Function() _clock;
 
   Future<void> load() async {
-    final readings = await _manager.localLatencies();
+    final readings = await _repository.localLatencies();
     if (mounted) state = state.copyWith(readings: readings, loaded: true);
   }
 
@@ -416,9 +408,10 @@ class MirrorLatencyNotifier extends StateNotifier<MirrorLatencyState> {
     final hosts = targets.map((site) => site.host).toSet();
     state = state.copyWith(testing: true, testingHosts: hosts);
     try {
-      final results = await _measure(targets.map((site) => site.url));
-      await _manager.saveLocalLatencies(results, testedAt: _clock());
-      final readings = await _manager.localLatencies();
+      final results =
+          await _repository.measureLatency(targets.map((site) => site.url));
+      await _repository.saveLocalLatencies(results, testedAt: _clock());
+      final readings = await _repository.localLatencies();
       if (mounted) {
         state = MirrorLatencyState(readings: readings, loaded: true);
       }
@@ -449,10 +442,7 @@ class MirrorLatencyNotifier extends StateNotifier<MirrorLatencyState> {
 
 final mirrorLatencyProvider =
     StateNotifierProvider<MirrorLatencyNotifier, MirrorLatencyState>((ref) {
-  return MirrorLatencyNotifier(
-    ref.watch(instanceManagerProvider),
-    MirrorLatencyTester().measure,
-  );
+  return MirrorLatencyNotifier(ref.watch(mirrorRepositoryProvider));
 });
 
 /// The Anna's Archive base URL the "open in site" button uses, or null
@@ -465,7 +455,7 @@ final mirrorLatencyProvider =
 /// stub the mirror.
 final annaArchiveBaseUrlProvider = FutureProvider<String?>((ref) async {
   final urls = await ref
-      .watch(instanceManagerProvider)
+      .watch(mirrorRepositoryProvider)
       .enabledUrls(MirrorService.annasArchive);
   if (urls.isEmpty) return null;
   final base = urls.first;

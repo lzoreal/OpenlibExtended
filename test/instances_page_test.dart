@@ -18,9 +18,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/data/services/slum_catalogue.dart';
+import 'package:openlib/state/repository_providers.dart'
+    show mirrorRepositoryProvider;
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/instances_page.dart';
 
@@ -41,7 +44,8 @@ InstanceManager _manager() => InstanceManager.forTest(
 Future<void> _pumpPage(WidgetTester tester, InstanceManager instanceManager) {
   return tester.pumpWidget(ProviderScope(
     overrides: [
-      instanceManagerProvider.overrideWithValue(instanceManager),
+      mirrorRepositoryProvider
+          .overrideWithValue(MirrorRepository(manager: instanceManager)),
       serviceInstancesProvider
           .overrideWith((ref, service) async => const <InstanceView>[]),
     ],

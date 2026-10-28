@@ -11,6 +11,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
 import 'package:openlib/l10n/app_localizations.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
+import 'package:openlib/data/services/instance_manager.dart';
+import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/state/repository_providers.dart'
+    show mirrorRepositoryProvider;
 import 'package:openlib/ui/categories_page.dart';
 import 'package:openlib/ui/search_page.dart';
 
@@ -33,6 +38,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          // The page resolves its mirrors through DI; tests do not run initDi.
+          mirrorRepositoryProvider.overrideWithValue(MirrorRepository(
+            manager: InstanceManager.forTest(store: MemoryPreferenceStore()),
+          )),
+        ],
         child: MaterialApp(
           locale: const Locale('zh'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,

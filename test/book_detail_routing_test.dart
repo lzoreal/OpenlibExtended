@@ -16,12 +16,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/book_detail_routing.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/data/services/slum_catalogue.dart';
-import 'package:openlib/state/state.dart'
-    show annaArchiveBaseUrlProvider, instanceManagerProvider;
+import 'package:openlib/state/repository_providers.dart'
+    show mirrorRepositoryProvider;
+import 'package:openlib/state/state.dart' show annaArchiveBaseUrlProvider;
 
 /// An open-slum.org page in the shape the catalogue parses.
 String _slumPage(List<String> origins) {
@@ -152,7 +154,8 @@ void main() {
       // which started catalogue I/O that widget tests could not settle.
       final container = ProviderContainer(
         overrides: [
-          instanceManagerProvider.overrideWithValue(managerFor(catalogue)),
+          mirrorRepositoryProvider.overrideWithValue(
+              MirrorRepository(manager: managerFor(catalogue))),
         ],
       );
       addTearDown(container.dispose);
@@ -180,7 +183,8 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
-          instanceManagerProvider.overrideWithValue(managerFor(empty)),
+          mirrorRepositoryProvider
+              .overrideWithValue(MirrorRepository(manager: managerFor(empty))),
         ],
       );
       addTearDown(container.dispose);

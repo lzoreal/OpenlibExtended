@@ -9,11 +9,21 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 
 // Project imports:
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/preference_store.dart';
 import 'package:openlib/data/services/slum_catalogue.dart';
 import 'package:openlib/state/state.dart';
+
+class _FakeTester extends MirrorLatencyTester {
+  _FakeTester(this.onMeasure);
+
+  final Future<Map<String, int?>> Function(Iterable<String>) onMeasure;
+
+  @override
+  Future<Map<String, int?>> measure(Iterable<String> urls) => onMeasure(urls);
+}
 
 InstanceManager _manager(MemoryPreferenceStore store) =>
     InstanceManager.forTest(
@@ -22,6 +32,15 @@ InstanceManager _manager(MemoryPreferenceStore store) =>
         baseUrl: 'http://127.0.0.1:9',
       ),
       store: store,
+    );
+
+MirrorRepository _repository(
+  InstanceManager manager, [
+  Future<Map<String, int?>> Function(Iterable<String>)? measure,
+]) =>
+    MirrorRepository(
+      manager: manager,
+      tester: _FakeTester(measure ?? (urls) async => <String, int?>{}),
     );
 
 InstanceView _view(
@@ -46,10 +65,7 @@ void main() {
     final manager = _manager(store);
     await manager.saveLocalLatencies({'a.com': 85});
 
-    final notifier = MirrorLatencyNotifier(
-      manager,
-      (urls) async => <String, int?>{},
-    );
+    final notifier = MirrorLatencyNotifier(_repository(manager));
     await notifier.load();
 
     expect(notifier.state.readings['a.com']?.milliseconds, 85);
@@ -101,10 +117,10 @@ void main() {
     final store = MemoryPreferenceStore();
     final manager = _manager(store);
     List<String>? requested;
-    final notifier = MirrorLatencyNotifier(manager, (urls) async {
+    final notifier = MirrorLatencyNotifier(_repository(manager, (urls) async {
       requested = urls.toList();
       return {'a.com': 85};
-    });
+    }));
 
     final result = await notifier.test([
       _view('a.com'),
@@ -126,8 +142,7 @@ void main() {
     final manager = _manager(store);
     final completer = Completer<Map<String, int?>>();
     final notifier = MirrorLatencyNotifier(
-      manager,
-      (urls) => completer.future,
+      _repository(manager, (urls) => completer.future),
     );
 
     final running = notifier.test([_view('a.com'), _view('b.com')]);
@@ -147,10 +162,10 @@ void main() {
     final store = MemoryPreferenceStore();
     final manager = _manager(store);
     var called = false;
-    final notifier = MirrorLatencyNotifier(manager, (urls) async {
+    final notifier = MirrorLatencyNotifier(_repository(manager, (urls) async {
       called = true;
       return <String, int?>{};
-    });
+    }));
 
     final result = await notifier.test([
       _view('a.com', enabled: false),
@@ -167,8 +182,7 @@ void main() {
     final store = MemoryPreferenceStore();
     final manager = _manager(store);
     final notifier = MirrorLatencyNotifier(
-      manager,
-      (urls) async => {'a.com': null},
+      _repository(manager, (urls) async => {'a.com': null}),
     );
 
     final result = await notifier.test([_view('a.com')]);
@@ -183,8 +197,7 @@ void main() {
     final manager = _manager(store);
     await manager.saveLocalLatencies({'b.com': 50});
     final notifier = MirrorLatencyNotifier(
-      manager,
-      (urls) async => {'a.com': 85},
+      _repository(manager, (urls) async => {'a.com': 85}),
     );
 
     await notifier.test([_view('a.com')]);

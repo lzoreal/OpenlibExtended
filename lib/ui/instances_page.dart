@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
+import 'package:openlib/state/repository_providers.dart'
+    show mirrorRepositoryProvider;
 import 'package:openlib/state/state.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/settings_row.dart';
@@ -39,7 +41,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     // The manager persists the mode; the switch must show the value the
     // manager will actually apply, or a restart in manual mode displays
     // "Automatic mirror order" while using the user's pinned order.
-    ref.read(instanceManagerProvider).isAutoMode().then((auto) {
+    ref.read(mirrorRepositoryProvider).isAutoMode().then((auto) {
       if (mounted && auto != ref.read(instanceAutoModeProvider)) {
         ref.read(instanceAutoModeProvider.notifier).state = auto;
       }
@@ -84,7 +86,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
     try {
-      final result = await ref.read(instanceManagerProvider).refresh();
+      final result = await ref.read(mirrorRepositoryProvider).refresh();
       if (!mounted) return;
       for (final service in _serviceOrder) {
         ref.invalidate(serviceInstancesProvider(service));
@@ -225,7 +227,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
         trailing: Switch(
           value: autoMode,
           onChanged: (value) async {
-            await ref.read(instanceManagerProvider).setAutoMode(value);
+            await ref.read(mirrorRepositoryProvider).setAutoMode(value);
             ref.read(instanceAutoModeProvider.notifier).state = value;
             for (final service in _serviceOrder) {
               ref.invalidate(serviceInstancesProvider(service));
@@ -396,7 +398,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                         ? null
                         : (value) async {
                             await ref
-                                .read(instanceManagerProvider)
+                                .read(mirrorRepositoryProvider)
                                 .setEnabled(service, site.host, value);
                             ref.invalidate(serviceInstancesProvider(service));
                           },
@@ -454,7 +456,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                                 ? null
                                 : () async {
                                     await ref
-                                        .read(instanceManagerProvider)
+                                        .read(mirrorRepositoryProvider)
                                         .move(service, site.host, -1);
                                     ref.invalidate(
                                         serviceInstancesProvider(service));
@@ -469,7 +471,7 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                                 ? null
                                 : () async {
                                     await ref
-                                        .read(instanceManagerProvider)
+                                        .read(mirrorRepositoryProvider)
                                         .move(service, site.host, 1);
                                     ref.invalidate(
                                         serviceInstancesProvider(service));

@@ -15,12 +15,13 @@ import 'package:openlib/data/services/google_suggest_api.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/mirror_latency.dart';
 import 'package:openlib/data/services/recent_searches.dart';
+import 'package:openlib/state/repository_providers.dart'
+    show mirrorRepositoryProvider;
 import 'package:openlib/state/state.dart'
     show
         enableFiltersState,
         fileType,
         getTrendingBooks,
-        instanceManagerProvider,
         languageValues,
         mirrorLatencyProvider,
         searchAuthorProvider,
@@ -106,10 +107,10 @@ class _SearchPageState extends ConsumerState<SearchPage>
 
     final l10n = AppLocalizations.of(context);
     try {
-      final manager = ref.read(instanceManagerProvider);
+      final repository = ref.read(mirrorRepositoryProvider);
       final views = <InstanceView>[];
       for (final service in MirrorService.values) {
-        views.addAll(await manager.instances(service));
+        views.addAll(await repository.instances(service));
       }
 
       final result = await ref.read(mirrorLatencyProvider.notifier).test(views);

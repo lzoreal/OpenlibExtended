@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
 import 'package:openlib/data/repositories/library_repository.dart';
+import 'package:openlib/data/repositories/mirror_repository.dart';
 import 'package:openlib/data/repositories/search_repository.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/download_manager.dart';
@@ -31,6 +32,7 @@ Future<void> initDi({
   getIt.registerLazySingleton<DownloadManager>(() => DownloadManager());
   getIt.registerLazySingleton<DownloadRepository>(
       () => DownloadRepository(manager: getIt<DownloadManager>()));
+  getIt.registerLazySingleton<MirrorRepository>(() => MirrorRepository());
 }
 
 Future<void> resetDi() => getIt.reset();
