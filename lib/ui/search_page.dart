@@ -9,10 +9,10 @@ import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
-import 'package:openlib/services/database.dart';
 import 'package:openlib/services/google_suggest_api.dart';
 import 'package:openlib/services/instance_manager.dart';
 import 'package:openlib/services/mirror_latency.dart';
+import 'package:openlib/services/preferences.dart';
 import 'package:openlib/services/recent_searches.dart';
 import 'package:openlib/state/state.dart'
     show
@@ -254,13 +254,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
 
   Future<void> _persistFilterDefaults() async {
     try {
-      await Future.wait([
-        MyLibraryDb.instance.savePreference('filterType', 'All'),
-        MyLibraryDb.instance.savePreference('filterSort', 'Most Relevant'),
-        MyLibraryDb.instance.savePreference('filterFileType', 'All'),
-        MyLibraryDb.instance.savePreference('filterLanguage', 'All'),
-        MyLibraryDb.instance.savePreference('filterYear', 'All'),
-      ]);
+      await PreferencesService().resetSearchFilters();
     } catch (_) {
       // The in-memory filters are already reset; persistence is best-effort.
     }
@@ -801,7 +795,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     );
     if (selected == null) return;
     ref.read(selectedTypeState.notifier).state = selected;
-    await MyLibraryDb.instance.savePreference('filterType', selected);
+    await PreferencesService()
+        .saveSearchFilter(SearchFilterKind.type, selected);
   }
 
   Future<void> _pickYear() async {
@@ -815,7 +810,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     );
     if (selected == null) return;
     ref.read(selectedYearState.notifier).state = selected;
-    await MyLibraryDb.instance.savePreference('filterYear', selected);
+    await PreferencesService()
+        .saveSearchFilter(SearchFilterKind.year, selected);
   }
 
   Future<void> _pickLanguage() async {
@@ -829,7 +825,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
     );
     if (selected == null) return;
     ref.read(selectedLanguageState.notifier).state = selected;
-    await MyLibraryDb.instance.savePreference('filterLanguage', selected);
+    await PreferencesService()
+        .saveSearchFilter(SearchFilterKind.language, selected);
   }
 
   void _reset() {
@@ -969,8 +966,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                       selected: fileTypeValue == value,
                       onTap: () {
                         ref.read(selectedFileTypeState.notifier).state = value;
-                        MyLibraryDb.instance
-                            .savePreference('filterFileType', value);
+                        PreferencesService().saveSearchFilter(
+                            SearchFilterKind.fileType, value);
                       },
                     ),
                 ],
@@ -988,8 +985,8 @@ class _AdvancedSearchTabState extends ConsumerState<_AdvancedSearchTab> {
                       selected: sortValue == value,
                       onTap: () {
                         ref.read(selectedSortState.notifier).state = value;
-                        MyLibraryDb.instance
-                            .savePreference('filterSort', value);
+                        PreferencesService()
+                            .saveSearchFilter(SearchFilterKind.sort, value);
                       },
                     ),
                 ],

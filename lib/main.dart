@@ -16,6 +16,7 @@ import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/database.dart' show MyLibraryDb;
 import 'package:openlib/services/platform_utils.dart';
+import 'package:openlib/services/preferences.dart';
 import 'package:openlib/services/challenge_html_cache.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 import 'package:openlib/services/update_checker.dart';
@@ -109,27 +110,8 @@ void main(List<String> args) async {
   String browserUserAgent = await dataBase.getBrowserOptions('userAgent');
   String browserCookie = await dataBase.getBrowserOptions('cookie');
 
-  // Load search filter preferences
-  String savedType = await dataBase
-          .getPreference('filterType')
-          .catchError((e) => 'All') as String? ??
-      'All';
-  String savedSort = await dataBase
-          .getPreference('filterSort')
-          .catchError((e) => 'Most Relevant') as String? ??
-      'Most Relevant';
-  String savedFileType = await dataBase
-          .getPreference('filterFileType')
-          .catchError((e) => 'All') as String? ??
-      'All';
-  String savedLanguage = await dataBase
-          .getPreference('filterLanguage')
-          .catchError((e) => 'All') as String? ??
-      'All';
-  String savedYear = await dataBase
-          .getPreference('filterYear')
-          .catchError((e) => 'All') as String? ??
-      'All';
+  final savedFilters =
+      await PreferencesService(database: dataBase).loadSearchFilters();
 
   String savedDonationKey = await dataBase
           .getPreference('donationKey')
@@ -200,11 +182,11 @@ void main(List<String> args) async {
         donationKeyProvider.overrideWith((ref) => savedDonationKey),
         userAgentProvider.overrideWith((ref) => browserUserAgent),
         cookieProvider.overrideWith((ref) => browserCookie),
-        selectedTypeState.overrideWith((ref) => savedType),
-        selectedSortState.overrideWith((ref) => savedSort),
-        selectedFileTypeState.overrideWith((ref) => savedFileType),
-        selectedLanguageState.overrideWith((ref) => savedLanguage),
-        selectedYearState.overrideWith((ref) => savedYear),
+        selectedTypeState.overrideWith((ref) => savedFilters.type),
+        selectedSortState.overrideWith((ref) => savedFilters.sort),
+        selectedFileTypeState.overrideWith((ref) => savedFilters.fileType),
+        selectedLanguageState.overrideWith((ref) => savedFilters.language),
+        selectedYearState.overrideWith((ref) => savedFilters.year),
       ],
       child: MyApp(
         onboardingCompleted: onboardingCompleted,

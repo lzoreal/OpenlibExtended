@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlib/main.dart' show MainScreen;
+import 'package:openlib/services/book_import.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/files.dart';
 import 'package:openlib/state/state.dart';
-import 'package:openlib/ui/settings_page.dart' show scanAndImportBooks;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -140,7 +140,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       // Scan new directory
       if (mounted) {
         final db = MyLibraryDb.instance;
-        await scanAndImportBooks(_storagePath, db, ref);
+        final imported = await importBooksFromDirectory(_storagePath, db);
+        if (imported > 0) {
+          // ignore: unused_result
+          ref.refresh(myLibraryProvider);
+        }
       }
     }
   }

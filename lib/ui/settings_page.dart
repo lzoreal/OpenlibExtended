@@ -11,21 +11,21 @@ import 'package:openlib/services/backup_service.dart';
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:device_info_plus/device_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/services/files.dart';
 import 'package:openlib/services/platform_utils.dart';
 import 'package:openlib/services/update_checker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 // Project imports:
-import 'package:openlib/services/book_format.dart';
+import 'package:openlib/services/book_import.dart';
 import 'package:openlib/services/database.dart';
 import 'package:openlib/services/logger.dart';
+import 'package:openlib/services/preferences.dart';
 import 'package:openlib/services/search_manager.dart';
+import 'package:openlib/services/storage_permission.dart';
 import 'package:openlib/services/webview_challenge_solver.dart';
 import 'package:openlib/ui/components/content_width.dart';
 import 'package:openlib/ui/components/page_header.dart';
@@ -51,90 +51,6 @@ import 'package:openlib/state/state.dart'
         searchSourceOrderProvider,
         localeOverrideProvider,
         downloadManagerProvider;
-
-// Scans a directory for book files (epub, pdf) and imports them to the library database
-Future<void> scanAndImportBooks(
-    String directoryPath, MyLibraryDb database, WidgetRef ref) async {
-  try {
-    final directory = Directory(directoryPath);
-    if (!await directory.exists()) return;
-
-    final files = directory.listSync(recursive: false);
-    int importedCount = 0;
-
-    for (var entity in files) {
-      if (entity is File) {
-        final fileName = entity.path.split(Platform.pathSeparator).last;
-        final extension = fileName.split('.').last.toLowerCase();
-
-        if (isSupportedBookFormat(extension)) {
-          // Extract the md5 hash from the filename (the part before the extension)
-          final parts = fileName.split('.');
-          if (parts.length >= 2) {
-            final md5 = parts.sublist(0, parts.length - 1).join('.');
-
-            // Check if this book already exists in the database
-            final exists = await database.checkIdExists(md5);
-            if (!exists) {
-              // Create a minimal book entry for the imported file
-              final book = MyBook(
-                id: md5,
-                title:
-                    md5, // Use filename as title since we don't have metadata
-                author: "Unknown",
-                thumbnail: "",
-                link: "",
-                publisher: "",
-                info: "",
-                description: "",
-                format: extension,
-              );
-              await database.insert(book);
-              importedCount++;
-            }
-          }
-        }
-      }
-    }
-
-    // Refresh the library provider to show new books
-    if (importedCount > 0) {
-      // ignore: unused_result
-      ref.refresh(myLibraryProvider);
-    }
-  } catch (e) {
-    // Silently fail - don't interrupt user flow
-  }
-}
-
-Future<void> requestStoragePermission() async {
-  // Desktop platforms don't require runtime storage permissions
-  if (PlatformUtils.isDesktop) return;
-
-  // Check whether the device is running Android 11 or higher
-  DeviceInfoPlugin plugin = DeviceInfoPlugin();
-  AndroidDeviceInfo android = await plugin.androidInfo;
-  // Android < 11
-  if (android.version.sdkInt < 33) {
-    if (await Permission.storage.request().isGranted) {
-      // Permission granted
-    } else if (await Permission.storage.request().isPermanentlyDenied) {
-      await openAppSettings();
-    }
-  }
-  // Android > 11
-  else {
-    if (await Permission.manageExternalStorage.request().isGranted) {
-      // Permission granted
-    } else if (await Permission.manageExternalStorage
-        .request()
-        .isPermanentlyDenied) {
-      await openAppSettings();
-    } else if (await Permission.manageExternalStorage.request().isDenied) {
-      // Permission denied
-    }
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Shared building blocks: every settings row renders through these, so all
@@ -266,15 +182,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   // Kept on the State instead of being rebuilt in build(): a new future
   // per build meant a database query and a platform-channel call every
   // time the page rebuilt, including while switching tabs.
-  late Future<dynamic> _storageDirectory = _readStorageDirectory();
+  late Future<String?> _storageDirectory = _readStorageDirectory();
   late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
-  Future<dynamic> _readStorageDirectory() async {
-    try {
-      return await MyLibraryDb.instance.getPreference('bookStorageDirectory');
-    } catch (_) {
-      return null;
-    }
+  Future<String?> _readStorageDirectory() {
+    return PreferencesService().bookStorageDirectory();
   }
 
   @override
@@ -414,10 +326,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                   subtitle: subtitle,
                   icon: Icons.folder,
                   onTap: () async {
-                    final currentDirectory =
-                        await dataBase.getPreference('bookStorageDirectory');
                     String? pickedDirectory = await pickBookStorageDirectory();
                     if (pickedDirectory == null) return;
+                    final currentDirectory =
+                        await PreferencesService().bookStorageDirectory() ??
+                            pickedDirectory;
                     await requestStoragePermission();
 
                     if (currentDirectory != pickedDirectory) {
@@ -426,7 +339,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
 
                     await dataBase.savePreference(
                         'bookStorageDirectory', pickedDirectory);
-                    await scanAndImportBooks(pickedDirectory, dataBase, ref);
+                    await importBooksFromDirectory(
+                        pickedDirectory, dataBase);
                     // ignore: unused_result
                     ref.refresh(myLibraryProvider);
                     if (!mounted) return;
