@@ -7,6 +7,7 @@ import 'package:openlib/l10n/app_localizations.dart';
 
 // Project imports:
 import 'package:openlib/data/models/book_data.dart';
+import 'package:openlib/data/models/download_refusal.dart';
 import 'package:openlib/data/services/share_book.dart';
 import 'package:openlib/ui/core/components/book_info_widget.dart';
 import 'package:openlib/ui/features/book_detail/view_models/book_detail_view_model.dart';
@@ -345,16 +346,22 @@ class _DetailActionBar extends StatelessWidget {
     );
   }
 
-  /// A mirror's own reason beats the generic "no mirrors"; the two WeLib
-  /// codes stand in for strings the view model cannot localize.
-  String _refusalMessage(AppLocalizations l10n, String? refusal) {
-    if (refusal == null) return l10n.noMirrors;
-    if (refusal == BookDetailViewModel.welibNoDownloadLinkRefusal) {
-      return l10n.welibNoDownloadLink;
-    }
-    if (refusal == BookDetailViewModel.welibPageUnreadableRefusal) {
-      return l10n.welibPageUnreadable;
-    }
-    return refusal;
-  }
+  String _refusalMessage(AppLocalizations l10n, String? refusal) =>
+      refusalMessage(l10n, refusal);
+}
+
+/// A mirror's own reason beats the generic "no mirrors". Providers return
+/// stable codes; only an unknown code falls through as raw text.
+String refusalMessage(AppLocalizations l10n, String? refusal) {
+  return switch (refusal) {
+    null => l10n.noMirrors,
+    DownloadRefusal.welibNoDownloadLink => l10n.welibNoDownloadLink,
+    DownloadRefusal.welibPageUnreadable => l10n.welibPageUnreadable,
+    DownloadRefusal.welibRateLimit => l10n.welibRateLimit,
+    DownloadRefusal.welibBotCheck => l10n.welibBotCheck,
+    DownloadRefusal.zlibDailyLimit => l10n.zlibDailyLimit,
+    DownloadRefusal.zlibSignIn => l10n.zlibSignIn,
+    DownloadRefusal.zlibNoDownloadLink => l10n.zlibNoDownloadLink,
+    _ => refusal,
+  };
 }

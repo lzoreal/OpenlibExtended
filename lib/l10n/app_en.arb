@@ -1527,6 +1527,26 @@
   "@welibNoDownloadLink": {
     "description": "UI text: WeLib did not offer a download link for this book."
   },
+  "zlibDailyLimit": "Z-Library has reached its daily download limit for your network. Try again tomorrow, or sign in to Z-Library in the app browser.",
+  "@zlibDailyLimit": {
+    "description": "UI text: zlibDailyLimit"
+  },
+  "zlibSignIn": "Z-Library asks you to sign in before downloading this book.",
+  "@zlibSignIn": {
+    "description": "UI text: zlibSignIn"
+  },
+  "zlibNoDownloadLink": "This Z-Library page did not offer a download link. The book may be restricted or removed.",
+  "@zlibNoDownloadLink": {
+    "description": "UI text: zlibNoDownloadLink"
+  },
+  "welibRateLimit": "WeLib is limiting downloads right now. Wait a few minutes and try again.",
+  "@welibRateLimit": {
+    "description": "UI text: welibRateLimit"
+  },
+  "welibBotCheck": "WeLib did not let the app through its bot check. Try again, or open the book in the app browser.",
+  "@welibBotCheck": {
+    "description": "UI text: welibBotCheck"
+  },
   "welibPageUnreadable": "Could not read the WeLib download page.",
   "@welibPageUnreadable": {
     "description": "UI text: Could not read the WeLib download page."

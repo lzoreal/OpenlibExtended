@@ -1170,6 +1170,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'WeLib did not offer a download link for this book.';
 
   @override
+  String get zlibDailyLimit =>
+      'Z-Library has reached its daily download limit for your network. Try again tomorrow, or sign in to Z-Library in the app browser.';
+
+  @override
+  String get zlibSignIn =>
+      'Z-Library asks you to sign in before downloading this book.';
+
+  @override
+  String get zlibNoDownloadLink =>
+      'This Z-Library page did not offer a download link. The book may be restricted or removed.';
+
+  @override
+  String get welibRateLimit =>
+      'WeLib is limiting downloads right now. Wait a few minutes and try again.';
+
+  @override
+  String get welibBotCheck =>
+      'WeLib did not let the app through its bot check. Try again, or open the book in the app browser.';
+
+  @override
   String get welibPageUnreadable => 'Could not read the WeLib download page.';
 
   @override

@@ -1117,6 +1117,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welibNoDownloadLink => 'WeLib 未提供此书的下载链接。';
 
   @override
+  String get zlibDailyLimit =>
+      'Z-Library 已达到此网络的每日下载上限。请明天再试，或在应用内浏览器登录 Z-Library 账号。';
+
+  @override
+  String get zlibSignIn => 'Z-Library 要求先登录才能下载这本书。';
+
+  @override
+  String get zlibNoDownloadLink => '这个 Z-Library 页面没有提供下载链接，书籍可能受限或已被删除。';
+
+  @override
+  String get welibRateLimit => 'WeLib 正在限制下载，请等待几分钟后重试。';
+
+  @override
+  String get welibBotCheck => 'WeLib 未让应用通过人机验证，请重试或在应用内浏览器打开这本书。';
+
+  @override
   String get welibPageUnreadable => '无法读取 WeLib 下载页面。';
 
   @override

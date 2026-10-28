@@ -15,6 +15,7 @@ import 'package:dio/dio.dart';
 // Project imports:
 import 'package:openlib/data/models/book_data.dart';
 import 'package:openlib/data/services/challenge_html_cache.dart';
+import 'package:openlib/data/models/download_refusal.dart';
 import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 
@@ -509,7 +510,7 @@ void main() {
         final result = await provider.resolveDownload(
             'http://127.0.0.1:${server.port}/slow_download/$_md5/0/0');
         expect(result.url, isNull);
-        expect(result.refusal, contains('rate-limiting'));
+        expect(result.refusal, DownloadRefusal.welibRateLimit);
       } finally {
         await server.close();
       }
@@ -535,7 +536,7 @@ void main() {
         final result = await provider.resolveDownload(
             'http://127.0.0.1:${server.port}/slow_download/$_md5/0/0');
         expect(result.url, isNull);
-        expect(result.refusal, contains('bot check'));
+        expect(result.refusal, DownloadRefusal.welibBotCheck);
       } finally {
         await server.close();
       }

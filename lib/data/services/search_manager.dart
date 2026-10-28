@@ -12,6 +12,7 @@ import 'package:html/parser.dart' as html_parser;
 
 // Project imports:
 import 'package:openlib/data/models/book_data.dart';
+import 'package:openlib/data/models/download_refusal.dart';
 import 'package:openlib/data/models/search_result.dart';
 import 'package:openlib/data/services/annas_archieve.dart';
 import 'package:openlib/data/services/book_format.dart';
@@ -759,8 +760,7 @@ class ZlibraryProvider implements SearchProvider {
     final links = await _allDownloadLinks(bookPageUrl);
     if (links.isEmpty) {
       return const ZlibraryDownload(
-          refusal: 'No download link found on the book page. '
-              'The book may have no files on this mirror.');
+          refusal: DownloadRefusal.zlibNoDownloadLink);
     }
 
     final acceptAnyStatus = Options(
@@ -931,14 +931,13 @@ class ZlibraryProvider implements SearchProvider {
 
     if (text.contains('downloads from your ip') ||
         text.contains('daily limit reached')) {
-      return 'Daily download limit reached for this network. '
-          'Sign in to Z-Library in the app browser, or try again tomorrow.';
+      return DownloadRefusal.zlibDailyLimit;
     }
     // Deliberately specific: every z-lib page carries a "Login" nav link,
     // so a bare 'login' match would mislabel any unrecognized page.
     if (text.contains('please sign in to your account') ||
         text.contains('registration to download')) {
-      return 'Z-Library asks to sign in before serving this file.';
+      return DownloadRefusal.zlibSignIn;
     }
     return null;
   }
@@ -1406,8 +1405,7 @@ class WelibProvider implements SearchProvider {
       // WeLib throttles anonymous clients by IP; a 429 is temporary.
       if (page.status == 429) {
         return const WelibDownload(
-          refusal: 'WeLib is rate-limiting downloads right now. '
-              'Wait a few minutes and try again.',
+          refusal: DownloadRefusal.welibRateLimit,
         );
       }
       // 403/503 is Cloudflare holding this client: the page is there, the
@@ -1415,8 +1413,7 @@ class WelibProvider implements SearchProvider {
       // Say that instead of blaming the book for having no link.
       if (page.status == 403 || page.status == 503) {
         return const WelibDownload(
-          refusal: 'WeLib did not let this client through its bot check. '
-              'Try again, or open the book in the app browser.',
+          refusal: DownloadRefusal.welibBotCheck,
         );
       }
       return const WelibDownload();

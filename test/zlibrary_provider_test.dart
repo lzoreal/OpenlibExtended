@@ -17,6 +17,7 @@ import 'package:dio/dio.dart';
 import 'package:openlib/data/services/diamwall_solver.dart';
 import 'package:openlib/data/services/instance_manager.dart';
 import 'package:openlib/data/services/preference_store.dart';
+import 'package:openlib/data/models/download_refusal.dart';
 import 'package:openlib/data/services/search_manager.dart';
 
 void main() {
@@ -394,7 +395,7 @@ void main() {
       expect(result.url, isNull);
       expect(result.refusal, isNotNull,
           reason: 'the limiter page names a reason the user can act on');
-      expect(result.refusal, contains('Daily download limit'));
+      expect(result.refusal, DownloadRefusal.zlibDailyLimit);
     });
 
     test('invents no reason when the page says nothing recognizable',

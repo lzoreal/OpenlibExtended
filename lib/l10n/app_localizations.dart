@@ -2216,6 +2216,36 @@ abstract class AppLocalizations {
   /// **'WeLib did not offer a download link for this book.'**
   String get welibNoDownloadLink;
 
+  /// UI text: zlibDailyLimit
+  ///
+  /// In en, this message translates to:
+  /// **'Z-Library has reached its daily download limit for your network. Try again tomorrow, or sign in to Z-Library in the app browser.'**
+  String get zlibDailyLimit;
+
+  /// UI text: zlibSignIn
+  ///
+  /// In en, this message translates to:
+  /// **'Z-Library asks you to sign in before downloading this book.'**
+  String get zlibSignIn;
+
+  /// UI text: zlibNoDownloadLink
+  ///
+  /// In en, this message translates to:
+  /// **'This Z-Library page did not offer a download link. The book may be restricted or removed.'**
+  String get zlibNoDownloadLink;
+
+  /// UI text: welibRateLimit
+  ///
+  /// In en, this message translates to:
+  /// **'WeLib is limiting downloads right now. Wait a few minutes and try again.'**
+  String get welibRateLimit;
+
+  /// UI text: welibBotCheck
+  ///
+  /// In en, this message translates to:
+  /// **'WeLib did not let the app through its bot check. Try again, or open the book in the app browser.'**
+  String get welibBotCheck;
+
   /// UI text: Could not read the WeLib download page.
   ///
   /// In en, this message translates to:

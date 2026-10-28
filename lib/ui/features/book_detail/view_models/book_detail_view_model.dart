@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:openlib/app/app_settings.dart';
 import 'package:openlib/app/di.dart';
 import 'package:openlib/data/models/book_data.dart';
+import 'package:openlib/data/models/download_refusal.dart';
 import 'package:openlib/data/models/my_book.dart';
 import 'package:openlib/data/repositories/book_info_repository.dart';
 import 'package:openlib/data/repositories/download_repository.dart';
@@ -93,8 +94,10 @@ class BookDetailViewModel extends ChangeNotifier {
 
   /// WeLib refusals the view model cannot localize; the page maps these
   /// codes back to its own strings.
-  static const welibNoDownloadLinkRefusal = 'welib:no-download-link';
-  static const welibPageUnreadableRefusal = 'welib:page-unreadable';
+  static const welibNoDownloadLinkRefusal =
+      DownloadRefusal.welibNoDownloadLink;
+  static const welibPageUnreadableRefusal =
+      DownloadRefusal.welibPageUnreadable;
 
   final String url;
   final String? source;
