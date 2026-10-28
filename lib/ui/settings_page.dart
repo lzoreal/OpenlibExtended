@@ -25,7 +25,6 @@ import 'package:openlib/data/services/book_import.dart';
 import 'package:openlib/data/services/database.dart';
 import 'package:openlib/data/services/logger.dart';
 import 'package:openlib/data/repositories/preferences_repository.dart';
-import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/storage_permission.dart';
 import 'package:openlib/data/services/webview_challenge_solver.dart';
 import 'package:openlib/ui/components/content_width.dart';
@@ -40,6 +39,8 @@ import 'package:openlib/ui/instances_page.dart';
 import 'package:openlib/ui/onboarding/onboarding_page.dart';
 import 'package:openlib/ui/themes.dart' show openlibColorScheme;
 
+import 'package:openlib/state/repository_providers.dart'
+    show searchRepositoryProvider;
 import 'package:openlib/state/state.dart'
     show
         themeModeProvider,
@@ -753,7 +754,6 @@ class _SearchProvidersWidget extends ConsumerWidget {
 
     return enabled.when(
       data: (enabledIds) {
-        final manager = SearchManager();
         final catalog = {
           SearchProviderId.annasArchive: (
             name: "Anna's Archive",
@@ -787,7 +787,7 @@ class _SearchProvidersWidget extends ConsumerWidget {
           // shifts everything after it, so the target index still lands
           // right in both directions.
           next.insert(targetIndex, dragged);
-          await manager.setSourceOrder(next);
+          await ref.read(searchRepositoryProvider).setSourceOrder(next);
           // ignore: unused_result
           ref.refresh(searchSourceOrderProvider);
         }
@@ -818,7 +818,9 @@ class _SearchProvidersWidget extends ConsumerWidget {
                           context: context, message: l10n.atLeastOneSource);
                       return;
                     }
-                    await manager.setProviderEnabled(id, !selected);
+                    await ref
+                        .read(searchRepositoryProvider)
+                        .setProviderEnabled(id, !selected);
                     // ignore: unused_result
                     ref.refresh(searchProviderToggles);
                   }

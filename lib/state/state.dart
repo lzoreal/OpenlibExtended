@@ -589,11 +589,11 @@ final searchProvider = FutureProvider.family
 
   // A provider failure must not swallow results from the others: the
   // manager returns what it got and lists the stragglers by name.
-  final manager = SearchManager();
-  final enabled = await manager.enabledProviders();
+  final repository = ref.watch(searchRepositoryProvider);
+  final enabled = await repository.enabledProviders();
   final source =
       key.source != null && enabled.contains(key.source) ? key.source : null;
-  final result = await manager.search(SearchQuery(
+  final result = await repository.search(SearchQuery(
     text: key.query,
     content: ref.watch(getTypeValue),
     sort: ref.watch(getSortValue),
@@ -628,7 +628,7 @@ final initialSearchProvider = StreamProvider.family
         const SearchManagerResult(books: [], failedProviders: []));
   }
   final enabledSource = key.source;
-  return SearchManager().watch(SearchQuery(
+  return ref.watch(searchRepositoryProvider).watch(SearchQuery(
     text: key.query,
     content: ref.watch(getTypeValue),
     sort: ref.watch(getSortValue),
@@ -645,13 +645,13 @@ final initialSearchProvider = StreamProvider.family
 
 // Which sources the user turned on in settings.
 final searchProviderToggles = FutureProvider<Set<SearchProviderId>>(
-    (ref) => SearchManager().enabledProviders());
+    (ref) => ref.watch(searchRepositoryProvider).enabledProviders());
 
 // The order the user dragged the sources into in settings. Shared by the
 // search capsules, the suggestions panel, the loading skeleton and the
 // manager's chain, so every surface shows the same journey.
 final searchSourceOrderProvider = FutureProvider<List<SearchProviderId>>(
-    (ref) => SearchManager().sourceOrder());
+    (ref) => ref.watch(searchRepositoryProvider).sourceOrder());
 
 // Provider for Book Info Details
 //

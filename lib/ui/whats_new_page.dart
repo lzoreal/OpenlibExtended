@@ -9,8 +9,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:openlib/l10n/app_localizations.dart';
 import 'package:openlib/main.dart' show MainScreen;
 import 'package:openlib/data/services/instance_manager.dart';
-import 'package:openlib/data/services/search_manager.dart';
 import 'package:openlib/data/services/update_checker.dart';
+import 'package:openlib/state/repository_providers.dart'
+    show searchRepositoryProvider;
 import 'package:openlib/ui/components/pill_tabs.dart';
 
 /// Shown once after an app upgrade (not on first install): what's
@@ -67,7 +68,7 @@ class _WhatsNewPageState extends ConsumerState<WhatsNewPage>
       final result = await InstanceManager().refresh();
       // Upgraders get every search provider back on: a stale saved
       // toggle list must not silently hide a new release's sources.
-      await SearchManager().enableAllProviders();
+      await ref.read(searchRepositoryProvider).enableAllProviders();
       if (mounted) {
         setState(() {
           _instancesUpdated = true;
