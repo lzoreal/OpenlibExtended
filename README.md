@@ -4,7 +4,7 @@
 
 # OpenlibExtended
 
-**The ultimate open-source cross-platform client for shadow libraries. <br/> Download, organize, and read your favorite books from Anna's Archive, LibGen, and Z-Library on any device.**
+**The open-source cross-platform client for shadow libraries. <br/> Search, download, and organize books from Anna's Archive, LibGen, Z-Library, and WeLib on Android, iOS, Windows, and Linux.**
 > Fork of [warreth/OpenlibExtended](https://github.com/warreth/OpenlibExtended), originally from [openlib](https://github.com/dstark5/Openlib).
 
 [![made-with-flutter](https://img.shields.io/badge/Made%20with-Flutter-4361ee.svg?style=for-the-badge)](https://flutter.dev/)
@@ -21,20 +21,23 @@
 
 ## Features ✨
 
-- **Cross-Platform Support**
-  Native performance on Android, iOS, Windows, Linux, and macOS.
+- **Four catalogues, one search**
+  Anna's Archive, LibGen, Z-Library, and WeLib are queried in parallel; results stream in as each source answers.
 
-- **Resilient Downloads**
-  Multi-instance engine automatically balances and fails over between mirrors to guarantee downloads.
+- **Resilient multi-mirror downloads**
+  Mirrors come from the SLUM catalogue, are ranked by an on-device latency test, and support resume, retry, and per-mirror failover.
 
-- **Advanced Search**
-  Filter by language, extension, and year. Includes instant search suggestions as you type.
+- **Nine ebook formats**
+  PDF, EPUB, MOBI, AZW3, FB2, DJVU, TXT, CBR, and CBZ are recognised end to end; downloaded books open in your preferred external reader.
 
-- **Built-in Reader**
-  Integrated EPUB and PDF reader with customizable tap zones and gesture support.
+- **Advanced filters**
+  Filter by language, file type, and publication year, with search suggestions as you type.
 
-- **Library Management**
-  Track your collection, discover trending books, and export files to other apps.
+- **Download centre**
+  Live progress, pause/resume, retry, batch delete, and completed records backed by a local SQLite library.
+
+- **Local-first data**
+  Library, download records, settings, and mirrors stay on device, with JSON backup and restore. Android builds also show download notifications.
 
 ## Star History ⭐️
 
@@ -42,11 +45,10 @@
 
 ## Roadmap 🎯
 
-- [ ] **Web Version**: Run OpenlibExtended directly in your browser.
-- [ ] **Cloud Sync**: Sync your library and reading progress with Booklore.
-- [ ] **Enhanced Formats**: Native support for CBR, CBZ, and AZW3.
+- [x] **Enhanced Formats**: PDF, EPUB, MOBI, AZW3, FB2, DJVU, TXT, CBR, and CBZ.
 - [ ] **Metadata Editor**: Fix and organize book details manually.
-- [ ] **MacOs release**
+- [ ] **Cloud Sync**: Sync your library and download records with Booklore.
+- [ ] **macOS release**: The macOS project exists but is not built or published yet.
 
 ## Screenshots 🖼️
 
@@ -77,6 +79,14 @@ Download the APK, IPA, AppImage, tar.gz or Windows installer directly from the [
 
 **Android:** releases ship per-ABI APKs — pick the one matching your device's architecture: `arm64-v8a` (most modern phones), `armeabi-v7a` (older 32-bit devices) or `x86_64` (emulators). Each APK contains only the native libraries for its architecture, keeping downloads roughly a third of a universal APK.
 
+**iOS:** the IPA is unsigned and must be sideloaded; in-app updates and notifications are unavailable.
+
+**Linux:** the AppImage and tar.gz builds require WebKitGTK 4.1 for mirror/challenge pages.
+
+**macOS:** the project is present but there is no published build yet.
+
+**Web:** not supported.
+
 **Note:** Publishing this app to the Play Store violates their terms.
 
 ## Development 🛠️
@@ -91,10 +101,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Donate 🎁
 
-If you like the app, consider supporting the original source or the development of this client.
+If you like the app, consider supporting the library itself, the upstream project, or the development of this fork.
 
 - [**Donate To Anna’s Archive**](https://annas-archive.org/donate?tier=1) (Support the library itself)
 - [**Sponsor the upstream maintainer on GitHub 💖**](https://github.com/sponsors/warreth) (Support the upstream project)
+- [**Sponsor this fork’s maintainer on GitHub 💖**](https://github.com/sponsors/lzoreal) (Support fork-specific work)
 
 ## License 📜
 

@@ -414,8 +414,8 @@ CI 只跑 `dart analyze lib/ test/` + `flutter test`（`.github/workflows/build.
 3. **版本号双轨**：`pubspec.yaml:19` 是 1.0.11+14；CI 在构建前把 `pubspec.yaml` 改成 tag 版本（`.github/workflows/build.yml:172` 等），所以发布包与 About 页正确，本地构建会显示旧版本。
 4. **搜索是并行聚合（设计约束）**：所有启用书源同时查询，按配置顺序合并并跨源去重；结果页用来源卡片切换单源视图。新增书源时不要把 UI 假设改回“顺序兜底、首个命中即停”。
 5. **分类目录硬编码**：28 个分类和 28 张远程封面写死在 `lib/ui/features/trending/views/categories_page.dart:31`；改分类需要发版，且依赖第三方 raw 图片。
-6. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`（`lib/main.dart:2`），README 仍把 Web 列为 roadmap（`README.md:45`）。
-7. **macOS 未进入发布流程**：有工程与 Podfile；CI 的 `build-ios` 跑在 macOS runner 上（`.github/workflows/build.yml:197`），但没有 macOS 桌面构建/签名/发布，README Roadmap 仍列 “MacOs release”（`README.md:49`）。
+6. **Web 端不可用**：`lib/main.dart` 直接 `import 'dart:io'`（`lib/main.dart:2`），没有 Web 构建，README 已标注不支持。
+7. **macOS 未进入发布流程**：有工程与 Podfile；CI 的 `build-ios` 跑在 macOS runner 上（`.github/workflows/build.yml:197`），但没有 macOS 桌面构建/签名/发布，README Roadmap 仍列 macOS release（`README.md:51`）。
 8. **Linux 后台抓镜像不可用**：`MirrorFetcherService` 在 Linux 直接返回空（`lib/data/services/mirror_fetcher.dart:27-30`），详情页因此走可见 WebView 手动流程（`lib/ui/features/book_detail/view_models/book_detail_view_model.dart:409`；入口 `lib/ui/features/book_detail/views/book_info_page.dart:306,352`）；过盾仍可用桌面窗口（需 WebKitGTK 4.1）。
 9. **备份不含书籍文件**：仅备份数据库表（`lib/data/services/backup_service.dart:41-57`），换机后需自行迁移书籍目录。
 10. **依赖锁有明确原因，不要随意升级**：`html: 0.15.6`、`permission_handler_android: 13.0.1`、`sqlite3_flutter_libs: ^0.5.42` 都是为兼容当前 Flutter/插件而钉死的（`pubspec.yaml:40,57,87`）。
